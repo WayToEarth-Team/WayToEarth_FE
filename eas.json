@@ -9,7 +9,8 @@
       "distribution": "internal",
       "env": {
         "GOOGLE_MAPS_API_KEY": "@GOOGLE_MAPS_API_KEY",
-        "KAKAO_NATIVE_APP_KEY": "@KAKAO_NATIVE_APP_KEY"
+        "KAKAO_NATIVE_APP_KEY": "@KAKAO_NATIVE_APP_KEY",
+        "ANDROID_MAPS_KEY": "@ANDROID_MAPS_KEY"
       },
       "android": { "buildType": "apk" }
     },
@@ -18,7 +19,8 @@
       "android": { "buildType": "apk" },
       "env": {
         "GOOGLE_MAPS_API_KEY": "@GOOGLE_MAPS_API_KEY",
-        "KAKAO_NATIVE_APP_KEY": "@KAKAO_NATIVE_APP_KEY"
+        "KAKAO_NATIVE_APP_KEY": "@KAKAO_NATIVE_APP_KEY",
+        "ANDROID_MAPS_KEY": "@ANDROID_MAPS_KEY"
       }
     },
     "production": {
@@ -26,7 +28,8 @@
       "android": { "buildType": "app-bundle" },
       "env": {
         "GOOGLE_MAPS_API_KEY": "@GOOGLE_MAPS_API_KEY",
-        "KAKAO_NATIVE_APP_KEY": "@KAKAO_NATIVE_APP_KEY"
+        "KAKAO_NATIVE_APP_KEY": "@KAKAO_NATIVE_APP_KEY",
+        "ANDROID_MAPS_KEY": "@ANDROID_MAPS_KEY"
       }
     }
   },
