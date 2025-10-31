@@ -284,6 +284,20 @@ export function isWatchAvailable(): boolean {
   return WayToEarthWear != null && typeof WayToEarthWear === 'object';
 }
 
+// Open companion app or Bluetooth settings to connect watch
+export async function openWatchConnectionUI(): Promise<boolean> {
+  try {
+    if (!isWatchAvailable()) return false;
+    if (typeof WayToEarthWear.openWearManager === 'function') {
+      const ok = await WayToEarthWear.openWearManager();
+      return !!ok;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 // JSON.parse with guard
 ;(JSON as any).parseSafe = (s: any) => { try { return JSON.parse(String(s)); } catch { return null; } };
 
@@ -297,4 +311,5 @@ export default {
   getRealtimeData,
   cleanupWatchSync,
   isWatchAvailable,
+  openWatchConnectionUI,
 };

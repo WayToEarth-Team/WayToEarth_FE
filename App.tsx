@@ -2,6 +2,7 @@
 import * as WebBrowser from "expo-web-browser";
 WebBrowser.maybeCompleteAuthSession();
 import React, { useEffect } from "react";
+import { NativeModules } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { navigationRef } from "./navigation/RootNavigation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -23,6 +24,7 @@ import Login from "./Pages/Login";
 import Main from "./Pages/Main";
 import RunSummaryScreen from "./Pages/RunSummaryscreen";
 import LiveRunningScreen from "./Pages/LiveRunningScreen";
+import RunningStartScreen from "./Pages/RunningStartScreen";
 import RunningComplete from "./Pages/RunningComplete";
 import JourneyRouteListScreen from "./Pages/JourneyRouteListScreen";
 import JourneyRouteDetailScreen from "./Pages/JourneyRouteDetailScreen";
@@ -60,7 +62,7 @@ function MainTabs() {
       tabBar={(props) => <TabBarAdapter {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="LiveRunningScreen" component={LiveRunningScreen} />
+      <Tab.Screen name="LiveRunningScreen" component={RunningStartScreen} />
       <Tab.Screen name="Feed" component={Feed2} />
       <Tab.Screen name="Record" component={Record} />
       <Tab.Screen name="Crew" component={CrewScreen} />
@@ -71,6 +73,17 @@ function MainTabs() {
 
 export default function App() {
   useEffect(() => {
+    // ===== 워치 모듈 디버깅 =====
+    console.log("===== NATIVE MODULES CHECK =====");
+    console.log("All modules:", Object.keys(NativeModules));
+    console.log("WayToEarthWear:", NativeModules.WayToEarthWear);
+    if (NativeModules.WayToEarthWear) {
+      console.log("WayToEarthWear methods:", Object.keys(NativeModules.WayToEarthWear));
+    } else {
+      console.error("❌ WayToEarthWear module NOT FOUND!");
+    }
+    console.log("================================");
+
     // Firebase FCM 토큰 등록 (Expo 서버 거치지 않음)
     (async () => {
       const token = await registerForPushNotificationsAsync();
@@ -133,6 +146,7 @@ export default function App() {
         <Stack.Screen name="LoginSuccess" component={LoginSuccessScreen} />
         <Stack.Screen name="Main" component={Main} />
         <Stack.Screen name="MainTabs" component={MainTabs} />
+        <Stack.Screen name="LiveRunning" component={LiveRunningScreen} />
 
         {/* 여정 러닝: 로딩/가이드/리스트/디테일/실행 */}
         <Stack.Screen name="JourneyLoading" component={JourneyLoadingScreen} />
