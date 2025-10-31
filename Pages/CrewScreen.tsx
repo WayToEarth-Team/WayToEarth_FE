@@ -7,9 +7,9 @@ import {
   StatusBar,
   ScrollView,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
 } from "react-native";
+import { PositiveAlert, NegativeAlert, MessageAlert } from "../components/ui/AlertDialog";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import TopCrewItem from "../components/Crew/TopCrewItem";
@@ -46,6 +46,7 @@ export default function CrewScreen() {
   } = useCrewData(search);
   // 탭 내비게이터 사용: 개별 화면에서 하단 바를 렌더하지 않음
   const navigation = useNavigation<any>();
+  const [dialog, setDialog] = useState<{ open:boolean; title?:string; message?:string; kind?:'positive'|'negative'|'message' }>({ open:false, kind:'message' });
   useFocusEffect(
     React.useCallback(() => {
       refresh();
@@ -174,7 +175,7 @@ export default function CrewScreen() {
                   setPreviewOpen(false);
                   setDetailOpen(true);
                 } else {
-                  Alert.alert("가입 불가", "현재 가입된 크루가 이미 있습니다.");
+                  setDialog({ open:true, kind:'message', title:'가입 불가', message:'현재 가입된 크루가 이미 있습니다.' });
                 }
               }}
             />
@@ -212,7 +213,7 @@ export default function CrewScreen() {
             await createMyCrew(name, description);
           } catch (e: any) {
             const msg = e?.response?.data?.message || e?.message || "크루 생성에 실패했습니다. 잠시 후 다시 시도해주세요.";
-            Alert.alert("생성 실패", msg);
+            setDialog({ open:true, kind:'negative', title:'생성 실패', message: msg });
           }
         }}
       />
@@ -240,18 +241,15 @@ export default function CrewScreen() {
                   setPreviewOpen(false);
                   // 승인 대기 안내
                   if ((res as any)?.pending) {
-                    Alert.alert(
-                      "신청 완료",
-                      "관리자 승인 후 크루에 참여할 수 있습니다."
-                    );
+                    setDialog({ open:true, kind:'message', title:'신청 완료', message:'관리자 승인 후 크루에 참여할 수 있습니다.' });
                   } else {
-                    Alert.alert("가입 완료", "크루에 가입되었습니다.");
+                    setDialog({ open:true, kind:'positive', title:'가입 완료', message:'크루에 가입되었습니다.' });
                   }
                 } catch (e: any) {
                   const msg = e?.code === "JOIN_PENDING_EXISTS"
                     ? "이미 해당 크루에 가입 신청이 접수되어 있습니다. 승인/거절 결과를 기다려주세요."
                     : (e?.response?.data?.message || e?.message || "가입 신청에 실패했습니다.");
-                  Alert.alert("신청 불가", msg);
+                  setDialog({ open:true, kind:'negative', title:'신청 불가', message: msg });
                 }
               }
             : undefined
@@ -278,24 +276,30 @@ export default function CrewScreen() {
                   );
                   setDetailOpen(false);
                   if ((res as any)?.pending) {
-                    Alert.alert(
-                      "신청 완료",
-                      "관리자 승인 후 크루에 참여할 수 있습니다."
-                    );
+                    setDialog({ open:true, kind:'message', title:'신청 완료', message:'관리자 승인 후 크루에 참여할 수 있습니다.' });
                   } else {
-                    Alert.alert("가입 완료", "크루에 가입되었습니다.");
+                    setDialog({ open:true, kind:'positive', title:'가입 완료', message:'크루에 가입되었습니다.' });
                   }
                 } catch (e: any) {
                   const msg =
                     e?.code === "JOIN_PENDING_EXISTS"
                       ? "이미 해당 크루에 가입 신청이 접수되어 있습니다. 승인/거절 결과를 기다려주세요."
                       : e?.response?.data?.message || e?.message || "가입 신청 중 오류가 발생했습니다.";
-                  Alert.alert("신청 실패", msg);
+                  setDialog({ open:true, kind:'negative', title:'신청 실패', message: msg });
                 }
               }
             : undefined
         }
       />
+      {dialog.open && dialog.kind === 'positive' && (
+        <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
+      {dialog.open && dialog.kind === 'negative' && (
+        <NegativeAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
+      {dialog.open && dialog.kind === 'message' && (
+        <MessageAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
     </View>
   );
 }

@@ -8,11 +8,11 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Animated,
   Dimensions,
   Image,
 } from "react-native";
+import { PositiveAlert, NegativeAlert, MessageAlert } from "../components/ui/AlertDialog";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
@@ -58,6 +58,7 @@ export default function OnboardingScreen() {
   const [saving, setSaving] = useState(false);
   const [nicknameChecking, setNicknameChecking] = useState(false);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<{ open:boolean; title?:string; message?:string; kind?:'positive'|'negative'|'message' }>({ open:false, kind:'message' });
 
   // Animation
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -108,7 +109,7 @@ export default function OnboardingScreen() {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("권한 필요", "사진 접근 권한이 필요합니다.");
+        setDialog({ open:true, kind:'message', title:'권한 필요', message:'사진 접근 권한이 필요합니다.' });
         return;
       }
 
@@ -127,7 +128,7 @@ export default function OnboardingScreen() {
       const info = await FileSystem.getInfoAsync(fileUri);
 
       if (!info.exists || info.isDirectory) {
-        Alert.alert("오류", "파일을 찾을 수 없습니다.");
+        setDialog({ open:true, kind:'negative', title:'오류', message:'파일을 찾을 수 없습니다.' });
         return;
       }
 
@@ -135,11 +136,11 @@ export default function OnboardingScreen() {
       const contentType = guessMime(fileName);
 
       if (size <= 0) {
-        Alert.alert("오류", "파일 크기를 확인할 수 없습니다.");
+        setDialog({ open:true, kind:'negative', title:'오류', message:'파일 크기를 확인할 수 없습니다.' });
         return;
       }
       if (size > 5 * 1024 * 1024) {
-        Alert.alert("용량 초과", "최대 5MB까지 업로드할 수 있습니다.");
+        setDialog({ open:true, kind:'message', title:'용량 초과', message:'최대 5MB까지 업로드할 수 있습니다.' });
         return;
       }
 
@@ -158,7 +159,7 @@ export default function OnboardingScreen() {
         data?.download_url ?? data?.public_url ?? data?.downloadUrl ?? data?.publicUrl;
 
       if (!signedUrl || !downloadUrl) {
-        Alert.alert("오류", "업로드 URL 발급에 실패했습니다.");
+        setDialog({ open:true, kind:'negative', title:'오류', message:'업로드 URL 발급에 실패했습니다.' });
         return;
       }
 
@@ -178,10 +179,10 @@ export default function OnboardingScreen() {
       }
 
       setProfileImageUrl(downloadUrl);
-      Alert.alert("완료", "프로필 사진이 업로드되었습니다.");
+      setDialog({ open:true, kind:'positive', title:'완료', message:'프로필 사진이 업로드되었습니다.' });
     } catch (e: any) {
       console.warn(e);
-      Alert.alert("오류", e?.message || "이미지 업로드에 실패했습니다.");
+      setDialog({ open:true, kind:'negative', title:'오류', message: e?.message || '이미지 업로드에 실패했습니다.' });
     } finally {
       setUploading(false);
     }
@@ -268,20 +269,11 @@ export default function OnboardingScreen() {
         profile_Image_Url: profileImageUrl || undefined,
       });
 
-      Alert.alert("환영합니다!", "Way to Earth에 오신 것을 환영합니다.", [
-        {
-          text: "시작하기",
-          onPress: () => {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "MainTabs", params: { screen: "LiveRunningScreen" } }],
-            });
-          },
-        },
-      ]);
+      setDialog({ open:true, kind:'positive', title:'환영합니다!', message:'Way to Earth에 오신 것을 환영합니다.' });
+      navigation.reset({ index: 0, routes: [{ name: 'MainTabs', params: { screen: 'LiveRunningScreen' } }] });
     } catch (e: any) {
       console.warn(e);
-      Alert.alert("오류", e?.response?.data?.message || "온보딩 완료에 실패했습니다.");
+      setDialog({ open:true, kind:'negative', title:'오류', message: e?.response?.data?.message || '온보딩 완료에 실패했습니다.' });
     } finally {
       setSaving(false);
     }
@@ -583,6 +575,15 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {dialog.open && dialog.kind === 'positive' && (
+        <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
+      {dialog.open && dialog.kind === 'negative' && (
+        <NegativeAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
+      {dialog.open && dialog.kind === 'message' && (
+        <MessageAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#333" />

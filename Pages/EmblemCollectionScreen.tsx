@@ -9,8 +9,8 @@ import {
   StatusBar,
   Image,
   ActivityIndicator,
-  Alert,
 } from "react-native";
+import { NegativeAlert } from "../components/ui/AlertDialog";
 import type { Achievement, Summary, EmblemFilter } from "../types/emblem";
 import { getEmblemSummary, getEmblemCatalog } from "../utils/api/emblems";
 
@@ -21,6 +21,7 @@ const EmblemCollectionScreen: React.FC<{ navigation?: any }> = ({
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [alert, setAlert] = useState<{ open:boolean; title?:string; message?:string }>( { open:false } );
 
   const fetchData = async () => {
     try {
@@ -33,7 +34,7 @@ const EmblemCollectionScreen: React.FC<{ navigation?: any }> = ({
       setAchievements(catalog);
     } catch (e) {
       console.error(e);
-      Alert.alert("에러", "엠블럼 데이터를 불러오지 못했습니다.");
+      setAlert({ open:true, title:'에러', message:'엠블럼 데이터를 불러오지 못했습니다.' });
     } finally {
       setLoading(false);
     }
@@ -115,6 +116,9 @@ const EmblemCollectionScreen: React.FC<{ navigation?: any }> = ({
 
   return (
     <SafeAreaView style={s.container}>
+      {alert.open && (
+        <NegativeAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false })} />
+      )}
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
       <View style={s.header}>

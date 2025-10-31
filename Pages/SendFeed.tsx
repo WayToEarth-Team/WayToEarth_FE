@@ -6,7 +6,6 @@ import {
   TextInput,
   Image,
   Pressable,
-  Alert,
   Platform,
   KeyboardAvoidingView,
   ScrollView,
@@ -14,6 +13,7 @@ import {
 } from "react-native";
 import { createFeed } from "../utils/api/feeds";
 import * as ImagePicker from "expo-image-picker";
+import { PositiveAlert, NegativeAlert, MessageAlert } from "../components/ui/AlertDialog";
 
 export default function FeedComposeScreen({ route, navigation }: any) {
   const { runId, defaultTitle, distanceKm, paceLabel, kcal } =
@@ -23,6 +23,7 @@ export default function FeedComposeScreen({ route, navigation }: any) {
   const [content, setContent] = useState("");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [dialog, setDialog] = useState<{ open: boolean; title?: string; message?: string; kind?: 'positive'|'negative'|'message' }>({ open: false, kind: 'message' });
 
   // runId 정규화: local_... → null, "123" → 123, 그 외 NaN → null
   const normalizedRunId: number | null = useMemo(() => {
@@ -49,16 +50,19 @@ export default function FeedComposeScreen({ route, navigation }: any) {
         setPhotoUrl(result.assets[0].uri);
       }
     } catch (e) {
-      Alert.alert("오류", "사진 선택에 실패했습니다.");
+      setDialog({ open: true, kind: 'negative', title: "오류", message: "사진 선택에 실패했습니다." });
     }
   };
 
   const onSubmit = async () => {
     if (!normalizedRunId) {
-      Alert.alert(
-        "기록 저장 필요",
-        "러닝 기록이 서버에 저장되지 않았어요.\n러닝 완료 저장 후 다시 시도해 주세요."
-      );
+      setDialog({
+        open: true,
+        kind: 'message',
+        title: "기록 저장 필요",
+        message:
+          "러닝 기록이 서버에 저장되지 않았어요.\n러닝 완료 저장 후 다시 시도해 주세요.",
+      });
       return;
     }
     try {
@@ -67,7 +71,7 @@ export default function FeedComposeScreen({ route, navigation }: any) {
       console.log("[FeedCompose] content:", content);
       console.log("[FeedCompose] photoUrl:", photoUrl);
       await createFeed({ runningRecordId: normalizedRunId, content, photoUrl });
-      Alert.alert("공유 완료", "피드가 업로드되었습니다.");
+      setDialog({ open: true, kind: 'positive', title: "공유 완료", message: "피드가 업로드되었습니다." });
       // 탭 네비게이터의 Feed 탭으로 이동 (중첩 네비게이션)
       try {
         navigation.navigate("MainTabs", { screen: "Feed" });
@@ -84,7 +88,7 @@ export default function FeedComposeScreen({ route, navigation }: any) {
         e?.response?.status === 401 || e?.response?.status === 403
           ? "로그인이 만료되었어요. 다시 로그인해 주세요."
           : `네트워크 또는 서버 오류가 발생했어요.\nrunId: ${normalizedRunId}`;
-      Alert.alert("게시 실패", msg);
+      setDialog({ open: true, kind: 'negative', title: "게시 실패", message: msg });
     } finally {
       setSubmitting(false);
     }
@@ -92,6 +96,15 @@ export default function FeedComposeScreen({ route, navigation }: any) {
 
   return (
     <SafeAreaView style={s.root}>
+      {dialog.open && dialog.kind === 'positive' && (
+        <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
+      {dialog.open && dialog.kind === 'negative' && (
+        <NegativeAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
+      {dialog.open && dialog.kind === 'message' && (
+        <MessageAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}

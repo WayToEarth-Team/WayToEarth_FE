@@ -10,11 +10,11 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Switch,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from "react-native";
+import { PositiveAlert, NegativeAlert, MessageAlert, DestructiveConfirm, ConfirmAlert } from "../ui/AlertDialog";
 import {
   createGuestbook,
   validateGuestbookMessage,
@@ -46,12 +46,14 @@ export default function GuestbookCreateModal({
   const [message, setMessage] = useState("");
   const [isPublic, setIsPublic] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [alert, setAlert] = useState<{ open:boolean; title?:string; message?:string; kind?:'positive'|'negative'|'message' }>({ open:false, kind:'message' });
+  const [confirm, setConfirm] = useState(false);
 
   const handleSubmit = async () => {
     // 클라이언트 유효성 검사
     const error = validateGuestbookMessage(message);
     if (error) {
-      Alert.alert("입력 오류", error);
+      setAlert({ open:true, kind:'negative', title:'입력 오류', message: error });
       return;
     }
 
@@ -64,7 +66,7 @@ export default function GuestbookCreateModal({
         isPublic,
       });
 
-      Alert.alert("성공", "방명록이 작성되었습니다!");
+      setAlert({ open:true, kind:'positive', title:'성공', message:'방명록이 작성되었습니다!' });
       setMessage("");
       setIsPublic(true);
       onSuccess?.();
@@ -72,7 +74,7 @@ export default function GuestbookCreateModal({
     } catch (err: any) {
       console.error("[GuestbookCreate] 작성 실패:", err);
       const errorMessage = getGuestbookErrorMessage(err);
-      Alert.alert("작성 실패", errorMessage);
+      setAlert({ open:true, kind:'negative', title:'작성 실패', message: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -80,22 +82,7 @@ export default function GuestbookCreateModal({
 
   const handleClose = () => {
     if (message.trim().length > 0) {
-      Alert.alert(
-        "작성 취소",
-        "작성 중인 내용이 있습니다. 정말 취소하시겠습니까?",
-        [
-          { text: "계속 작성", style: "cancel" },
-          {
-            text: "취소",
-            style: "destructive",
-            onPress: () => {
-              setMessage("");
-              setIsPublic(true);
-              onClose();
-            },
-          },
-        ]
-      );
+      setConfirm(true);
     } else {
       onClose();
     }
@@ -113,6 +100,25 @@ export default function GuestbookCreateModal({
       onRequestClose={handleClose}
     >
       <SafeAreaView style={styles.container}>
+        {alert.open && alert.kind === 'positive' && (
+          <PositiveAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+        )}
+        {alert.open && alert.kind === 'negative' && (
+          <NegativeAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+        )}
+        {alert.open && alert.kind === 'message' && (
+          <MessageAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+        )}
+        {confirm && (
+          <DestructiveConfirm
+            visible
+            title="작성 취소"
+            message="작성 중인 내용이 있습니다. 정말 취소하시겠습니까?"
+            onClose={() => setConfirm(false)}
+            onCancel={() => setConfirm(false)}
+            onConfirm={() => { setMessage(""); setIsPublic(true); setConfirm(false); onClose(); }}
+          />
+        )}
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.keyboardView}

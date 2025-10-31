@@ -8,8 +8,8 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   TextInput,
-  Alert,
 } from "react-native";
+import { PositiveAlert, NegativeAlert, MessageAlert } from "../components/ui/AlertDialog";
 import { Dimensions } from "react-native";
 import {
   getWeeklyStats,
@@ -32,6 +32,7 @@ export default function RecordScreen({ navigation }: any) {
   const [offset, setOffset] = useState<number>(0);
   const [hasMore, setHasMore] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [dialog, setDialog] = useState<{ open: boolean; title?: string; message?: string; kind?: 'positive'|'negative'|'message' }>({ open:false, kind:'message' });
   const width = Dimensions.get("window").width;
   const [previews, setPreviews] = useState<
     Record<number, { coords: { latitude: number; longitude: number }[] }>
@@ -146,7 +147,7 @@ export default function RecordScreen({ navigation }: any) {
       };
 
       await client.put("/v1/users/me", payload);
-      Alert.alert("완료", "주간 목표가 저장되었습니다.");
+      setDialog({ open:true, kind:'positive', title:'완료', message:'주간 목표가 저장되었습니다.' });
       setIsEditingGoal(false);
     } catch (e: any) {
       console.warn(e);
@@ -154,7 +155,7 @@ export default function RecordScreen({ navigation }: any) {
         e?.response?.data?.message ||
         e?.message ||
         "주간 목표 저장에 실패했습니다.";
-      Alert.alert("오류", msg);
+      setDialog({ open:true, kind:'negative', title:'오류', message: msg });
     } finally {
       setSavingGoal(false);
     }
@@ -280,6 +281,15 @@ export default function RecordScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={s.root}>
+      {dialog.open && dialog.kind === 'positive' && (
+        <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
+      {dialog.open && dialog.kind === 'negative' && (
+        <NegativeAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
+      {dialog.open && dialog.kind === 'message' && (
+        <MessageAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
       <ScrollView
         contentContainerStyle={{ padding: 16 }}
         onScroll={({ nativeEvent }) => {
@@ -818,9 +828,6 @@ const s = StyleSheet.create({
     backgroundColor: "#E5E7EB",
   },
 });
-
-
-
 
 
 
