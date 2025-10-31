@@ -9,11 +9,11 @@ import {
   Dimensions,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   StatusBar,
   RefreshControl,
   FlatList,
 } from "react-native";
+import { NegativeAlert } from "../components/ui/AlertDialog";
 import { Ionicons } from "@expo/vector-icons";
 import { avgPaceLabel } from "../utils/run";
 import { listFeeds, toggleFeedLike, FeedItem } from "../utils/api/feeds";
@@ -29,6 +29,7 @@ export default function FeedScreen({ navigation, route }: any) {
   const [error, setError] = useState<string | null>(null);
   const [myNickname, setMyNickname] = useState<string | null>(null);
   const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);
+  const [alert, setAlert] = useState<{ open:boolean; title?:string; message?:string }>( { open:false } );
 
 
   const fetchFeeds = useCallback(async () => {
@@ -90,7 +91,7 @@ export default function FeedScreen({ navigation, route }: any) {
       );
     } catch (err) {
       console.error("좋아요 실패:", err);
-      Alert.alert("오류", "좋아요 처리에 실패했습니다.");
+      setAlert({ open:true, title:'오류', message:'좋아요 처리에 실패했습니다.' });
     }
   };
 
@@ -160,6 +161,9 @@ export default function FeedScreen({ navigation, route }: any) {
 
     return (
       <View style={styles.postContainer}>
+        {alert.open && (
+          <NegativeAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false })} />
+        )}
         {/* Post Header */}
         <View style={styles.postHeader}>
           {finalUrl ? (

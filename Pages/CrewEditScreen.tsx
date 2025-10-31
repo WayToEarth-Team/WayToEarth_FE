@@ -8,7 +8,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   Image,
   ActivityIndicator,
 } from "react-native";
@@ -18,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { getCrewById } from "../utils/api/crews";
 import { client } from "../utils/api/client";
+import { PositiveAlert, NegativeAlert, MessageAlert, DestructiveConfirm } from "../components/ui/AlertDialog";
 
 export default function CrewEditScreen() {
   const navigation = useNavigation<any>();
@@ -34,6 +34,8 @@ export default function CrewEditScreen() {
   const [maxMembers, setMaxMembers] = useState(50);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [newImage, setNewImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [dialog, setDialog] = useState<{ open:boolean; title?:string; message?:string; kind?:'positive'|'negative'|'message' }>({ open:false, kind:'message' });
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // 초기 데이터 로드
   useEffect(() => {
@@ -46,8 +48,8 @@ export default function CrewEditScreen() {
 
     if (!crewId) {
       console.log("[CrewEdit] crewId 없음");
-      Alert.alert("오류", "크루 정보를 불러올 수 없습니다.");
-      navigation.goBack();
+      setDialog({ open:true, kind:'negative', title:'오류', message:'크루 정보를 불러올 수 없습니다.' });
+      setTimeout(() => navigation.goBack(), 300);
       return;
     }
 
@@ -76,7 +78,7 @@ export default function CrewEditScreen() {
         response: error?.response?.data,
         status: error?.response?.status,
       });
-      Alert.alert("오류", "크루 정보를 불러오는데 실패했습니다.");
+      setDialog({ open:true, kind:'negative', title:'오류', message:'크루 정보를 불러오는데 실패했습니다.' });
     } finally {
       setLoading(false);
       console.log("[CrewEdit] 로딩 완료");
@@ -91,7 +93,7 @@ export default function CrewEditScreen() {
 
     if (status !== "granted") {
       console.log("[CrewEdit] 권한 거부됨");
-      Alert.alert("권한 필요", "사진 라이브러리 접근 권한이 필요합니다.");
+      setDialog({ open:true, kind:'message', title:'권한 필요', message:'사진 라이브러리 접근 권한이 필요합니다.' });
       return;
     }
 
@@ -122,35 +124,7 @@ export default function CrewEditScreen() {
 
   // 이미지 삭제
   const deleteImage = async () => {
-    Alert.alert(
-      "이미지 삭제",
-      "프로필 이미지를 삭제하시겠습니까?",
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: "삭제",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              console.log("[CrewEdit] 이미지 삭제 요청 시작:", crewId);
-              await client.delete(`/v1/files/crew/${crewId}/profile`);
-              console.log("[CrewEdit] 이미지 삭제 성공");
-              setProfileImageUrl(null);
-              setNewImage(null);
-              Alert.alert("완료", "프로필 이미지가 삭제되었습니다.");
-            } catch (error: any) {
-              console.error("[CrewEdit] 이미지 삭제 실패:", error);
-              console.error("[CrewEdit] 에러 상세:", {
-                status: error?.response?.status,
-                message: error?.response?.data?.message,
-                data: error?.response?.data,
-              });
-              Alert.alert("오류", error?.response?.data?.message || "이미지 삭제에 실패했습니다.");
-            }
-          },
-        },
-      ]
-    );
+    setConfirmDelete(true);
   };
 
   // 이미지 업로드
@@ -251,22 +225,22 @@ export default function CrewEditScreen() {
     // 유효성 검사
     if (!name.trim()) {
       console.log("[CrewEdit] 유효성 검사 실패: 크루 이름 없음");
-      Alert.alert("입력 오류", "크루 이름을 입력해주세요.");
+      setDialog({ open:true, kind:'negative', title:'입력 오류', message:'크루 이름을 입력해주세요.' });
       return;
     }
     if (name.length > 50) {
       console.log("[CrewEdit] 유효성 검사 실패: 크루 이름 길이 초과");
-      Alert.alert("입력 오류", "크루 이름은 최대 50자까지 입력 가능합니다.");
+      setDialog({ open:true, kind:'negative', title:'입력 오류', message:'크루 이름은 최대 50자까지 입력 가능합니다.' });
       return;
     }
     if (description.length > 500) {
       console.log("[CrewEdit] 유효성 검사 실패: 크루 소개 길이 초과");
-      Alert.alert("입력 오류", "크루 소개는 최대 500자까지 입력 가능합니다.");
+      setDialog({ open:true, kind:'negative', title:'입력 오류', message:'크루 소개는 최대 500자까지 입력 가능합니다.' });
       return;
     }
     if (maxMembers < 2 || maxMembers > 100) {
       console.log("[CrewEdit] 유효성 검사 실패: 최대 인원 범위 초과");
-      Alert.alert("입력 오류", "최대 인원은 2명에서 100명 사이로 설정해주세요.");
+      setDialog({ open:true, kind:'negative', title:'입력 오류', message:'최대 인원은 2명에서 100명 사이로 설정해주세요.' });
       return;
     }
 
@@ -309,15 +283,7 @@ export default function CrewEditScreen() {
       });
 
       console.log("[CrewEdit] ===== 저장 완료 =====");
-      Alert.alert("완료", "크루 정보가 수정되었습니다.", [
-        {
-          text: "확인",
-          onPress: () => {
-            console.log("[CrewEdit] 뒤로가기");
-            navigation.goBack();
-          },
-        },
-      ]);
+      setDialog({ open:true, kind:'positive', title:'완료', message:'크루 정보가 수정되었습니다.' });
     } catch (error: any) {
       console.error("[CrewEdit] ===== 저장 실패 =====");
       console.error("[CrewEdit] 에러:", error);
@@ -328,7 +294,7 @@ export default function CrewEditScreen() {
       });
 
       const message = error?.response?.data?.message || error?.message || "저장에 실패했습니다.";
-      Alert.alert("오류", message);
+      setDialog({ open:true, kind:'negative', title:'오류', message });
     } finally {
       setSaving(false);
       console.log("[CrewEdit] 저장 프로세스 종료");
@@ -358,6 +324,44 @@ export default function CrewEditScreen() {
 
   return (
     <SafeAreaView style={s.container}>
+      {dialog.open && dialog.kind === 'positive' && (
+        <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => { setDialog({ open:false, kind:'message' }); navigation.goBack(); }} />
+      )}
+      {dialog.open && dialog.kind === 'negative' && (
+        <NegativeAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
+      {dialog.open && dialog.kind === 'message' && (
+        <MessageAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
+      {confirmDelete && (
+        <DestructiveConfirm
+          visible
+          title="이미지 삭제"
+          message="프로필 이미지를 삭제하시겠습니까?"
+          onClose={() => setConfirmDelete(false)}
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={async () => {
+            try {
+              console.log("[CrewEdit] 이미지 삭제 요청 시작:", crewId);
+              await client.delete(`/v1/files/crew/${crewId}/profile`);
+              console.log("[CrewEdit] 이미지 삭제 성공");
+              setProfileImageUrl(null);
+              setNewImage(null);
+              setDialog({ open:true, kind:'positive', title:'완료', message:'프로필 이미지가 삭제되었습니다.' });
+            } catch (error: any) {
+              console.error("[CrewEdit] 이미지 삭제 실패:", error);
+              console.error("[CrewEdit] 에러 상세:", {
+                status: error?.response?.status,
+                message: error?.response?.data?.message,
+                data: error?.response?.data,
+              });
+              setDialog({ open:true, kind:'negative', title:'오류', message: (error?.response?.data?.message || '이미지 삭제에 실패했습니다.') });
+            } finally {
+              setConfirmDelete(false);
+            }
+          }}
+        />
+      )}
       <StatusBar barStyle="light-content" />
 
       {/* 헤더 */}

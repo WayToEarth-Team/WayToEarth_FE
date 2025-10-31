@@ -5,10 +5,10 @@ import {
   StyleSheet,
   Pressable,
   TextInput,
-  Alert,
   SafeAreaView,
   ScrollView,
 } from "react-native";
+import { PositiveAlert, NegativeAlert, MessageAlert } from "../components/ui/AlertDialog";
 import { Ionicons } from "@expo/vector-icons";
 // ✅ 올바른 경로로 수정
 import { apiComplete } from "../utils/api/running";
@@ -33,6 +33,7 @@ export default function RunSummaryScreen({ route, navigation }: any) {
   const [title, setTitle] = useState("금요일 오전 러닝");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [dialog, setDialog] = useState<{ open:boolean; title?:string; message?:string; kind?:'positive'|'negative'|'message' }>({ open:false, kind:'message' });
   const [routeForMap, setRouteForMap] = useState<any[]>(
     (routePath?.length && (routePath[0]?.lat != null || routePath[0]?.lng != null))
       ? routePath.map((p: any) => ({ latitude: p.latitude ?? p.lat, longitude: p.longitude ?? p.lng }))
@@ -127,7 +128,7 @@ export default function RunSummaryScreen({ route, navigation }: any) {
         runIdRef.current = runId;
       } catch (e) {
         console.error("[RunSummary] 저장 실패:", e);
-        Alert.alert("저장 실패", "네트워크 상태를 확인하고 다시 시도해주세요.");
+        setDialog({ open:true, kind:'negative', title:'저장 실패', message:'네트워크 상태를 확인하고 다시 시도해주세요.' });
       } finally {
         setSaving(false);
       }
@@ -163,7 +164,7 @@ export default function RunSummaryScreen({ route, navigation }: any) {
 
   const onSharePress = () => {
     if (runIdRef.current === null) {
-      Alert.alert("잠시만요", "기록 저장 후 다시 시도해주세요.");
+      setDialog({ open:true, kind:'message', title:'잠시만요', message:'기록 저장 후 다시 시도해주세요.' });
       return;
     }
 
@@ -190,6 +191,15 @@ export default function RunSummaryScreen({ route, navigation }: any) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+      {dialog.open && dialog.kind === 'positive' && (
+        <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
+      {dialog.open && dialog.kind === 'negative' && (
+        <NegativeAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
+      {dialog.open && dialog.kind === 'message' && (
+        <MessageAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
       <ScrollView showsVerticalScrollIndicator={false}>
         <View
           style={{

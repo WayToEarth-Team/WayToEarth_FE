@@ -7,13 +7,13 @@ import {
   StyleSheet,
   View,
   Text,
-  Alert,
   Pressable,
   Animated,
   Easing,
   AppState,
   TouchableOpacity,
 } from "react-native";
+import { PositiveAlert, NegativeAlert, MessageAlert, ConfirmAlert } from "../components/ui/AlertDialog";
 import { LinearGradient } from 'expo-linear-gradient';
 import MapRoute from "../components/Running/MapRoute";
 import RunStatsCard from "../components/Running/RunStatsCard";
@@ -40,6 +40,9 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
     undefined
   );
   const isStoppingRef = useRef(false);
+  const [alert, setAlert] = useState<{ open: boolean; title?: string; message?: string; kind?: 'positive'|'negative'|'message' }>({ open:false, kind:'message' });
+  const [confirmExit, setConfirmExit] = useState(false);
+  const [confirmSave, setConfirmSave] = useState(false);
 
   // 탭 상태: 'running' | 'journey'
   const [activeTab, setActiveTab] = useState<'running' | 'journey'>('running');
@@ -140,6 +143,74 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
     }
   };
 
+  const doExitWithoutSave = useCallback(async () => {
+    try {
+      await backgroundRunning.clearSession();
+    } catch {}
+
+    if (navigationRef.isReady()) {
+      navigationRef.dispatch(StackActions.replace("MainTabs"));
+    } else {
+      const rootParent = navigation.getParent?.()?.getParent?.();
+      if (rootParent && typeof rootParent.dispatch === 'function') {
+        rootParent.dispatch(StackActions.replace("MainTabs"));
+      } else {
+        navigation.navigate("MainTabs", { screen: "LiveRunningScreen" });
+      }
+    }
+
+    requestAnimationFrame(async () => {
+      try {
+        await backgroundRunning.stopForegroundService();
+        await t.stop();
+      } catch (e) {
+        console.error("러닝 정리 실패:", e);
+      } finally {
+        isStoppingRef.current = false;
+      }
+    });
+  }, [navigation, backgroundRunning, t]);
+
+  const doExitWithSave = useCallback(async () => {
+    try {
+      const avgPaceSec =
+        t.distance > 0 && Number.isFinite(t.elapsedSec / t.distance)
+          ? Math.floor(t.elapsedSec / Math.max(t.distance, 0.000001))
+          : null;
+      const routePoints = t.route.map((p, i) => ({ latitude: p.latitude, longitude: p.longitude, sequence: i + 1 }));
+      const { runId } = await apiComplete({
+        sessionId: t.sessionId as string,
+        distanceMeters: Math.round(t.distance * 1000),
+        durationSeconds: t.elapsedSec,
+        averagePaceSeconds: avgPaceSec,
+        calories: Math.round(t.kcal),
+        routePoints,
+        endedAt: Date.now(),
+        title: "오늘의 러닝",
+      });
+
+      await backgroundRunning.stopForegroundService();
+      await backgroundRunning.clearSession();
+      await t.stop();
+      navigation.navigate("RunSummary", {
+        runId,
+        defaultTitle: "오늘의 러닝",
+        distanceKm: t.distance,
+        paceLabel: t.paceLabel,
+        kcal: Math.round(t.kcal),
+        elapsedSec: t.elapsedSec,
+        elapsedLabel: `${Math.floor(t.elapsedSec / 60)}:${String(t.elapsedSec % 60).padStart(2, "0")}`,
+        routePath: t.route,
+        sessionId: (t.sessionId as string) ?? "",
+      });
+    } catch (e) {
+      console.error("러닝 완료/저장 실패:", e);
+      setAlert({ open:true, kind:'negative', title:'저장 실패', message:'네트워크 또는 서버 오류가 발생했어요.' });
+    } finally {
+      isStoppingRef.current = false;
+    }
+  }, [navigation, t, backgroundRunning]);
+
   const completeRun = useCallback(async () => {
     if (isStoppingRef.current) return;
     isStoppingRef.current = true;
@@ -149,102 +220,8 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
       t.pause();
     }
 
-    // 저장 여부 확인
-    Alert.alert(
-      "러닝 종료",
-      "러닝 기록을 저장하시겠습니까?",
-      [
-        {
-          text: "취소",
-          style: "cancel",
-          onPress: () => {
-            isStoppingRef.current = false;
-            // 다시 재개
-            if (t.isPaused) {
-              t.resume();
-            }
-          },
-        },
-        {
-          text: "저장 안 함",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // 탭바 보이도록 세션 키를 먼저 제거
-              await backgroundRunning.clearSession();
-            } catch {}
-
-            // 먼저 네비게이션 실행 (동기) - 루트 스택에서 MainTabs로 교체 이동
-            if (navigationRef.isReady()) {
-              navigationRef.dispatch(StackActions.replace("MainTabs"));
-            } else {
-              const rootParent = navigation.getParent?.()?.getParent?.();
-              if (rootParent && typeof rootParent.dispatch === 'function') {
-                rootParent.dispatch(StackActions.replace("MainTabs"));
-              } else {
-                navigation.navigate("MainTabs", { screen: "LiveRunningScreen" });
-              }
-            }
-
-            // 그 후 비동기로 정리 (화면 전환 후에 실행)
-            requestAnimationFrame(async () => {
-              try {
-                await backgroundRunning.stopForegroundService();
-                await t.stop();
-              } catch (e) {
-                console.error("러닝 정리 실패:", e);
-              } finally {
-                isStoppingRef.current = false;
-              }
-            });
-          },
-        },
-        {
-          text: "저장",
-          onPress: async () => {
-            try {
-              const avgPaceSec =
-                t.distance > 0 && Number.isFinite(t.elapsedSec / t.distance)
-                  ? Math.floor(t.elapsedSec / Math.max(t.distance, 0.000001))
-                  : null;
-              const routePoints = t.route.map((p, i) => ({ latitude: p.latitude, longitude: p.longitude, sequence: i + 1 }));
-              const { runId } = await apiComplete({
-                sessionId: t.sessionId as string,
-                distanceMeters: Math.round(t.distance * 1000),
-                durationSeconds: t.elapsedSec,
-                averagePaceSeconds: avgPaceSec,
-                calories: Math.round(t.kcal),
-                routePoints,
-                endedAt: Date.now(),
-                title: "오늘의 러닝",
-              });
-
-              // 백그라운드 서비스 중지 및 세션 정리
-              await backgroundRunning.stopForegroundService();
-              await backgroundRunning.clearSession();
-
-              await t.stop();
-              navigation.navigate("RunSummary", {
-                runId,
-                defaultTitle: "오늘의 러닝",
-                distanceKm: t.distance,
-                paceLabel: t.paceLabel,
-                kcal: Math.round(t.kcal),
-                elapsedSec: t.elapsedSec,
-                elapsedLabel: `${Math.floor(t.elapsedSec / 60)}:${String(t.elapsedSec % 60).padStart(2, "0")}`,
-                routePath: t.route,
-                sessionId: (t.sessionId as string) ?? "",
-              });
-            } catch (e) {
-              console.error("러닝 완료/저장 실패:", e);
-              Alert.alert("저장 실패", "네트워크 또는 서버 오류가 발생했어요.");
-            } finally {
-              isStoppingRef.current = false;
-            }
-          },
-        },
-      ]
-    );
+    // 1차: 종료 확인
+    setConfirmExit(true);
   }, [navigation, t, backgroundRunning]);
 
   React.useEffect(() => {
@@ -257,6 +234,47 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
 
   return (
     <SafeLayout withBottomInset>
+      {alert.open && alert.kind === 'positive' && (
+        <PositiveAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+      )}
+      {alert.open && alert.kind === 'negative' && (
+        <NegativeAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+      )}
+      {alert.open && alert.kind === 'message' && (
+        <MessageAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+      )}
+      <ConfirmAlert
+        visible={confirmExit}
+        title="러닝 종료"
+        message="러닝을 종료하시겠습니까?"
+        onClose={() => setConfirmExit(false)}
+        onCancel={() => {
+          setConfirmExit(false);
+          isStoppingRef.current = false;
+          if (t.isPaused) t.resume();
+        }}
+        onConfirm={() => {
+          setConfirmExit(false);
+          setConfirmSave(true);
+        }}
+        confirmText="종료"
+      />
+      <ConfirmAlert
+        visible={confirmSave}
+        title="기록 저장"
+        message="러닝 기록을 저장하시겠습니까?"
+        onClose={() => setConfirmSave(false)}
+        onCancel={() => {
+          setConfirmSave(false);
+          doExitWithoutSave();
+        }}
+        onConfirm={() => {
+          setConfirmSave(false);
+          doExitWithSave();
+        }}
+        confirmText="저장"
+        cancelText="저장 안 함"
+      />
       <MapRoute
         route={t.route}
         last={t.last}
@@ -481,7 +499,7 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
           onPlay={() => t.start()}
           onPause={() => t.pause()}
           onResume={() => t.resume()}
-          onStopTap={() => Alert.alert("종료하려면 길게 누르세요")}
+          onStopTap={() => setAlert({ open:true, kind:'message', title:'안내', message:'종료하려면 길게 누르세요' })}
           onStopLong={completeRun}
         />
       )}

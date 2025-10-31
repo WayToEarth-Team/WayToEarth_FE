@@ -8,8 +8,8 @@ import {
   SafeAreaView,
   ScrollView,
   Dimensions,
-  Alert,
 } from "react-native";
+import { NegativeAlert, PositiveAlert, DestructiveConfirm, MessageAlert, ConfirmAlert } from "../components/ui/AlertDialog";
 import { getMyProfile } from "../utils/api/users";
 import { deleteFeed as apiDeleteFeed } from "../utils/api/feeds";
 
@@ -20,6 +20,8 @@ export default function FeedDetail({ route, navigation }: any) {
   const { feed } = route.params;
   const [me, setMe] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [alert, setAlert] = useState<{ open:boolean; title?:string; message?:string; kind?:'positive'|'negative'|'message' }>({ open:false, kind:'message' });
+  const [confirm, setConfirm] = useState<{ open:boolean; title?:string; message?:string }>();
 
   // ✅ 사용자 정보 가져오기
   const fetchUserData = useCallback(async () => {
@@ -28,10 +30,7 @@ export default function FeedDetail({ route, navigation }: any) {
       setMe(meRes);
     } catch (err) {
       console.warn(err);
-      Alert.alert(
-        "오류",
-        err?.response?.data?.message || "사용자 정보를 불러오지 못했습니다."
-      );
+      setAlert({ open:true, kind:'negative', title:'오류', message: err?.response?.data?.message || '사용자 정보를 불러오지 못했습니다.' });
     } finally {
       setLoading(false);
     }
@@ -57,29 +56,42 @@ export default function FeedDetail({ route, navigation }: any) {
 
   // ✅ 피드 삭제 핸들러
   const handleDelete = async () => {
-    Alert.alert("삭제 확인", "이 게시물을 삭제하시겠습니까?", [
-      { text: "취소", style: "cancel" },
-      {
-        text: "삭제",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await apiDeleteFeed(feed.id);
-            Alert.alert("삭제 완료", "피드가 삭제되었습니다.");
-            // 목록 화면으로 돌아가면 focus에서 자동 새로고침
-            if (navigation.canGoBack()) navigation.goBack();
-            else navigation.navigate("Feed", { deletedId: feed.id });
-          } catch (error) {
-            console.error(error);
-            Alert.alert("오류", "피드 삭제에 실패했습니다.");
-          }
-        },
-      },
-    ]);
+    setConfirm({ open:true, title:'삭제 확인', message:'이 게시물을 삭제하시겠습니까?' });
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      {alert.open && alert.kind === 'positive' && (
+        <PositiveAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+      )}
+      {alert.open && alert.kind === 'negative' && (
+        <NegativeAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+      )}
+      {alert.open && alert.kind === 'message' && (
+        <MessageAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+      )}
+      {confirm?.open && (
+        <DestructiveConfirm
+          visible
+          title={confirm.title}
+          message={confirm.message}
+          onClose={() => setConfirm(undefined)}
+          onCancel={() => setConfirm(undefined)}
+          onConfirm={async () => {
+            try {
+              await apiDeleteFeed(feed.id);
+              setAlert({ open:true, kind:'positive', title:'삭제 완료', message:'피드가 삭제되었습니다.' });
+              if (navigation.canGoBack()) navigation.goBack();
+              else navigation.navigate('Feed', { deletedId: feed.id });
+            } catch (error) {
+              console.error(error);
+              setAlert({ open:true, kind:'negative', title:'오류', message:'피드 삭제에 실패했습니다.' });
+            } finally {
+              setConfirm(undefined);
+            }
+          }}
+        />
+      )}
       {/* 상단 모사 상태바 제거 */}
 
       {/* 피드 카드 */}

@@ -7,12 +7,12 @@ import {
   StatusBar,
   ScrollView,
   TouchableOpacity,
-  Alert,
   Image,
   ActivityIndicator,
   RefreshControl,
   AppState,
 } from "react-native";
+import { PositiveAlert, NegativeAlert, MessageAlert, ConfirmAlert, DestructiveConfirm } from "../components/ui/AlertDialog";
 import { Ionicons } from "@expo/vector-icons";
 import { getMyProfile, getUserProfile } from "../utils/api/users";
 import {
@@ -83,6 +83,8 @@ export default function CrewDetailScreen() {
   const [loadingMoreMembers, setLoadingMoreMembers] = useState(false);
 
   const isRefreshingRef = useRef(false);
+  const [alert, setAlert] = useState<{ open:boolean; title?:string; message?:string; kind?:'positive'|'negative'|'message' }>({ open:false, kind:'message' });
+  const [confirm, setConfirm] = useState<{ open:boolean; title?:string; message?:string; destructive?:boolean; onConfirm?: ()=>void }>({ open:false });
 
   const refresh = async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -206,7 +208,7 @@ export default function CrewDetailScreen() {
           totalDistance: "0km",
           activeMembers: "0명",
         });
-        Alert.alert("내 크루 없음", "현재 가입된 크루가 없습니다.");
+        setAlert({ open:true, kind:'message', title:'내 크루 없음', message:'현재 가입된 크루가 없습니다.' });
       }
     } finally {
       console.log("[CREW_DETAIL] refresh done");
@@ -322,6 +324,7 @@ export default function CrewDetailScreen() {
 
   return (
     <SafeAreaView style={s.container}>
+      <Alerts alert={alert} setAlert={setAlert} confirm={confirm} setConfirm={setConfirm} />
       <StatusBar barStyle="light-content" />
 
       {/* 헤더 */}
@@ -332,17 +335,9 @@ export default function CrewDetailScreen() {
           <TouchableOpacity
             style={s.searchIcon}
             onPress={() => {
-              Alert.alert(
-                "채팅 이동",
-                crewId
-                  ? `크루(${crewName || ""}) 채팅으로 이동 시도`
-                  : "크루 정보를 불러오지 못했습니다."
-              );
+              setAlert({ open:true, kind:'message', title:'채팅 이동', message: crewId ? `크루(${crewName || ""}) 채팅으로 이동 시도` : '크루 정보를 불러오지 못했습니다.' });
               if (!crewId) {
-                Alert.alert(
-                  "채팅 이동 불가",
-                  "크루 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요."
-                );
+                setAlert({ open:true, kind:'negative', title:'채팅 이동 불가', message:'크루 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.' });
                 return;
               }
               const params: any = { crewId: crewId, crewName };
@@ -357,10 +352,7 @@ export default function CrewDetailScreen() {
                 if (parent) {
                   parent.navigate("CrewChat", params);
                 } else {
-                  Alert.alert(
-                    "채팅 이동 불가",
-                    "네비게이션 경로를 찾을 수 없습니다."
-                  );
+                  setAlert({ open:true, kind:'negative', title:'채팅 이동 불가', message:'네비게이션 경로를 찾을 수 없습니다.' });
                 }
               }
             }}
@@ -509,10 +501,10 @@ export default function CrewDetailScreen() {
                               if (already) {
                                 await refresh({ silent: true });
                               } else {
-                                Alert.alert('승인 실패', e?.response?.data?.message || '서버 오류로 승인에 실패했습니다. 잠시 후 다시 시도해주세요.');
+                                setAlert({ open:true, kind:'negative', title:'승인 실패', message: e?.response?.data?.message || '서버 오류로 승인에 실패했습니다. 잠시 후 다시 시도해주세요.' });
                               }
                             } catch {
-                              Alert.alert('승인 실패', e?.response?.data?.message || '서버 오류로 승인에 실패했습니다. 잠시 후 다시 시도해주세요.');
+                              setAlert({ open:true, kind:'negative', title:'승인 실패', message: e?.response?.data?.message || '서버 오류로 승인에 실패했습니다. 잠시 후 다시 시도해주세요.' });
                             }
                           }
                         }}
@@ -635,21 +627,16 @@ export default function CrewDetailScreen() {
                         <TouchableOpacity
                           style={s.roundIconBtn}
                           onPress={() => {
-                            Alert.alert(
-                              "관리자 임명",
-                              `${m.nickname} 님을 매니저(관리자)로 임명하시겠습니까?`,
-                              [
-                                { text: "취소", style: "cancel" },
-                                {
-                                  text: "임명",
-                                  style: "default",
-                                  onPress: async () => {
-                                    await promoteMember(crewId, m.id);
-                                    await refresh({ silent: true });
-                                  },
-                                },
-                              ]
-                            );
+                            setConfirm({
+                              open: true,
+                              title: '관리자 임명',
+                              message: `${m.nickname} 님을 매니저(관리자)로 임명하시겠습니까?`,
+                              destructive: false,
+                              onConfirm: async () => {
+                                await promoteMember(crewId, m.id);
+                                await refresh({ silent: true });
+                              },
+                            });
                           }}
                           accessibilityLabel="관리자 지정"
                         >
@@ -663,21 +650,16 @@ export default function CrewDetailScreen() {
                         <TouchableOpacity
                           style={s.roundIconBtn}
                           onPress={() => {
-                            Alert.alert(
-                              "권한 해제",
-                              `${m.nickname} 님의 매니저 권한을 해제하시겠습니까?`,
-                              [
-                                { text: "취소", style: "cancel" },
-                                {
-                                  text: "해제",
-                                  style: "destructive",
-                                  onPress: async () => {
-                                    await demoteMember(crewId, m.id);
-                                    await refresh({ silent: true });
-                                  },
-                                },
-                              ]
-                            );
+                            setConfirm({
+                              open: true,
+                              title: '권한 해제',
+                              message: `${m.nickname} 님의 매니저 권한을 해제하시겠습니까?`,
+                              destructive: true,
+                              onConfirm: async () => {
+                                await demoteMember(crewId, m.id);
+                                await refresh({ silent: true });
+                              },
+                            });
                           }}
                           accessibilityLabel="권한 해제"
                         >
@@ -688,21 +670,16 @@ export default function CrewDetailScreen() {
                         <TouchableOpacity
                           style={s.roundIconBtn}
                           onPress={() => {
-                            Alert.alert(
-                              "권한 이임",
-                              `${m.nickname} 님에게 운영 권한을 이임하시겠습니까?`,
-                              [
-                                { text: "취소", style: "cancel" },
-                                {
-                                  text: "이임",
-                                  style: "destructive",
-                                  onPress: async () => {
-                                    await transferOwnership(crewId, m.id);
-                                    await refresh({ silent: true });
-                                  },
-                                },
-                              ]
-                            );
+                            setConfirm({
+                              open: true,
+                              title: '권한 이임',
+                              message: `${m.nickname} 님에게 운영 권한을 이임하시겠습니까?`,
+                              destructive: true,
+                              onConfirm: async () => {
+                                await transferOwnership(crewId, m.id);
+                                await refresh({ silent: true });
+                              },
+                            });
                           }}
                           accessibilityLabel="권한 이임"
                         >
@@ -717,21 +694,16 @@ export default function CrewDetailScreen() {
                         <TouchableOpacity
                           style={s.roundIconBtn}
                           onPress={() => {
-                            Alert.alert(
-                              "확인",
-                              `${m.nickname} 님을 내보낼까요?`,
-                              [
-                                { text: "취소", style: "cancel" },
-                                {
-                                  text: "내보내기",
-                                  style: "destructive",
-                                  onPress: async () => {
-                                    await removeMember(crewId, m.id);
-                                    await refresh({ silent: true });
-                                  },
-                                },
-                              ]
-                            );
+                            setConfirm({
+                              open: true,
+                              title: '확인',
+                              message: `${m.nickname} 님을 내보낼까요?`,
+                              destructive: true,
+                              onConfirm: async () => {
+                                await removeMember(crewId, m.id);
+                                await refresh({ silent: true });
+                              },
+                            });
                           }}
                           accessibilityLabel="내보내기"
                         >
@@ -792,22 +764,17 @@ export default function CrewDetailScreen() {
               <TouchableOpacity
                 style={s.closeCrewBtn}
                 onPress={() => {
-                  Alert.alert(
-                    "크루 폐쇄",
-                    "정말로 크루를 폐쇄하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
-                    [
-                      { text: "취소", style: "cancel" },
-                      {
-                        text: "폐쇄",
-                        style: "destructive",
-                        onPress: async () => {
-                          await closeCrew(crewId);
-                          Alert.alert("완료", "크루가 폐쇄되었습니다.");
-                          navigation.navigate("Crew" as never);
-                        },
-                      },
-                    ]
-                  );
+                  setConfirm({
+                    open: true,
+                    title: '크루 폐쇄',
+                    message: '정말로 크루를 폐쇄하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+                    destructive: true,
+                    onConfirm: async () => {
+                      await closeCrew(crewId);
+                      setAlert({ open:true, kind:'positive', title:'완료', message:'크루가 폐쇄되었습니다.' });
+                      navigation.navigate("Crew" as never);
+                    },
+                  });
                 }}
               >
                 <Ionicons name="trash" size={18} color="#fff" />
@@ -817,34 +784,26 @@ export default function CrewDetailScreen() {
               <TouchableOpacity
                 style={[s.closeCrewBtn, { backgroundColor: "#111827" }]}
                 onPress={() => {
-                  Alert.alert("크루 탈퇴", "크루를 탈퇴하시겠습니까?", [
-                    { text: "취소", style: "cancel" },
-                    {
-                      text: "탈퇴",
-                      style: "destructive",
-                      onPress: async () => {
-                        try {
-                          await leaveCrew(crewId);
-                          Alert.alert("완료", "크루에서 탈퇴했습니다.");
-                          navigation.navigate("Crew" as never);
-                        } catch (e: any) {
-                          const msg =
-                            e?.response?.data?.message ||
-                            e?.message ||
-                            "잠시 후 다시 시도해주세요.";
-                          // 서버 정책: 크루장은 탈퇴 불가. 해당 문구를 명확히 안내
-                          if (/크루장|OWNER|소유자/.test(String(msg))) {
-                            Alert.alert(
-                              "탈퇴 불가",
-                              "크루장은 바로 탈퇴할 수 없습니다. 멤버에게 소유권을 양도한 뒤 탈퇴하거나, 크루를 폐쇄하세요."
-                            );
-                          } else {
-                            Alert.alert("탈퇴 실패", msg);
-                          }
+                  setConfirm({
+                    open: true,
+                    title: '크루 탈퇴',
+                    message: '크루를 탈퇴하시겠습니까?',
+                    destructive: true,
+                    onConfirm: async () => {
+                      try {
+                        await leaveCrew(crewId);
+                        setAlert({ open:true, kind:'positive', title:'완료', message:'크루에서 탈퇴했습니다.' });
+                        navigation.navigate("Crew" as never);
+                      } catch (e: any) {
+                        const msg = e?.response?.data?.message || e?.message || '잠시 후 다시 시도해주세요.';
+                        if (/크루장|OWNER|소유자/.test(String(msg))) {
+                          setAlert({ open:true, kind:'message', title:'탈퇴 불가', message:'크루장은 바로 탈퇴할 수 없습니다. 멤버에게 소유권을 양도한 뒤 탈퇴하거나, 크루를 폐쇄하세요.' });
+                        } else {
+                          setAlert({ open:true, kind:'negative', title:'탈퇴 실패', message: msg });
                         }
-                      },
+                      }
                     },
-                  ]);
+                  });
                 }}
               >
                 <Ionicons name="log-out-outline" size={18} color="#fff" />
@@ -855,6 +814,42 @@ export default function CrewDetailScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+// Alerts rendering
+function Alerts({ alert, setAlert, confirm, setConfirm }: any) {
+  return (
+    <>
+      {alert?.open && alert.kind === 'positive' && (
+        <PositiveAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+      )}
+      {alert?.open && alert.kind === 'negative' && (
+        <NegativeAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+      )}
+      {alert?.open && alert.kind === 'message' && (
+        <MessageAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+      )}
+      {confirm?.open && (confirm?.destructive ? (
+        <DestructiveConfirm
+          visible
+          title={confirm.title}
+          message={confirm.message}
+          onClose={() => setConfirm({ open:false })}
+          onCancel={() => setConfirm({ open:false })}
+          onConfirm={async () => { await confirm.onConfirm?.(); setConfirm({ open:false }); }}
+        />
+      ) : (
+        <ConfirmAlert
+          visible
+          title={confirm.title}
+          message={confirm.message}
+          onClose={() => setConfirm({ open:false })}
+          onCancel={() => setConfirm({ open:false })}
+          onConfirm={async () => { await confirm.onConfirm?.(); setConfirm({ open:false }); }}
+        />
+      ))}
+    </>
   );
 }
 

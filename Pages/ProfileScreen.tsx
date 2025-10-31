@@ -9,7 +9,6 @@ import {
   RefreshControl,
   ActivityIndicator,
   Image,
-  Alert,
   Platform,
   SafeAreaView,
 } from "react-native";
@@ -25,6 +24,13 @@ import SafeLayout from "../components/Layout/SafeLayout";
 import { clearTokens } from "../utils/auth/tokenManager";
 import { deactivateToken } from "../utils/notifications";
 import { logout as apiLogout } from "../utils/api/auth";
+import {
+  PositiveAlert,
+  NegativeAlert,
+  MessageAlert,
+  ConfirmAlert,
+  DestructiveConfirm,
+} from "../components/ui/AlertDialog";
 
 const number = (v: number | null | undefined, digits = 1) =>
   typeof v === "number" ? Number(v.toFixed(digits)) : 0;
@@ -41,6 +47,10 @@ export default function ProfileScreen({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const retriedRef = React.useRef(false);
+  const [alert, setAlert] = useState<{ open: boolean; title?: string; message?: string; kind?: 'positive'|'negative'|'message' }>({ open:false, kind:'message' });
+  const [logoutConfirm, setLogoutConfirm] = useState(false);
+  const [deleteConfirm1, setDeleteConfirm1] = useState(false);
+  const [deleteConfirm2, setDeleteConfirm2] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -54,10 +64,7 @@ export default function ProfileScreen({
       console.log("✅ /v1/users/me/summary 응답:", sumRes);
     } catch (err: any) {
       console.warn(err);
-      Alert.alert(
-        "오류",
-        err?.response?.data?.message || "정보를 불러오지 못했습니다."
-      );
+      setAlert({ open:true, kind:'negative', title:'오류', message: err?.response?.data?.message || '정보를 불러오지 못했습니다.' });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -105,96 +112,44 @@ export default function ProfileScreen({
   }, [fetchData]);
 
   const handleLogout = useCallback(async () => {
-    Alert.alert("로그아웃", "정말 로그아웃 하시겠어요?", [
-      { text: "취소", style: "cancel" },
-      {
-        text: "로그아웃",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            // 서버 로그아웃 (Authorization 필요)
-            // 1) FCM 토큰 비활성화 (인증 필요하므로 먼저 수행)
-            await deactivateToken();
-            // 2) 서버 로그아웃 (세션 무효화)
-            try { await apiLogout(); } catch {}
-          } catch (error) {
-            console.error("로그아웃 실패:", error);
-            Alert.alert("오류", "로그아웃 중 문제가 발생했습니다.");
-          } finally {
-            // 로컬 토큰 정리 및 로그인 화면 이동
-            try { await clearTokens(); } catch {}
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "Login" }],
-            });
-          }
-        },
-      },
-    ]);
+    setLogoutConfirm(true);
+  }, []);
+
+  const doLogout = useCallback(async () => {
+    setLogoutConfirm(false);
+    try {
+      await deactivateToken();
+      try { await apiLogout(); } catch {}
+    } catch (error) {
+      console.error("로그아웃 실패:", error);
+      setAlert({ open:true, kind:'negative', title:'오류', message:'로그아웃 중 문제가 발생했습니다.' });
+    } finally {
+      try { await clearTokens(); } catch {}
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+    }
   }, [navigation]);
 
   const handleDeleteAccount = useCallback(() => {
-    Alert.alert(
-      "회원 탈퇴",
-      "정말 탈퇴하시겠습니까?\n\n모든 데이터가 영구적으로 삭제되며 복구할 수 없습니다.\n- 러닝 기록\n- 크루 정보\n- 피드 게시물\n- 방명록\n- 엠블럼",
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: "탈퇴",
-          style: "destructive",
-          onPress: () => {
-            // 2차 확인
-            Alert.alert(
-              "최종 확인",
-              "정말로 탈퇴하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
-              [
-                { text: "취소", style: "cancel" },
-                {
-                  text: "탈퇴",
-                  style: "destructive",
-                  onPress: async () => {
-                    try {
-                      // 1) FCM 토큰 비활성화 (인증 필요하므로 먼저 수행)
-                      try {
-                        await deactivateToken();
-                      } catch (e) {
-                        console.warn("FCM 토큰 비활성화 실패:", e);
-                      }
+    setDeleteConfirm1(true);
+  }, []);
 
-                      // 2) 서버에 회원 탈퇴 요청
-                      await deleteMyAccount();
+  const doDeleteAccountPhase1 = useCallback(() => {
+    setDeleteConfirm1(false);
+    setDeleteConfirm2(true);
+  }, []);
 
-                      // 3) 로컬 토큰 정리
-                      try {
-                        await clearTokens();
-                      } catch {}
-
-                      // 4) 로그인 화면으로 이동
-                      navigation.reset({
-                        index: 0,
-                        routes: [{ name: "Login" }],
-                      });
-
-                      // 5) 탈퇴 완료 메시지
-                      setTimeout(() => {
-                        Alert.alert("탈퇴 완료", "회원 탈퇴가 완료되었습니다.");
-                      }, 500);
-                    } catch (error: any) {
-                      console.error("회원 탈퇴 실패:", error);
-                      Alert.alert(
-                        "오류",
-                        error?.response?.data?.message ||
-                          "회원 탈퇴 중 문제가 발생했습니다."
-                      );
-                    }
-                  },
-                },
-              ]
-            );
-          },
-        },
-      ]
-    );
+  const doDeleteAccountPhase2 = useCallback(async () => {
+    setDeleteConfirm2(false);
+    try {
+      try { await deactivateToken(); } catch (e) { console.warn('FCM 토큰 비활성화 실패:', e); }
+      await deleteMyAccount();
+      try { await clearTokens(); } catch {}
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      setTimeout(() => setAlert({ open:true, kind:'positive', title:'탈퇴 완료', message:'회원 탈퇴가 완료되었습니다.' }), 500);
+    } catch (error: any) {
+      console.error('회원 탈퇴 실패:', error);
+      setAlert({ open:true, kind:'negative', title:'오류', message: error?.response?.data?.message || '회원 탈퇴 중 문제가 발생했습니다.' });
+    }
   }, [navigation]);
 
   // 필드 매핑
@@ -254,6 +209,42 @@ export default function ProfileScreen({
 
   return (
     <SafeLayout withBottomInset={false}>
+      {alert.open && alert.kind === 'positive' && (
+        <PositiveAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+      )}
+      {alert.open && alert.kind === 'negative' && (
+        <NegativeAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+      )}
+      {alert.open && alert.kind === 'message' && (
+        <MessageAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+      )}
+      <ConfirmAlert
+        visible={logoutConfirm}
+        title="로그아웃"
+        message="정말 로그아웃 하시겠어요?"
+        onClose={() => setLogoutConfirm(false)}
+        onCancel={() => setLogoutConfirm(false)}
+        onConfirm={doLogout}
+        confirmText="로그아웃"
+      />
+      <DestructiveConfirm
+        visible={deleteConfirm1}
+        title="회원 탈퇴"
+        message={`정말 탈퇴하시겠습니까?\n\n모든 데이터가 영구적으로 삭제되며 복구할 수 없습니다.\n- 러닝 기록\n- 크루 정보\n- 피드 게시물\n- 방명록\n- 엠블럼`}
+        onClose={() => setDeleteConfirm1(false)}
+        onCancel={() => setDeleteConfirm1(false)}
+        onConfirm={doDeleteAccountPhase1}
+        confirmText="탈퇴"
+      />
+      <DestructiveConfirm
+        visible={deleteConfirm2}
+        title="최종 확인"
+        message={`정말로 탈퇴하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`}
+        onClose={() => setDeleteConfirm2(false)}
+        onCancel={() => setDeleteConfirm2(false)}
+        onConfirm={doDeleteAccountPhase2}
+        confirmText="탈퇴"
+      />
       <View style={styles.container}>
         {/* 헤더 */}
         <View style={styles.header}>

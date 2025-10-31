@@ -7,11 +7,11 @@ import {
   SafeAreaView,
   StatusBar,
   Dimensions,
-  Alert,
   ActivityIndicator,
   Image,
   TextInput, // ✅ 추가
 } from "react-native";
+import { PositiveAlert, NegativeAlert, MessageAlert } from "../components/ui/AlertDialog";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiComplete, apiStart } from "../utils/api/running";
 import { createFeed } from "../utils/api/feeds";
@@ -26,6 +26,7 @@ const RunningComplete: React.FC = () => {
   const [sessionId, setSessionId] = useState(null);
   const [exerciseImage, setExerciseImage] = useState(null); // ✅ 최종 S3 URL 저장
   const [comment, setComment] = useState(""); // ✅ 사용자 입력 상태 추가
+  const [dialog, setDialog] = useState<{ open:boolean; title?:string; message?:string; kind?:'positive'|'negative'|'message' }>({ open:false, kind:'message' });
 
   // 이미지 업로드는 createFeed가 presign+S3 업로드를 처리합니다.
 
@@ -50,7 +51,7 @@ const RunningComplete: React.FC = () => {
       }
     } catch (e) {
       console.warn(e);
-      Alert.alert("오류", "이미지 선택에 실패했습니다.");
+      setDialog({ open:true, kind:'negative', title:'오류', message:'이미지 선택에 실패했습니다.' });
     }
   }, []);
 
@@ -66,7 +67,7 @@ const RunningComplete: React.FC = () => {
       await AsyncStorage.setItem("runningSessionId", sid);
     } catch (e) {
       console.warn(e);
-      Alert.alert("오류", "러닝 시작에 실패했습니다.");
+      setDialog({ open:true, kind:'negative', title:'오류', message:'러닝 시작에 실패했습니다.' });
     } finally {
       setLoading(false);
     }
@@ -78,7 +79,7 @@ const RunningComplete: React.FC = () => {
       setLoading(true);
       const sid = sessionId || (await AsyncStorage.getItem("runningSessionId"));
       if (!sid) {
-        Alert.alert("세션 없음", "먼저 러닝을 시작해주세요.");
+        setDialog({ open:true, kind:'message', title:'세션 없음', message:'먼저 러닝을 시작해주세요.' });
         return;
       }
 
@@ -103,7 +104,7 @@ const RunningComplete: React.FC = () => {
       await AsyncStorage.removeItem("runningSessionId");
     } catch (e) {
       console.warn(e);
-      Alert.alert("오류", "러닝 완료에 실패했습니다.");
+      setDialog({ open:true, kind:'negative', title:'오류', message:'러닝 완료에 실패했습니다.' });
     } finally {
       setLoading(false);
     }
@@ -112,11 +113,11 @@ const RunningComplete: React.FC = () => {
   // ✅ 공유 버튼 → 피드 작성
   const onShare = useCallback(async () => {
     if (!recordId) {
-      Alert.alert("잠시 후 다시 시도해주세요.");
+      setDialog({ open:true, kind:'message', title:'안내', message:'잠시 후 다시 시도해주세요.' });
       return;
     }
     if (!comment.trim()) {
-      Alert.alert("입력 필요", "러닝 후기를 작성해주세요!");
+      setDialog({ open:true, kind:'message', title:'입력 필요', message:'러닝 후기를 작성해주세요!' });
       return;
     }
     try {
@@ -127,11 +128,11 @@ const RunningComplete: React.FC = () => {
         photoUrl: exerciseImage ?? undefined,
       });
       console.log("[feed created]", feed);
-      Alert.alert("완료", "피드가 공유되었습니다!");
+      setDialog({ open:true, kind:'positive', title:'완료', message:'피드가 공유되었습니다!' });
       setComment(""); // 입력 초기화
     } catch (e) {
       console.warn(e);
-      Alert.alert("오류", "피드 공유에 실패했습니다.");
+      setDialog({ open:true, kind:'negative', title:'오류', message:'피드 공유에 실패했습니다.' });
     } finally {
       setLoading(false);
     }
@@ -139,6 +140,15 @@ const RunningComplete: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {dialog.open && dialog.kind === 'positive' && (
+        <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
+      {dialog.open && dialog.kind === 'negative' && (
+        <NegativeAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
+      {dialog.open && dialog.kind === 'message' && (
+        <MessageAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      )}
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
       {/* 상단 모사 상태바 제거 */}

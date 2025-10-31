@@ -35,7 +35,9 @@ export default function TabBarAdapter({
       const raw = await AsyncStorage.getItem("@running_session");
       if (raw) {
         const s = JSON.parse(raw);
-        setHidden(!!s?.isRunning);
+        // 탭바 숨김은 러닝 화면에서만 적용
+        const isRunning = !!s?.isRunning;
+        setHidden(isRunning && route.name === 'LiveRunningScreen');
       } else {
         setHidden(false);
       }

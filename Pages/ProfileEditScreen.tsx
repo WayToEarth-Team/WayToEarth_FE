@@ -15,13 +15,17 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { client } from "../utils/api/client";
 import { checkNickname, getMyProfile } from "../utils/api/users";
 // import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
+import {
+  PositiveAlert,
+  NegativeAlert,
+  MessageAlert,
+} from "../components/ui/AlertDialog";
 
 export default function ProfileEditScreen({ navigation }: { navigation: any }) {
   // form state
@@ -43,6 +47,12 @@ export default function ProfileEditScreen({ navigation }: { navigation: any }) {
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [nicknameSaving, setNicknameSaving] = useState(false); // ✅ 닉네임만 저장 상태
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [dialog, setDialog] = useState<{
+    open: boolean;
+    title?: string;
+    message?: string;
+    kind?: "positive" | "negative" | "message";
+  }>({ open: false, kind: "message" });
 
   // 초기값 로드
   const loadMe = useCallback(async () => {
@@ -65,7 +75,7 @@ export default function ProfileEditScreen({ navigation }: { navigation: any }) {
       setNicknameError(null);
     } catch (e) {
       console.warn(e);
-      Alert.alert("오류", "내 정보를 불러오지 못했습니다.");
+      setDialog({ open: true, kind: "negative", title: "오류", message: "내 정보를 불러오지 못했습니다." });
     } finally {
       setLoading(false);
     }
@@ -145,7 +155,7 @@ export default function ProfileEditScreen({ navigation }: { navigation: any }) {
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("권한 필요", "사진 접근 권한이 필요합니다.");
+        setDialog({ open: true, kind: "message", title: "권한 필요", message: "사진 접근 권한이 필요합니다." });
         return;
       }
 
@@ -160,7 +170,7 @@ export default function ProfileEditScreen({ navigation }: { navigation: any }) {
       const fileName = fileUri.split("/").pop() || "profile.jpg";
       const info = await FileSystem.getInfoAsync(fileUri);
       if (!info.exists || info.isDirectory) {
-        Alert.alert("오류", "파일을 찾을 수 없거나 폴더입니다.");
+        setDialog({ open: true, kind: "negative", title: "오류", message: "파일을 찾을 수 없거나 폴더입니다." });
         return;
       }
       const size =
@@ -168,11 +178,11 @@ export default function ProfileEditScreen({ navigation }: { navigation: any }) {
       const contentType = guessMime(fileName);
 
       if (size <= 0) {
-        Alert.alert("오류", "파일 크기를 확인할 수 없습니다.");
+        setDialog({ open: true, kind: "negative", title: "오류", message: "파일 크기를 확인할 수 없습니다." });
         return;
       }
       if (size > 5 * 1024 * 1024) {
-        Alert.alert("용량 초과", "최대 5MB까지 업로드할 수 있습니다.");
+        setDialog({ open: true, kind: "message", title: "용량 초과", message: "최대 5MB까지 업로드할 수 있습니다." });
         return;
       }
 
@@ -198,7 +208,7 @@ export default function ProfileEditScreen({ navigation }: { navigation: any }) {
       const key = data?.key ?? data?.file_key ?? data?.fileKey;
 
       if (!signedUrl || !downloadUrl) {
-        Alert.alert("오류", "업로드 URL 발급에 실패했습니다.");
+        setDialog({ open: true, kind: "negative", title: "오류", message: "업로드 URL 발급에 실패했습니다." });
         return;
       }
 
@@ -233,14 +243,14 @@ export default function ProfileEditScreen({ navigation }: { navigation: any }) {
       setProfileImageUrl(downloadUrl);
       if (key) setProfileImageKey(key);
       setImageCacheBuster(Date.now()); // UI 강제 리렌더링
-      Alert.alert("완료", "프로필 사진이 변경되었습니다.");
+      setDialog({ open: true, kind: "positive", title: "완료", message: "프로필 사진이 변경되었습니다." });
     } catch (e: any) {
       console.warn(e);
       const msg =
         e?.response?.data?.message ||
         e?.message ||
         "이미지 업로드에 실패했습니다.";
-      Alert.alert("오류", msg);
+      setDialog({ open: true, kind: "negative", title: "오류", message: msg });
     } finally {
       setUploading(false);
     }
@@ -253,21 +263,31 @@ export default function ProfileEditScreen({ navigation }: { navigation: any }) {
       setNicknameSaving(true);
       const trimmed = nickname.trim();
       if (trimmed.length < 2) {
-        Alert.alert("오류", "닉네임은 2자 이상이어야 합니다.");
+        setDialog({
+          open: true,
+          kind: "negative",
+          title: "오류",
+          message: "닉네임은 2자 이상이어야 합니다.",
+        });
         return;
       }
       console.log("PUT /v1/users/me (nickname)", { nickname: trimmed });
       await client.put("/v1/users/me", { nickname: trimmed });
       setOriginalNickname(trimmed); // ✅ 원본 갱신
       setNicknameError(null);
-      Alert.alert("완료", "닉네임이 변경되었습니다.");
+      setDialog({
+        open: true,
+        kind: "positive",
+        title: "완료",
+        message: "닉네임이 변경되었습니다.",
+      });
     } catch (e: any) {
       console.warn(e);
       const msg =
         e?.response?.data?.message ||
         e?.message ||
         "닉네임 변경에 실패했습니다.";
-      Alert.alert("오류", msg);
+      setDialog({ open: true, kind: "negative", title: "오류", message: msg });
     } finally {
       setNicknameSaving(false);
     }
@@ -281,11 +301,14 @@ export default function ProfileEditScreen({ navigation }: { navigation: any }) {
       const weeklyGoalNumberRaw =
         weeklyGoal?.trim() === "" ? undefined : Number(weeklyGoal);
       const weeklySanitized =
-        typeof weeklyGoalNumberRaw === "number" && !Number.isNaN(weeklyGoalNumberRaw)
+        typeof weeklyGoalNumberRaw === "number" &&
+        !Number.isNaN(weeklyGoalNumberRaw)
           ? Math.max(0.01, weeklyGoalNumberRaw)
           : undefined;
 
-      const urlOk = Boolean(profileImageUrl && /^https?:\/\//i.test(profileImageUrl));
+      const urlOk = Boolean(
+        profileImageUrl && /^https?:\/\//i.test(profileImageUrl)
+      );
 
       const payload = {
         // nickname 제외 ✅ (닉네임은 onChangeNickname 경로)
@@ -297,7 +320,7 @@ export default function ProfileEditScreen({ navigation }: { navigation: any }) {
       };
       console.log("PUT /v1/users/me", payload);
       await client.put("/v1/users/me", payload);
-      Alert.alert("완료", "프로필이 수정되었습니다.");
+      setDialog({ open: true, kind: "positive", title: "완료", message: "프로필이 수정되었습니다." });
       await loadMe();
       // 저장 후 이전 화면으로 복귀하면 focus에서 재조회
       navigation?.goBack?.();
@@ -307,7 +330,7 @@ export default function ProfileEditScreen({ navigation }: { navigation: any }) {
         e?.response?.data?.message ||
         e?.message ||
         "프로필 수정에 실패했습니다.";
-      Alert.alert("오류", msg);
+      setDialog({ open: true, kind: "negative", title: "오류", message: msg });
     } finally {
       setSaving(false);
     }
@@ -328,133 +351,166 @@ export default function ProfileEditScreen({ navigation }: { navigation: any }) {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* 상단 제목 */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation?.goBack?.()}>
-          <Text style={styles.backButton}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>기본 정보 관리</Text>
-      </View>
-
-      {/* 본문 */}
-      <View style={styles.main}>
-        <Text style={styles.title}>프로필 정보를 수정하세요!</Text>
-        <Text style={styles.subtitle}>
-          러닝을 시작하기 위한{"\n"}기본 정보를 업데이트해주세요
-        </Text>
-
-        {/* 프로필 사진 */}
-        <View style={styles.profileImage}>
-          {profileImageUrl ? (
-            <Image
-              key={imageCacheBuster}
-              source={{
-                uri: profileImageUrl + (profileImageUrl.includes('?') ? '&' : '?') + `_cache=${imageCacheBuster}`
-              }}
-              style={{ width: 100, height: 100, borderRadius: 50 }}
-            />
-          ) : (
-            <Text style={styles.profileIcon}>👤</Text>
-          )}
+    <>
+      {dialog.open && dialog.kind === "positive" && (
+        <PositiveAlert
+          visible
+          title={dialog.title}
+          message={dialog.message}
+          onClose={() => setDialog({ open: false, kind: "message" })}
+        />
+      )}
+      {dialog.open && dialog.kind === "negative" && (
+        <NegativeAlert
+          visible
+          title={dialog.title}
+          message={dialog.message}
+          onClose={() => setDialog({ open: false, kind: "message" })}
+        />
+      )}
+      {dialog.open && dialog.kind === "message" && (
+        <MessageAlert
+          visible
+          title={dialog.title}
+          message={dialog.message}
+          onClose={() => setDialog({ open: false, kind: "message" })}
+        />
+      )}
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* 상단 제목 */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation?.goBack?.()}>
+            <Text style={styles.backButton}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>기본 정보 관리</Text>
         </View>
-        <TouchableOpacity onPress={onChangePhoto} disabled={uploading}>
-          <Text style={[styles.changePhoto, uploading && { opacity: 0.6 }]}>
-            {uploading ? "업로드 중…" : "프로필 사진 변경"}
-          </Text>
-        </TouchableOpacity>
 
-        {/* 닉네임 (별도 변경 버튼) */}
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>닉네임</Text>
-          <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
-            <View
-              style={[
-                styles.input,
-                { flex: 1, flexDirection: "row", alignItems: "center" },
-              ]}
-            >
-              <TextInput
-                style={[styles.textInput, { flex: 1 }]}
-                placeholder="닉네임을 입력하세요"
-                placeholderTextColor="rgba(68,68,68,0.27)"
-                value={nickname}
-                onChangeText={setNickname}
-                autoCapitalize="none"
-                maxLength={20}
+        {/* 본문 */}
+        <View style={styles.main}>
+          <Text style={styles.title}>프로필 정보를 수정하세요!</Text>
+          <Text style={styles.subtitle}>
+            러닝을 시작하기 위한{"\n"}기본 정보를 업데이트해주세요
+          </Text>
+
+          {/* 프로필 사진 */}
+          <View style={styles.profileImage}>
+            {profileImageUrl ? (
+              <Image
+                key={imageCacheBuster}
+                source={{
+                  uri:
+                    profileImageUrl +
+                    (profileImageUrl.includes("?") ? "&" : "?") +
+                    `_cache=${imageCacheBuster}`,
+                }}
+                style={{ width: 100, height: 100, borderRadius: 50 }}
               />
-              {nicknameChecking && (
-                <ActivityIndicator style={{ marginLeft: 8 }} />
-              )}
+            ) : (
+              <Text style={styles.profileIcon}>👤</Text>
+            )}
+          </View>
+          <TouchableOpacity onPress={onChangePhoto} disabled={uploading}>
+            <Text style={[styles.changePhoto, uploading && { opacity: 0.6 }]}>
+              {uploading ? "업로드 중…" : "프로필 사진 변경"}
+            </Text>
+          </TouchableOpacity>
+
+          {/* 닉네임 (별도 변경 버튼) */}
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>닉네임</Text>
+            <View
+              style={{ flexDirection: "row", gap: 10, alignItems: "center" }}
+            >
+              <View
+                style={[
+                  styles.input,
+                  { flex: 1, flexDirection: "row", alignItems: "center" },
+                ]}
+              >
+                <TextInput
+                  style={[styles.textInput, { flex: 1 }]}
+                  placeholder="닉네임을 입력하세요"
+                  placeholderTextColor="rgba(68,68,68,0.27)"
+                  value={nickname}
+                  onChangeText={setNickname}
+                  autoCapitalize="none"
+                  maxLength={20}
+                />
+                {nicknameChecking && (
+                  <ActivityIndicator style={{ marginLeft: 8 }} />
+                )}
+              </View>
+
+              <TouchableOpacity
+                onPress={onChangeNickname}
+                disabled={!canChangeNickname}
+                style={[
+                  styles.nickChangeBtn,
+                  { opacity: canChangeNickname ? 1 : 0.5 },
+                ]}
+              >
+                {nicknameSaving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.nickChangeBtnText}>변경</Text>
+                )}
+              </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              onPress={onChangeNickname}
-              disabled={!canChangeNickname}
-              style={[
-                styles.nickChangeBtn,
-                { opacity: canChangeNickname ? 1 : 0.5 },
-              ]}
-            >
-              {nicknameSaving ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.nickChangeBtnText}>변경</Text>
-              )}
-            </TouchableOpacity>
+            {/* 입력 오른쪽 배지 제거, 필요 시 하단 안내만 */}
+            {!!nicknameError && (
+              <Text style={{ color: "#d00", marginTop: 6 }}>
+                {nicknameError}
+              </Text>
+            )}
           </View>
 
-          {/* 입력 오른쪽 배지 제거, 필요 시 하단 안내만 */}
-          {!!nicknameError && (
-            <Text style={{ color: "#d00", marginTop: 6 }}>{nicknameError}</Text>
-          )}
-        </View>
-
-        {/* 거주 지역 */}
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>거주 지역</Text>
-          <View style={styles.input}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="예) 강원도 춘천시"
-              placeholderTextColor="rgba(68,68,68,0.27)"
-              value={residence}
-              onChangeText={setResidence}
-            />
+          {/* 거주 지역 */}
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>거주 지역</Text>
+            <View style={styles.input}>
+              <TextInput
+                style={styles.textInput}
+                placeholder="예) 강원도 춘천시"
+                placeholderTextColor="rgba(68,68,68,0.27)"
+                value={residence}
+                onChangeText={setResidence}
+              />
+            </View>
           </View>
-        </View>
 
-        {/* 주간 목표 거리 */}
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>주간 목표 거리 (km)</Text>
-          <View style={styles.input}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="예) 25"
-              placeholderTextColor="rgba(68,68,68,0.27)"
-              value={weeklyGoal}
-              onChangeText={(v) => setWeeklyGoal(v.replace(/[^\d]/g, ""))} // 숫자만
-              keyboardType="number-pad"
-              inputMode="numeric"
-              maxLength={4}
-            />
+          {/* 주간 목표 거리 */}
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>주간 목표 거리 (km)</Text>
+            <View style={styles.input}>
+              <TextInput
+                style={styles.textInput}
+                placeholder="예) 25"
+                placeholderTextColor="rgba(68,68,68,0.27)"
+                value={weeklyGoal}
+                onChangeText={(v) => setWeeklyGoal(v.replace(/[^\d]/g, ""))} // 숫자만
+                keyboardType="number-pad"
+                inputMode="numeric"
+                maxLength={4}
+              />
+            </View>
           </View>
-        </View>
 
-        {/* 저장 버튼 (닉네임 제외) */}
-        <TouchableOpacity
-          style={[styles.saveButton, { opacity: canSaveProfile ? 1 : 0.5 }]}
-          disabled={!canSaveProfile}
-          onPress={onSaveProfile}
-        >
-          {saving || uploading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.saveButtonText}>변경사항 저장</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          {/* 저장 버튼 (닉네임 제외) */}
+          <TouchableOpacity
+            style={[styles.saveButton, { opacity: canSaveProfile ? 1 : 0.5 }]}
+            disabled={!canSaveProfile}
+            onPress={onSaveProfile}
+          >
+            {saving || uploading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.saveButtonText}>변경사항 저장</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </>
   );
 }
 
