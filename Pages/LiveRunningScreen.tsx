@@ -41,6 +41,9 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
   // 백그라운드 러닝 훅
   const backgroundRunning = useBackgroundRunning();
 
+  // 워치 연결 상태
+  const watchStatus = useWatchConnection();
+
   const insets = useSafeAreaInsets();
   const bottomSafe = Math.max(insets.bottom, 12);
 
@@ -56,6 +59,10 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
   const [activeTab, setActiveTab] = useState<'running' | 'journey'>('running');
   const [mapReady, setMapReady] = useState(false);
   const [countdownVisible, setCountdownVisible] = useState(false);
+
+  // 워치 모드 상태
+  const [watchMode, setWatchMode] = useState(false);
+  const [watchData, setWatchData] = useState<RealtimeRunningData | null>(null);
 
   // 날씨 정보
   const { weather, loading: weatherLoading } = useWeather();
@@ -108,27 +115,90 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
     };
   }, []);
 
-  const handleRunningStart = useCallback(() => {
-    console.log("[LiveRunning] start pressed -> show countdown");
-    // 카운트다운 동안 GPS 가열: 초기 위치 락 향상
-    try { (t as any).prime?.(); } catch {}
-    setCountdownVisible(true);
+  // 워치 동기화 초기화
+  useEffect(() => {
+    if (isWatchAvailable()) {
+      console.log('[LiveRunning] Initializing watch sync');
+      initWatchSync();
+    }
   }, []);
 
+  // 워치 모드일 때 실시간 데이터 구독
+  useEffect(() => {
+    if (!watchMode || !t.isRunning) return;
+
+    console.log('[LiveRunning] Subscribing to watch updates');
+    const unsubscribe = subscribeRealtimeUpdates((data) => {
+      console.log('[LiveRunning] Watch data received:', data);
+      setWatchData(data);
+
+      // 워치 데이터로 UI 업데이트
+      // Note: useLiveRunTracker는 phone-only 모드이므로, watch 모드에서는 별도 상태 관리
+      // 여기서는 watchData 상태를 업데이트하고, RunStatsCard에 전달
+    });
+
+    return unsubscribe;
+  }, [watchMode, t.isRunning]);
+
+  const handleRunningStart = useCallback(() => {
+    console.log("[LiveRunning] start pressed -> checking watch connection");
+
+    // 워치 연결 확인 후 모드 결정
+    if (watchStatus.isConnected && isWatchAvailable()) {
+      console.log("[LiveRunning] Watch connected, using watch mode");
+      setWatchMode(true);
+    } else {
+      console.log("[LiveRunning] Watch not connected, using phone-only mode");
+      setWatchMode(false);
+      // 폰 모드에서만 GPS 가열
+      try { (t as any).prime?.(); } catch {}
+    }
+
+    setCountdownVisible(true);
+  }, [watchStatus.isConnected]);
+
   const handleCountdownDone = useCallback(async () => {
-    console.log("[LiveRunning] countdown done");
+    console.log("[LiveRunning] countdown done, watchMode:", watchMode);
     console.log("[LiveRunning] AppState at start:", AppState.currentState);
     setCountdownVisible(false);
 
-    // 즉시 시작 시도 (권한은 내부에서 처리)
-    requestAnimationFrame(() => {
-      console.log("[LiveRunning] calling t.start()");
-      t.start();
-    });
+    if (watchMode) {
+      // 워치 모드: 워치 세션 시작
+      try {
+        console.log("[LiveRunning] Starting watch session");
+        const sessionId = await startRunOrchestrated('SINGLE');
+        console.log("[LiveRunning] Watch session started:", sessionId);
+        setAlert({
+          open: true,
+          kind: 'positive',
+          title: '워치 연동',
+          message: '워치와 연동되어 러닝을 시작합니다'
+        });
+      } catch (error) {
+        console.error("[LiveRunning] Watch start failed, fallback to phone mode:", error);
+        // 워치 시작 실패 시 폰 모드로 전환
+        setWatchMode(false);
+        requestAnimationFrame(() => {
+          t.start();
+        });
+        setAlert({
+          open: true,
+          kind: 'negative',
+          title: '워치 연동 실패',
+          message: '폰 모드로 시작합니다'
+        });
+      }
+    } else {
+      // 폰 전용 모드: 기존 로직
+      requestAnimationFrame(() => {
+        console.log("[LiveRunning] calling t.start() (phone mode)");
+        t.start();
+      });
+    }
 
     // 권한 요청은 비동기로 병렬 처리 (UI 차단 방지)
     backgroundRunning.requestNotificationPermission().catch(() => {});
-  }, [t, backgroundRunning]);
+  }, [watchMode, t, backgroundRunning]);
 
   const elapsedLabel = useMemo(() => {
     const m = Math.floor(t.elapsedSec / 60);
@@ -393,13 +463,17 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
         />
       </View>
 
-      {(t.isRunning || t.isPaused) && (
+      {(t.isRunning || t.isPaused || watchMode) && (
         <RunStatsCard
-          distanceKm={t.distance}
-          paceLabel={t.paceLabel}
-          kcal={t.kcal}
+          distanceKm={watchMode && watchData ? watchData.distanceMeters / 1000 : t.distance}
+          paceLabel={
+            watchMode && watchData && watchData.averagePaceSeconds
+              ? `${Math.floor(watchData.averagePaceSeconds / 60)}:${String(watchData.averagePaceSeconds % 60).padStart(2, "0")}`
+              : t.paceLabel
+          }
+          kcal={watchMode && watchData ? watchData.calories : t.kcal}
           speedKmh={t.speedKmh}
-          elapsedSec={t.elapsedSec}
+          elapsedSec={watchMode && watchData ? watchData.durationSeconds : t.elapsedSec}
         />
       )}
 
