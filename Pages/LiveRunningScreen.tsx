@@ -25,6 +25,14 @@ import { useBackgroundRunning } from "../hooks/journey/useBackgroundRunning";
 import { useWeather } from "../contexts/WeatherContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiComplete } from "../utils/api/running"; // ✅ 추가
+import {
+  initWatchSync,
+  subscribeRealtimeUpdates,
+  startRunOrchestrated,
+  isWatchAvailable,
+  type RealtimeRunningData
+} from "../src/modules/watchSync";
+import { useWatchConnection } from "../src/hooks/useWatchConnection";
 
 export default function LiveRunningScreen({ navigation, route }: { navigation: any; route?: any }) {
   const targetDistanceKm = (route?.params?.targetDistanceKm as number | undefined) ?? undefined;
