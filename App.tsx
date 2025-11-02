@@ -62,7 +62,7 @@ function MainTabs() {
       tabBar={(props) => <TabBarAdapter {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="LiveRunningScreen" component={RunningStartScreen} />
+      <Tab.Screen name="LiveRunningScreen" component={LiveRunningScreen} />
       <Tab.Screen name="Feed" component={Feed2} />
       <Tab.Screen name="Record" component={Record} />
       <Tab.Screen name="Crew" component={CrewScreen} />
