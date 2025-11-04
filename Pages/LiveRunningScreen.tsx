@@ -202,6 +202,12 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
         // 워치 러닝 종료
         setWatchRunning(false);
 
+        // 혹시 실행 중인 핸드폰 러닝이 있다면 종료 (정리)
+        if (t.isRunning) {
+          console.log('[LiveRunning] Stopping phone running session after watch complete');
+          t.stop().catch(err => console.error('[LiveRunning] Failed to stop:', err));
+        }
+
         // AsyncStorage 세션 정보 제거
         import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
           AsyncStorage.removeItem('@running_session');
@@ -325,6 +331,12 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
 
   const doExitWithoutSave = useCallback(async () => {
     try {
+      // 혹시 실행 중인 러닝 세션이 있다면 종료
+      if (t.isRunning) {
+        console.log('[LiveRunning] Stopping running session in doExitWithoutSave');
+        await t.stop();
+      }
+
       await backgroundRunning.clearSession();
 
       // AsyncStorage 세션 정보도 제거
