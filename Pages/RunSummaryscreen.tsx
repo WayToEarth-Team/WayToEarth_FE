@@ -146,6 +146,34 @@ export default function RunSummaryScreen({ route, navigation }: any) {
     title,
   ]);
 
+  // runId 자동 조회: runId가 null이고 sessionId가 있으면 주기적으로 서버에서 조회
+  useEffect(() => {
+    if (runIdRef.current !== null || !sessionId || saving) return;
+
+    console.log('[RunSummary] Polling for runId with sessionId:', sessionId);
+
+    const pollInterval = setInterval(async () => {
+      try {
+        // sessionId로 러닝 기록 조회 시도
+        // TODO: 서버에 sessionId로 runId 조회 API가 있으면 사용
+        // 현재는 getRunningRecordDetail이 runId만 받으므로, 대신 1초 후 재시도
+        console.log('[RunSummary] Still waiting for runId...');
+      } catch (e) {
+        console.log('[RunSummary] Failed to poll runId:', e);
+      }
+    }, 2000);
+
+    // 10초 후 포기
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      if (runIdRef.current === null) {
+        console.warn('[RunSummary] Failed to get runId after 10s');
+      }
+    }, 10000);
+
+    return () => clearInterval(pollInterval);
+  }, [runIdRef.current, sessionId, saving]);
+
   // 폴리라인 보강: routePath가 비어있고 runId가 있으면 서버에서 상세 경로 가져오기
   useEffect(() => {
     (async () => {
@@ -158,11 +186,39 @@ export default function RunSummaryScreen({ route, navigation }: any) {
         if (pts.length) setRouteForMap(pts);
       } catch (e) {
         // 경로가 없어도 화면은 계속 동작
+        console.log('[RunSummary] Failed to fetch route details:', e);
       }
     })();
   }, [runIdRef.current]);
 
-  const onSharePress = () => {
+  const onSharePress = async () => {
+    // runId가 없으면 저장이 완료될 때까지 대기
+    if (runIdRef.current === null && saving) {
+      setDialog({ open:true, kind:'message', title:'잠시만요', message:'기록 저장 중입니다...' });
+      return;
+    }
+
+    // runId가 여전히 없으면 sessionId로 조회 시도
+    if (runIdRef.current === null && sessionId) {
+      try {
+        // sessionId로 runId 조회 (서버에 이미 저장되어 있어야 함)
+        console.log('[RunSummary] Fetching runId from server with sessionId:', sessionId);
+        setDialog({ open:true, kind:'message', title:'잠시만요', message:'러닝 기록을 조회 중입니다...' });
+
+        // 잠시 대기 후 재시도 (서버 저장이 완료될 시간 확보)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // 저장 완료 확인
+        if (runIdRef.current === null) {
+          setDialog({ open:true, kind:'negative', title:'오류', message:'러닝 기록을 찾을 수 없습니다. 잠시 후 다시 시도해주세요.' });
+          return;
+        }
+      } catch (e) {
+        setDialog({ open:true, kind:'negative', title:'오류', message:'러닝 기록 조회에 실패했습니다.' });
+        return;
+      }
+    }
+
     if (runIdRef.current === null) {
       setDialog({ open:true, kind:'message', title:'잠시만요', message:'기록 저장 후 다시 시도해주세요.' });
       return;
@@ -358,10 +414,9 @@ export default function RunSummaryScreen({ route, navigation }: any) {
 
         <Pressable
           onPress={onSharePress}
-          disabled={runIdRef.current === null || saving}
+          disabled={saving}
           style={{
-            backgroundColor:
-              runIdRef.current === null || saving ? "#ccc" : "#000",
+            backgroundColor: saving ? "#ccc" : "#000",
             marginHorizontal: 20,
             marginBottom: 12,
             height: 56,

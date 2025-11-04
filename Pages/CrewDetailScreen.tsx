@@ -772,7 +772,8 @@ export default function CrewDetailScreen() {
                     onConfirm: async () => {
                       await closeCrew(crewId);
                       setAlert({ open:true, kind:'positive', title:'완료', message:'크루가 폐쇄되었습니다.' });
-                      navigation.navigate("Crew" as never);
+                      // 폐쇄 후 뒤로 가기 (크루 목록 화면으로)
+                      navigation.goBack();
                     },
                   });
                 }}
@@ -793,7 +794,8 @@ export default function CrewDetailScreen() {
                       try {
                         await leaveCrew(crewId);
                         setAlert({ open:true, kind:'positive', title:'완료', message:'크루에서 탈퇴했습니다.' });
-                        navigation.navigate("Crew" as never);
+                        // 탈퇴 후 뒤로 가기 (크루 목록 화면으로)
+                        navigation.goBack();
                       } catch (e: any) {
                         const msg = e?.response?.data?.message || e?.message || '잠시 후 다시 시도해주세요.';
                         if (/크루장|OWNER|소유자/.test(String(msg))) {

@@ -20,7 +20,7 @@ export default {
     },
 
     ios: {
-      bundleIdentifier: "com.waytoearth", // ✅ 필수 추가
+      bundleIdentifier: "com.waytoearth", // ???�수 추�?
       supportsTablet: true,
       config: { googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY },
     },
@@ -28,7 +28,7 @@ export default {
     android: {
       package: "cloud.waytoearth",
       googleServicesFile: "./google-services.json",
-      // Android 권한: 백그라운드 위치/정밀 위치/FG 서비스/알림
+      // Android 권한: 백그?�운???�치/?��? ?�치/FG ?�비???�림
       permissions: [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -71,8 +71,9 @@ export default {
       apiBaseUrl:
         process.env.EXPO_PUBLIC_API_BASE_URL || "https://api.waytoearth.cloud",
       mockEnabled: process.env.EXPO_PUBLIC_API_MOCK === "1",
-      crewMockEnabled: false, // 실제 크루 API 연동 사용
+      crewMockEnabled: false, // ?�제 ?�루 API ?�동 ?�용
       eas: { projectId: "7a5e6a60-69ad-4ddc-8301-9aaf03e404a6" },
     },
   },
 };
+
