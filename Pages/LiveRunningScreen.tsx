@@ -65,6 +65,7 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
   const [watchRunning, setWatchRunning] = useState(false);
   const [watchData, setWatchData] = useState<RealtimeRunningData | null>(null);
   const [watchCompleteData, setWatchCompleteData] = useState<any>(null);
+  const [watchRoutePoints, setWatchRoutePoints] = useState<Array<{latitude: number; longitude: number}>>([]);
 
   // 날씨 정보
   const { weather, loading: weatherLoading } = useWeather();
@@ -150,12 +151,29 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
         });
       }
 
-      // 워치 위치로 지도 이동
-      if (data.currentPoint && t.bindMapCenter) {
-        t.bindMapCenter({
+      // 워치 위치로 지도 이동 및 경로 누적
+      if (data.currentPoint && data.currentPoint.latitude && data.currentPoint.longitude) {
+        const newPoint = {
           latitude: data.currentPoint.latitude,
           longitude: data.currentPoint.longitude,
+        };
+
+        // 경로에 새 포인트 추가 (중복 방지)
+        setWatchRoutePoints(prev => {
+          const lastPoint = prev[prev.length - 1];
+          // 마지막 포인트와 동일한지 확인 (좌표가 정확히 같으면 추가하지 않음)
+          if (lastPoint &&
+              Math.abs(lastPoint.latitude - newPoint.latitude) < 0.00001 &&
+              Math.abs(lastPoint.longitude - newPoint.longitude) < 0.00001) {
+            return prev;
+          }
+          return [...prev, newPoint];
         });
+
+        // 지도 중심 이동
+        if (t.bindMapCenter) {
+          t.bindMapCenter(newPoint);
+        }
       }
     });
 
@@ -196,10 +214,31 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
       }
     });
 
+    // wearRunIdReceived 이벤트 리스너 추가 (서버에서 runId 수신)
+    const runIdSub = emitter.addListener('wearRunIdReceived', (payload: string) => {
+      console.log('[LiveRunning] Watch runId received:', payload);
+
+      try {
+        const data = JSON.parse(payload);
+        console.log('[LiveRunning] Parsed runId data:', data);
+
+        // watchCompleteData 업데이트
+        setWatchCompleteData(prev => {
+          if (prev && prev.sessionId === data.sessionId) {
+            return { ...prev, runId: data.runId };
+          }
+          return prev;
+        });
+      } catch (e) {
+        console.error('[LiveRunning] Failed to parse runId data:', e);
+      }
+    });
+
     return () => {
       unsubscribeUpdates();
       startedSub.remove();
       completeSub.remove();
+      runIdSub.remove();
     };
   }, [watchMode]);
 
@@ -299,6 +338,7 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
     setWatchRunning(false);
     setWatchData(null);
     setWatchCompleteData(null);
+    setWatchRoutePoints([]);
 
     if (navigationRef.isReady()) {
       navigationRef.dispatch(StackActions.replace("MainTabs"));
@@ -336,22 +376,38 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
         const calories = watchCompleteData.calories || 0;
         const durationSec = watchCompleteData.durationSeconds || 0;
 
+        // routePoints 처리: watchCompleteData에서 가져오거나 실시간 누적된 watchRoutePoints 사용
+        let routePointsForSummary = [];
+        if (watchCompleteData.routePoints && Array.isArray(watchCompleteData.routePoints) && watchCompleteData.routePoints.length > 0) {
+          routePointsForSummary = watchCompleteData.routePoints.map((p: any) => ({
+            latitude: p.latitude,
+            longitude: p.longitude,
+          }));
+          console.log('[LiveRunning] Using routePoints from watchCompleteData:', routePointsForSummary.length);
+        } else if (watchRoutePoints.length > 0) {
+          routePointsForSummary = watchRoutePoints;
+          console.log('[LiveRunning] Using accumulated watchRoutePoints:', routePointsForSummary.length);
+        } else {
+          console.warn('[LiveRunning] No route points available');
+        }
+
         await backgroundRunning.stopForegroundService();
         await backgroundRunning.clearSession();
 
         // watchMode 리셋
         setWatchMode(false);
         setWatchCompleteData(null);
+        setWatchRoutePoints([]);
 
         navigation.navigate("RunSummary", {
-          runId: null, // watchSync.ts에서 이미 서버에 저장됨
+          runId: watchCompleteData.runId || null, // watchSync.ts에서 apiComplete 결과로 받은 runId
           defaultTitle: "오늘의 러닝",
           distanceKm,
           paceLabel: avgPaceSec ? `${Math.floor(avgPaceSec / 60)}:${String(avgPaceSec % 60).padStart(2, "0")}` : "--:--",
           kcal: calories,
           elapsedSec: durationSec,
           elapsedLabel: `${Math.floor(durationSec / 60)}:${String(durationSec % 60).padStart(2, "0")}`,
-          routePath: [], // 워치 데이터에는 전체 경로 없음
+          routePath: routePointsForSummary,
           sessionId: watchCompleteData.sessionId || "",
         });
       } else {
@@ -460,8 +516,8 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
         cancelText="저장 안 함"
       />
       <MapRoute
-        route={t.route}
-        last={t.last}
+        route={watchMode && watchRunning ? watchRoutePoints : t.route}
+        last={watchMode && watchRunning && watchRoutePoints.length > 0 ? watchRoutePoints[watchRoutePoints.length - 1] : t.last}
         liveMode
         onBindCenter={t.bindMapCenter}
         onBindSnapshot={(fn) => {

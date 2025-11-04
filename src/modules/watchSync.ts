@@ -166,8 +166,21 @@ export function initWatchSync() {
         };
         console.log('[API] running/complete payload:', { sessionId: body.sessionId, distanceMeters, durationSeconds, averagePaceSeconds, calories, averageHeartRate, maxHeartRate, count: routePoints.length });
 
-        // Send to backend
-        apiComplete(body).catch(err => console.log('[API ERR] complete:', err?.message));
+        // Send to backend and store runId
+        apiComplete(body)
+          .then(result => {
+            console.log('[API OK] running/complete -> runId:', result?.runId);
+            // runId를 complete data에 추가하고 별도 이벤트 발생
+            if (result?.runId) {
+              run.runId = result.runId;
+              // runId를 별도로 알리는 이벤트 발생
+              emitter.emit('wearRunIdReceived', JSON.stringify({
+                sessionId: run.sessionId,
+                runId: result.runId
+              }));
+            }
+          })
+          .catch(err => console.log('[API ERR] complete:', err?.message));
 
         // Clear realtime data and notify listeners (running has ended)
         realtimeData = null;
