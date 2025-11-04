@@ -165,18 +165,15 @@ export default function CrewScreen() {
               progress={c.progress}
               imageUrl={c.imageUrl}
               onPress={() => {
-                if (!myCrew) {
-                  setSelected({
-                    id: c.id,
-                    name: c.name,
-                    description: c.description,
-                    progress: c.progress,
-                  });
-                  setPreviewOpen(false);
-                  setDetailOpen(true);
-                } else {
-                  setDialog({ open:true, kind:'message', title:'가입 불가', message:'현재 가입된 크루가 이미 있습니다.' });
-                }
+                // 크루 상세 화면은 항상 볼 수 있도록 허용
+                setSelected({
+                  id: c.id,
+                  name: c.name,
+                  description: c.description,
+                  progress: c.progress,
+                });
+                setPreviewOpen(false);
+                setDetailOpen(true);
               }}
             />
           ))}
@@ -264,6 +261,12 @@ export default function CrewScreen() {
         onApply={
           selected
             ? async (intro) => {
+                // 가입 신청 시점에 이미 크루가 있는지 체크
+                if (myCrew) {
+                  setDialog({ open:true, kind:'message', title:'가입 불가', message:'이미 가입된 크루가 있습니다. 크루는 하나만 가입할 수 있습니다.' });
+                  return;
+                }
+
                 try {
                   const res = await joinExistingCrew(
                     {
