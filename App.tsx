@@ -19,6 +19,9 @@ import {
   setupTokenRefreshListener,
 } from "./utils/notifications";
 import { WeatherProvider } from "./contexts/WeatherContext";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./utils/queryClient";
+import { setupReactQueryFocus } from "./utils/reactQueryFocus";
 
 import Onboading from "./Pages/Onboading";
 import OnboardingScreen from "./Pages/OnboardingScreen";
@@ -71,6 +74,8 @@ function MainTabs() {
 }
 
 export default function App() {
+  // React Query가 RN 포커스를 인지하도록 설정(1회)
+  setupReactQueryFocus();
   useEffect(() => {
     // ===== 워치 모듈 디버깅 =====
     console.log("===== NATIVE MODULES CHECK =====");
@@ -123,8 +128,9 @@ export default function App() {
   };
 
   return (
-    <WeatherProvider>
-      <SafeAreaProvider>
+    <QueryClientProvider client={queryClient}>
+      <WeatherProvider>
+        <SafeAreaProvider>
       <NavigationContainer ref={navigationRef} onReady={handleNavReady}>
         <Stack.Navigator
           initialRouteName={"Onboading"}
@@ -220,8 +226,9 @@ export default function App() {
           options={{ headerShown: false }}
         />
       </Stack.Navigator>
-    </NavigationContainer>
-    </SafeAreaProvider>
-    </WeatherProvider>
+      </NavigationContainer>
+        </SafeAreaProvider>
+      </WeatherProvider>
+    </QueryClientProvider>
   );
 }

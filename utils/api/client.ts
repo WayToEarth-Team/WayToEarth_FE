@@ -1,6 +1,7 @@
 // utils/api/client.ts
 import axios, { AxiosResponse } from "axios";
 import { getAccessToken, refreshAccessToken, ensureAccessToken } from "../auth/tokenManager";
+import { showToast } from "../toast";
 
 // 목데이터 사용 중단: 항상 실서버 연동
 
@@ -66,6 +67,19 @@ client.interceptors.response.use(
       } catch (e) {
         // fallthrough to reject below after cleanup
       }
+    }
+
+    // 429 Too Many Requests: 사용자 알림 후 단회 지연 재시도
+    if (status === 429 && !(cfg as any)._retry429) {
+      (cfg as any)._retry429 = true;
+      try {
+        showToast("요청이 너무 많습니다. 잠시 후 다시 시도해주세요.");
+      } catch {}
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(client(cfg));
+        }, 30_000);
+      });
     }
 
     // 로깅 (디버깅용)
