@@ -14,6 +14,8 @@ import { caloriesKcal } from '../../utils/run';
 const { WayToEarthWear } = NativeModules as any;
 const emitter = new NativeEventEmitter(WayToEarthWear);
 
+const debugLog = (...args: any[]) => { if (__DEV__) { try { console.log(...args); } catch {} } };
+
 export type RunningType = 'SINGLE' | 'JOURNEY' | 'CREW' | string;
 
 export interface RealtimeRunningData {
@@ -51,24 +53,24 @@ export function initWatchSync() {
 
   subs.push(
     emitter.addListener('wearStarted', (s: string) => {
-      try { console.log('[WEAR EVT] started:', s); } catch {}
+      try { debugLog('[WEAR EVT] started:', s); } catch {}
     }),
     emitter.addListener('wearStopped', (s: string) => {
-      try { console.log('[WEAR EVT] stopped:', s); } catch {}
+      try { debugLog('[WEAR EVT] stopped:', s); } catch {}
     }),
     emitter.addListener('wearPaused', (s: string) => {
       try {
-        console.log('[WEAR EVT] paused:', s);
+        debugLog('[WEAR EVT] paused:', s);
         const p = JSON.parseSafe(s);
-        if (p?.sessionId) apiPause({ sessionId: p.sessionId }).catch(err => console.log('[API ERR] pause:', err?.message));
-      } catch (e) { console.log('[EVT ERR] wearPaused parse:', (e as Error).message); }
+        if (p?.sessionId) apiPause({ sessionId: p.sessionId }).catch(err => debugLog('[API ERR] pause:', err?.message));
+      } catch (e) { debugLog('[EVT ERR] wearPaused parse:', (e as Error).message); }
     }),
     emitter.addListener('wearResumed', (s: string) => {
       try {
-        console.log('[WEAR EVT] resumed:', s);
+        debugLog('[WEAR EVT] resumed:', s);
         const p = JSON.parseSafe(s);
-        if (p?.sessionId) apiResume({ sessionId: p.sessionId }).catch(err => console.log('[API ERR] resume:', err?.message));
-      } catch (e) { console.log('[EVT ERR] wearResumed parse:', (e as Error).message); }
+        if (p?.sessionId) apiResume({ sessionId: p.sessionId }).catch(err => debugLog('[API ERR] resume:', err?.message));
+      } catch (e) { debugLog('[EVT ERR] wearResumed parse:', (e as Error).message); }
     }),
     emitter.addListener('wearRealtimeUpdate', (s: string) => {
       try {
@@ -110,7 +112,7 @@ export function initWatchSync() {
           try {
             listener(realtimeData!);
           } catch (err) {
-            console.log('[UI ERR] realtime listener:', (err as Error).message);
+            debugLog('[UI ERR] realtime listener:', (err as Error).message);
           }
         });
 
@@ -123,15 +125,15 @@ export function initWatchSync() {
           calories,
           currentPoint,
         } as any;
-        console.log('[API] running/update payload:', body);
-        apiUpdate(body).catch(err => console.log('[API ERR] update:', err?.message));
+        debugLog('[API] running/update payload:', body);
+        apiUpdate(body).catch(err => debugLog('[API ERR] update:', err?.message));
       } catch (e) {
-        console.log('[EVT ERR] realtime parse:', (e as Error).message);
+        debugLog('[EVT ERR] realtime parse:', (e as Error).message);
       }
     }),
     emitter.addListener('wearRunningComplete', (s: string) => {
       try {
-        console.log('[WEAR EVT] complete len=', s?.length);
+        debugLog('[WEAR EVT] complete len=', s?.length);
         const run = JSON.parseSafe(s);
         if (!run || !run.sessionId) return;
         // Transform to apiComplete payload
@@ -164,12 +166,12 @@ export function initWatchSync() {
           routePoints,
           endedAt: Date.now(),
         };
-        console.log('[API] running/complete payload:', { sessionId: body.sessionId, distanceMeters, durationSeconds, averagePaceSeconds, calories, averageHeartRate, maxHeartRate, count: routePoints.length });
+        debugLog('[API] running/complete payload:', { sessionId: body.sessionId, distanceMeters, durationSeconds, averagePaceSeconds, calories, averageHeartRate, maxHeartRate, count: routePoints.length });
 
         // Send to backend and store runId
         apiComplete(body)
           .then(result => {
-            console.log('[API OK] running/complete -> runId:', result?.runId);
+            debugLog('[API OK] running/complete -> runId:', result?.runId);
             // runId를 complete data에 추가하고 별도 이벤트 발생
             if (result?.runId) {
               run.runId = result.runId;
@@ -180,14 +182,14 @@ export function initWatchSync() {
               }));
             }
           })
-          .catch(err => console.log('[API ERR] complete:', err?.message));
+          .catch(err => debugLog('[API ERR] complete:', err?.message));
 
         // Clear realtime data and notify listeners (running has ended)
         realtimeData = null;
         currentSessionId = null;
-        console.log('[WATCH] Running session cleared');
+        debugLog('[WATCH] Running session cleared');
       } catch (e) {
-        console.log('[EVT ERR] complete parse:', (e as Error).message);
+        debugLog('[EVT ERR] complete parse:', (e as Error).message);
       }
     }),
   );
@@ -205,58 +207,58 @@ export async function startRunOrchestrated(runningType: RunningType, opts?: { jo
     const startRes = await apiStart({ sessionId, runningType: (runningType as any) || 'SINGLE', journeyId: opts?.journeyId });
     const sid = String(startRes?.sessionId || sessionId);
     currentSessionId = sid;
-    console.log('[API OK] running/start -> sessionId=', sid);
+    debugLog('[API OK] running/start -> sessionId=', sid);
     // 2) Start watch session
     const ok = await WayToEarthWear.startWatchSession(sid, runningType);
-    console.log('[WEAR] start command sent ok=', ok);
+    debugLog('[WEAR] start command sent ok=', ok);
     return sid;
   } catch (e: any) {
-    console.log('[ORCH ERR] startRunOrchestrated:', e?.message);
+    debugLog('[ORCH ERR] startRunOrchestrated:', e?.message);
     throw e;
   }
 }
 
 export async function pauseRun(sessionId?: string) {
   if (!isWatchAvailable()) {
-    console.log('[ORCH WARN] pauseRun: Watch module not available');
+    debugLog('[ORCH WARN] pauseRun: Watch module not available');
     return false;
   }
   const sid = sessionId || currentSessionId; if (!sid) return false;
   try {
     const ok = await WayToEarthWear.pauseWatchSession(sid);
-    console.log('[WEAR] pause command sent ok=', ok);
+    debugLog('[WEAR] pause command sent ok=', ok);
     // 서버 동기화는 wearPaused 이벤트에서 호출됨(이중 호출 방지)
     return ok;
-  } catch (e:any) { console.log('[ORCH ERR] pause:', e?.message); return false; }
+  } catch (e:any) { debugLog('[ORCH ERR] pause:', e?.message); return false; }
 }
 
 export async function resumeRun(sessionId?: string) {
   if (!isWatchAvailable()) {
-    console.log('[ORCH WARN] resumeRun: Watch module not available');
+    debugLog('[ORCH WARN] resumeRun: Watch module not available');
     return false;
   }
   const sid = sessionId || currentSessionId; if (!sid) return false;
   try {
     const ok = await WayToEarthWear.resumeWatchSession(sid);
-    console.log('[WEAR] resume command sent ok=', ok);
+    debugLog('[WEAR] resume command sent ok=', ok);
     // 서버 동기화는 wearResumed 이벤트에서 호출됨
     return ok;
-  } catch (e:any) { console.log('[ORCH ERR] resume:', e?.message); return false; }
+  } catch (e:any) { debugLog('[ORCH ERR] resume:', e?.message); return false; }
 }
 
 export async function stopRun(sessionId?: string) {
   if (!isWatchAvailable()) {
-    console.log('[ORCH WARN] stopRun: Watch module not available');
+    debugLog('[ORCH WARN] stopRun: Watch module not available');
     return false;
   }
   const sid = sessionId || currentSessionId; if (!sid) return false;
   try {
     const ok = await WayToEarthWear.stopWatchSession(sid);
-    console.log('[WEAR] stop command sent ok=', ok);
+    debugLog('[WEAR] stop command sent ok=', ok);
     // 서버 complete는 wearRunningComplete 이벤트에서 호출됨
     // Note: realtimeData will be cleared after wearRunningComplete event
     return ok;
-  } catch (e:any) { console.log('[ORCH ERR] stop:', e?.message); return false; }
+  } catch (e:any) { debugLog('[ORCH ERR] stop:', e?.message); return false; }
 }
 
 // Subscribe to realtime updates
@@ -276,12 +278,12 @@ export function getRealtimeData(): RealtimeRunningData | null {
 
 // Cleanup all listeners and reset state
 export function cleanupWatchSync() {
-  console.log('[WATCH] Cleaning up listeners...');
+  debugLog('[WATCH] Cleaning up listeners...');
   subs.forEach(sub => {
     try {
       sub.remove();
     } catch (e) {
-      console.log('[WATCH] Failed to remove listener:', (e as Error).message);
+      debugLog('[WATCH] Failed to remove listener:', (e as Error).message);
     }
   });
   subs = [];
@@ -289,7 +291,7 @@ export function cleanupWatchSync() {
   realtimeData = null;
   currentSessionId = null;
   inited = false;
-  console.log('[WATCH] Cleanup complete');
+  debugLog('[WATCH] Cleanup complete');
 }
 
 // Check if watch module is available

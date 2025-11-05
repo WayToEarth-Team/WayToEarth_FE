@@ -92,7 +92,7 @@ export function useWatchConnection(): WatchConnectionStatus {
         });
       }
     } catch (error) {
-      console.log('[WATCH] Connection check failed:', error);
+      if (__DEV__) console.log('[WATCH] Connection check failed:', error);
       setStatus({
         isAvailable: true,
         isConnected: false,
