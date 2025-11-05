@@ -170,8 +170,7 @@ export async function isSecureStoreAvailable(): Promise<boolean> {
 export async function logStorageBackendOnce() {
   try {
     const available = await isSecureStoreAvailable();
-    console.log(`[auth] SecureStore available: ${available ? 'YES' : 'NO'}`);
-    console.log(`[auth] refreshToken backend: ${available ? 'SecureStore' : 'AsyncStorage (fallback)'}`);
+    if (__DEV__) console.log(`[auth] SecureStore available: ${available ? 'YES' : 'NO'}`);
+    if (__DEV__) console.log(`[auth] refreshToken backend: ${available ? 'SecureStore' : 'AsyncStorage (fallback)'}`);
   } catch {}
 }
-

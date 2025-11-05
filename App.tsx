@@ -77,16 +77,18 @@ export default function App() {
   // React Query가 RN 포커스를 인지하도록 설정(1회)
   setupReactQueryFocus();
   useEffect(() => {
-    // ===== 워치 모듈 디버깅 =====
-    console.log("===== NATIVE MODULES CHECK =====");
-    console.log("All modules:", Object.keys(NativeModules));
-    console.log("WayToEarthWear:", NativeModules.WayToEarthWear);
-    if (NativeModules.WayToEarthWear) {
-      console.log("WayToEarthWear methods:", Object.keys(NativeModules.WayToEarthWear));
-    } else {
-      console.error("❌ WayToEarthWear module NOT FOUND!");
+    if (__DEV__) {
+      // 개발 중에만 네이티브 모듈 점검 로그 표시
+      console.log("===== NATIVE MODULES CHECK =====");
+      console.log("All modules:", Object.keys(NativeModules));
+      console.log("WayToEarthWear:", NativeModules.WayToEarthWear);
+      if (NativeModules.WayToEarthWear) {
+        console.log("WayToEarthWear methods:", Object.keys(NativeModules.WayToEarthWear));
+      } else {
+        console.error("❌ WayToEarthWear module NOT FOUND!");
+      }
+      console.log("================================");
     }
-    console.log("================================");
 
     // Firebase FCM 토큰 등록 (Expo 서버 거치지 않음)
     (async () => {
@@ -94,7 +96,6 @@ export default function App() {
       if (token) {
         // 백엔드에 토큰 전송 (로그인 후에 호출하는 것이 더 좋음)
         // await sendTokenToServer(token);
-        console.log("Firebase FCM 토큰 발급 완료:", token);
       }
     })();
 

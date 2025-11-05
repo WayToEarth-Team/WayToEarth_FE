@@ -67,9 +67,6 @@ export default function FeedComposeScreen({ route, navigation }: any) {
     }
     try {
       setSubmitting(true);
-      console.log("[FeedCompose] 피드 생성 시도 - runId:", normalizedRunId);
-      console.log("[FeedCompose] content:", content);
-      console.log("[FeedCompose] photoUrl:", photoUrl);
       await createFeed({ runningRecordId: normalizedRunId, content, photoUrl });
       setDialog({ open: true, kind: 'positive', title: "공유 완료", message: "피드가 업로드되었습니다." });
       // 탭 네비게이터의 Feed 탭으로 이동 (중첩 네비게이션)
