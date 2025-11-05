@@ -3,6 +3,7 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import BottomNavigation from "./BottomNav";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState } from "react-native";
+import { useBottomBarHeight } from "./BottomBarHeightContext";
 
 const ROUTE_TO_KEY: Record<string, string> = {
   Profile: "profile",
@@ -24,6 +25,7 @@ export default function TabBarAdapter({
   state,
   navigation,
 }: BottomTabBarProps) {
+  const { setHeight } = useBottomBarHeight();
   const route = state.routes[state.index];
   const activeTab = ROUTE_TO_KEY[route.name] || "running";
 
@@ -60,6 +62,11 @@ export default function TabBarAdapter({
       unsubscribeFocus();
     };
   }, [route?.name, navigation]);
+
+  // 탭바가 숨김일 때는 높이를 0으로 반영
+  useEffect(() => {
+    if (hidden) setHeight(0);
+  }, [hidden, setHeight]);
 
   const onTabPress = (key: string) => {
     const target = KEY_TO_ROUTE[key];

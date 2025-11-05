@@ -9,8 +9,8 @@ import {
   Platform,
   KeyboardAvoidingView,
   ScrollView,
-  SafeAreaView,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { createFeed } from "../utils/api/feeds";
 import * as ImagePicker from "expo-image-picker";
 import { PositiveAlert, NegativeAlert, MessageAlert } from "../components/ui/AlertDialog";
@@ -95,7 +95,7 @@ export default function FeedComposeScreen({ route, navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={s.root}>
+    <SafeAreaView edges={["top"]} style={s.root}>
       {dialog.open && dialog.kind === 'positive' && (
         <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
       )}

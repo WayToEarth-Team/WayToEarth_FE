@@ -1,16 +1,7 @@
 // Pages/GuestbookScreen.tsx
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  SafeAreaView,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-  Image,
-} from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Image } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   getRecentGuestbooks,
   getGuestbookErrorMessage,
@@ -235,7 +226,7 @@ export default function GuestbookScreen({ navigation }: { navigation?: any }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={["top"]} style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>방명록 피드</Text>

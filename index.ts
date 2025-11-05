@@ -1,6 +1,16 @@
 import { registerRootComponent } from "expo";
 import messaging from "@react-native-firebase/messaging";
-// import notifee, { AndroidImportance, EventType } from "@notifee/react-native";
+// Lazy-load notifee so Expo Go / missing native module doesn't crash
+let notifee: any | null = null;
+let AndroidImportance: any | undefined;
+let EventType: any | undefined;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const mod = require("@notifee/react-native");
+  notifee = mod?.default ?? mod;
+  AndroidImportance = mod?.AndroidImportance;
+  EventType = mod?.EventType;
+} catch {}
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { navigationRef } from "./navigation/RootNavigation";
@@ -18,8 +28,7 @@ messaging().setBackgroundMessageHandler(async (remoteMessage) => {
   const hasData =
     !!remoteMessage.data &&
     (remoteMessage.data.title || remoteMessage.data.body);
-  if (hasNotification || hasData) {
-    // 채널 보장 (앱 종료 상태에서도 안전하게)
+  if ((hasNotification || hasData) && notifee && AndroidImportance) {
     try {
       await notifee.createChannel({
         id: "running_session",
@@ -27,25 +36,24 @@ messaging().setBackgroundMessageHandler(async (remoteMessage) => {
         importance: AndroidImportance.HIGH,
         sound: "default",
       });
+      await notifee.displayNotification({
+        title:
+          remoteMessage.notification?.title ||
+          (remoteMessage.data?.title as string) ||
+          "Way to Earth",
+        body:
+          remoteMessage.notification?.body ||
+          (remoteMessage.data?.body as string) ||
+          "",
+        data: remoteMessage.data,
+        android: {
+          channelId: "running_session",
+          smallIcon: "ic_launcher",
+          color: "#10b981",
+          pressAction: { id: "default", launchActivity: "default" },
+        },
+      });
     } catch {}
-
-    await notifee.displayNotification({
-      title:
-        remoteMessage.notification?.title ||
-        (remoteMessage.data?.title as string) ||
-        "Way to Earth",
-      body:
-        remoteMessage.notification?.body ||
-        (remoteMessage.data?.body as string) ||
-        "",
-      data: remoteMessage.data,
-      android: {
-        channelId: "running_session",
-        smallIcon: "ic_launcher",
-        color: "#10b981",
-        pressAction: { id: "default", launchActivity: "default" },
-      },
-    });
   }
 });
 
@@ -55,7 +63,7 @@ try { logStorageBackendOnce(); } catch {}
 
 registerRootComponent(App);
 // Android foreground service registration for Notifee (required for asForegroundService)
-if (Platform.OS === "android") {
+if (Platform.OS === "android" && notifee) {
   try {
     // Pre-create notification channels to avoid delays before foreground service starts
     (async () => {
@@ -63,13 +71,13 @@ if (Platform.OS === "android") {
         await notifee.createChannel({
           id: "running_session_ongoing",
           name: "러닝 진행(무음)",
-          importance: AndroidImportance.DEFAULT,
+          importance: AndroidImportance?.DEFAULT,
           vibration: false,
         });
         await notifee.createChannel({
           id: "running_session_popup",
           name: "러닝 시작 알림",
-          importance: AndroidImportance.HIGH,
+          importance: AndroidImportance?.HIGH,
           vibration: true,
           sound: "default",
         });
@@ -86,9 +94,9 @@ if (Platform.OS === "android") {
 
   // Optional: handle background notification events to avoid warnings
   try {
-    notifee.onBackgroundEvent(async ({ type, detail }) => {
+    notifee.onBackgroundEvent?.(async ({ type, detail }: any) => {
       // Only act on presses; ignore delivered updates
-      if (type === EventType.PRESS || type === EventType.ACTION_PRESS) {
+      if (type === EventType?.PRESS || type === EventType?.ACTION_PRESS) {
         try {
           // Decide target from saved running session
           const raw = await AsyncStorage.getItem("@running_session");
