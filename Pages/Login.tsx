@@ -1,15 +1,7 @@
 // screens/WayToEarthOnboarding.tsx
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  SafeAreaView,
-  StatusBar,
-  StyleSheet,
-  Dimensions,
-  ActivityIndicator,
-  NativeModules,
-} from "react-native";
+import { View, Text, StatusBar, StyleSheet, Dimensions, ActivityIndicator, NativeModules } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import KakaoLoginButton from "../components/KakaoLoginButton";
 import RunningManIcon from "../components/Running/RunningManIcon";
 import useKakaoLogin from "../hooks/useKakaoLogin";
@@ -68,7 +60,7 @@ export default function WayToEarthOnboarding() {
   }, [navigation]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={["top"]} style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <View style={styles.content}>
         {checking ? (

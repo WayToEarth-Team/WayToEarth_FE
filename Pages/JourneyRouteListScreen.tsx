@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import useRouteList from "../hooks/journey/useJourneyRouteList";
 import type { RouteSummary } from "../utils/api/journeyRoutes";
 import { getJourneyLandmarks } from '../utils/api/landmarks';
@@ -63,7 +64,7 @@ export default function RouteListScreen({ navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={["top"]} style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       <View style={styles.header}>
@@ -151,7 +152,7 @@ export default function RouteListScreen({ navigation }: any) {
           );
         })}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -1,14 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  ActivityIndicator,
-  TouchableOpacity,
-  TextInput,
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, TextInput } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { PositiveAlert, NegativeAlert, MessageAlert } from "../components/ui/AlertDialog";
 import { Dimensions } from "react-native";
 import {
@@ -122,7 +114,7 @@ export default function RecordScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={s.root}>
+      <SafeAreaView edges={["top"]} style={s.root}>
         <View style={s.center}>
           <ActivityIndicator size="large" />
           <Text style={{ marginTop: 8, color: "#6b7280" }}>불러오는 중...</Text>
@@ -280,7 +272,7 @@ export default function RecordScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={s.root}>
+    <SafeAreaView edges={["top"]} style={s.root}>
       {dialog.open && dialog.kind === 'positive' && (
         <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
       )}
@@ -828,7 +820,6 @@ const s = StyleSheet.create({
     backgroundColor: "#E5E7EB",
   },
 });
-
 
 
 

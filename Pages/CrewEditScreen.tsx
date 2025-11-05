@@ -1,16 +1,6 @@
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Image,
-  ActivityIndicator,
-} from "react-native";
+import { View, Text, StyleSheet, StatusBar, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -303,7 +293,7 @@ export default function CrewEditScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={s.container}>
+      <SafeAreaView edges={["top"]} style={s.container}>
         <StatusBar barStyle="light-content" />
         <View style={[s.blueHeader, { paddingTop: insets.top + 8 }]}>
           <View style={s.headerTop}>
@@ -323,7 +313,7 @@ export default function CrewEditScreen() {
   }
 
   return (
-    <SafeAreaView style={s.container}>
+    <SafeAreaView edges={["top"]} style={s.container}>
       {dialog.open && dialog.kind === 'positive' && (
         <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => { setDialog({ open:false, kind:'message' }); navigation.goBack(); }} />
       )}

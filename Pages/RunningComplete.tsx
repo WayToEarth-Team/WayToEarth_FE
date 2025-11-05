@@ -1,16 +1,6 @@
 import React, { useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-  Dimensions,
-  ActivityIndicator,
-  Image,
-  TextInput, // ✅ 추가
-} from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Dimensions, ActivityIndicator, Image, TextInput } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { PositiveAlert, NegativeAlert, MessageAlert } from "../components/ui/AlertDialog";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiComplete, apiStart } from "../utils/api/running";
@@ -139,7 +129,7 @@ const RunningComplete: React.FC = () => {
   }, [recordId, exerciseImage, comment]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={["top"]} style={styles.container}>
       {dialog.open && dialog.kind === 'positive' && (
         <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
       )}

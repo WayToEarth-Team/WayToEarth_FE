@@ -1,17 +1,6 @@
 import React, { useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  Dimensions,
-  Image,
-  PanResponder,
-  Animated,
-} from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions, Image, PanResponder, Animated } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import MapView, { Polyline } from "react-native-maps";
 import { getRunningRecordDetail } from "../utils/api/running";
 import { useFocusEffect } from "@react-navigation/native";
@@ -27,7 +16,7 @@ const RecordDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const SCREEN_H = Dimensions.get("window").height;
   const SHEET_EXPANDED_Y = 120; // 가장 위로 올렸을 때 위치
-  const SHEET_COLLAPSED_Y = 400; // 기본 상태 - 지도 바로 아래
+  const SHEET_COLLAPSED_Y = 420; // 기본 상태 - 지도 바로 아래 (상단 SafeArea 반영여유)
   const translateY = React.useRef(
     new Animated.Value(SHEET_COLLAPSED_Y)
   ).current;
@@ -154,7 +143,7 @@ const RecordDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={["top"]} style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#10b981" />
           <Text style={styles.loadingText}>운동 기록을 불러오는 중...</Text>
@@ -165,7 +154,7 @@ const RecordDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   if (!recordDetail) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={["top"]} style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>운동 기록을 찾을 수 없습니다.</Text>
           <TouchableOpacity
@@ -212,7 +201,7 @@ const RecordDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     recordDetail.averagePace || formatPace(durationSec, distanceKm);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={["top"]} style={styles.container}>
       {/* 배경: 큰 이미지 또는 지도 - 동적 크기 */}
       <Animated.View style={[
         styles.heroWrap,

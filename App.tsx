@@ -2,8 +2,10 @@
 import * as WebBrowser from "expo-web-browser";
 WebBrowser.maybeCompleteAuthSession();
 import React, { useEffect } from "react";
-import { NativeModules } from "react-native";
+import { NativeModules, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+// safe-area not required here; keep padding minimal for tab bar only
 import { navigationRef } from "./navigation/RootNavigation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createStackNavigator, CardStyleInterpolators, TransitionSpecs } from "@react-navigation/stack";
@@ -58,10 +60,7 @@ const Tab = createBottomTabNavigator();
 // MainTabs: 하단 탭 네비게이터 (팀원 구조)
 function MainTabs() {
   return (
-    <Tab.Navigator
-      tabBar={(props) => <TabBarAdapter {...props} />}
-      screenOptions={{ headerShown: false }}
-    >
+    <Tab.Navigator tabBar={(props) => <TabBarAdapter {...props} />} screenOptions={{ headerShown: false }}>
       <Tab.Screen name="LiveRunningScreen" component={LiveRunningScreen} />
       <Tab.Screen name="Feed" component={Feed2} />
       <Tab.Screen name="Record" component={Record} />
@@ -125,6 +124,7 @@ export default function App() {
 
   return (
     <WeatherProvider>
+      <SafeAreaProvider>
       <NavigationContainer ref={navigationRef} onReady={handleNavReady}>
         <Stack.Navigator
           initialRouteName={"Onboading"}
@@ -221,6 +221,7 @@ export default function App() {
         />
       </Stack.Navigator>
     </NavigationContainer>
+    </SafeAreaProvider>
     </WeatherProvider>
   );
 }

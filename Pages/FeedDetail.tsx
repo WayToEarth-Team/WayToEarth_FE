@@ -1,14 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-  SafeAreaView,
-  ScrollView,
-  Dimensions,
-} from "react-native";
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Dimensions } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { NegativeAlert, PositiveAlert, DestructiveConfirm, MessageAlert, ConfirmAlert } from "../components/ui/AlertDialog";
 import { getMyProfile } from "../utils/api/users";
 import { deleteFeed as apiDeleteFeed } from "../utils/api/feeds";
@@ -60,7 +52,7 @@ export default function FeedDetail({ route, navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={["top"]} style={styles.container}>
       {alert.open && alert.kind === 'positive' && (
         <PositiveAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
       )}

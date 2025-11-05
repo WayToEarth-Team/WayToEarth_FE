@@ -1,15 +1,7 @@
 // Pages/LandmarkGuestbookScreen.tsx
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  SafeAreaView,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-} from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   getGuestbooksByLandmark,
   getGuestbookErrorMessage,
@@ -214,7 +206,7 @@ export default function LandmarkGuestbookScreen({
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={["top"]} style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
