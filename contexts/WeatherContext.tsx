@@ -1,6 +1,7 @@
 // contexts/WeatherContext.tsx
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
+import React, { createContext, useContext, ReactNode, useCallback, useEffect } from "react";
 import * as Location from "expo-location";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentWeather } from "../utils/api/weather";
 import { ensureAccessToken, onAuthTokenChange } from "../utils/auth/tokenManager";
 
@@ -14,7 +15,7 @@ export interface WeatherData {
 }
 
 interface WeatherContextType {
-  weather: WeatherData | null;
+  weather: WeatherData | undefined;
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
@@ -22,105 +23,59 @@ interface WeatherContextType {
 
 const WeatherContext = createContext<WeatherContextType | undefined>(undefined);
 
-const REFRESH_INTERVAL = 15 * 60 * 1000; // 15분
-
 export function WeatherProvider({ children }: { children: ReactNode }) {
-  const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isFetchingRef = useRef(false);
+  const client = useQueryClient();
 
-  const fetchWeather = async (isBackground = false) => {
-    // 중복 호출 방지
-    if (isFetchingRef.current) {
-      console.log("[WeatherContext] 이미 호출 중, 스킵");
-      return;
+  const fetcher = useCallback(async () => {
+    const token = await ensureAccessToken();
+    if (!token) {
+      throw new Error("인증이 필요합니다");
     }
 
-    try {
-      isFetchingRef.current = true;
-
-      if (!isBackground) {
-        setLoading(true);
-      }
-      setError(null);
-
-      // 인증 토큰 확인: 없으면 조용히 스킵 (로그인 전 403 방지)
-      const token = await ensureAccessToken();
-      if (!token) {
-        console.log("[WeatherContext] 토큰 없음 → 호출 스킵");
-        isFetchingRef.current = false;
-        if (!isBackground) setLoading(false);
-        return;
-      }
-
-      console.log("[WeatherContext] 위치 권한 확인 중...");
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        console.error("[WeatherContext] 위치 권한 거부됨");
-        setError("위치 권한이 필요합니다");
-        setLoading(false);
-        isFetchingRef.current = false;
-        return;
-      }
-
-      console.log("[WeatherContext] 현재 위치 가져오는 중...");
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      console.log("[WeatherContext] 위치:", location.coords.latitude, location.coords.longitude);
-
-      console.log("[WeatherContext] 날씨 API 호출 중...");
-      const weatherData = await getCurrentWeather(
-        location.coords.latitude,
-        location.coords.longitude
-      );
-
-      console.log("[WeatherContext] 날씨 데이터:", weatherData);
-      setWeather(weatherData);
-    } catch (err: any) {
-      console.error("[WeatherContext] 에러 발생:", err);
-      console.error("[WeatherContext] 에러 메시지:", err?.message);
-      console.error("[WeatherContext] 에러 스택:", err?.stack);
-      if (!isBackground) {
-        setError(err?.message || "날씨 정보를 가져올 수 없습니다");
-      }
-    } finally {
-      if (!isBackground) {
-        setLoading(false);
-      }
-      isFetchingRef.current = false;
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      throw new Error("위치 권한이 필요합니다");
     }
-  };
-
-  useEffect(() => {
-    // 초기 로딩
-    fetchWeather();
-
-    // 15분마다 백그라운드 갱신
-    intervalRef.current = setInterval(() => {
-      fetchWeather(true);
-    }, REFRESH_INTERVAL);
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    const data = await getCurrentWeather(
+      location.coords.latitude,
+      location.coords.longitude
+    );
+    return data as WeatherData;
   }, []);
 
-  // 로그인 등 토큰 상태 변경 시 즉시 갱신
+  const query = useQuery<WeatherData, Error>({
+    queryKey: ["weather"],
+    queryFn: fetcher,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
+    retry: (count, err: any) => {
+      if ((err as any)?.response?.status === 429) return false;
+      return count < 2;
+    },
+  });
+
+  // 토큰 상태 변경 시 캐시 무효화 → 다음 포커스/요청 때 재조회
   useEffect(() => {
     const off = onAuthTokenChange(() => {
-      // 토큰이 생겼을 때만 호출하도록 가드
-      ensureAccessToken().then((t) => { if (t) fetchWeather(false); });
+      client.invalidateQueries({ queryKey: ["weather"] }).catch(() => {});
     });
     return off;
-  }, []);
+  }, [client]);
 
   return (
-    <WeatherContext.Provider value={{ weather, loading, error, refetch: fetchWeather }}>
+    <WeatherContext.Provider
+      value={{
+        weather: query.data,
+        loading: query.isLoading,
+        error: query.error ? (query.error.message || "오류가 발생했습니다") : null,
+        refetch: async () => { await query.refetch(); },
+      }}
+    >
       {children}
     </WeatherContext.Provider>
   );
