@@ -38,8 +38,11 @@ export default function GuestbookCreateModal({
   const [confirm, setConfirm] = useState(false);
 
   const handleSubmit = async () => {
-    // 클라이언트 유효성 검사
-    const error = validateGuestbookMessage(message);
+    // 공백/제로폭 문자 제거 후 유효성 검사
+    const cleaned = (message || "")
+      .replace(/[\u200B\u200C\u200D\uFEFF]/g, "") // zero-width류 제거
+      .trim();
+    const error = validateGuestbookMessage(cleaned);
     if (error) {
       setAlert({ open:true, kind:'negative', title:'입력 오류', message: error });
       return;
@@ -50,7 +53,7 @@ export default function GuestbookCreateModal({
     try {
       await createGuestbook(userId, {
         landmarkId: landmark.id,
-        message: message.trim(),
+        message: cleaned,
         isPublic,
       });
 
