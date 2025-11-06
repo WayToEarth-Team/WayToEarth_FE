@@ -43,6 +43,7 @@ export type RouteSummary = {
   image: string;
   tags: string[];
   runningTogether?: number; // 함께 뛰는 러너 수
+  category?: "DOMESTIC" | "INTERNATIONAL"; // 필터용 카테고리
 };
 
 export type Landmark = {
@@ -73,6 +74,7 @@ function mapJourneyToSummary(j: Journey): RouteSummary {
     image: j.thumbnailUrl || "palace",
     tags: [],
     runningTogether: j.runningTogether, // 함께 뛰는 러너 수
+    category: j.category,
   };
 }
 

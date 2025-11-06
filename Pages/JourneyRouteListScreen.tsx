@@ -41,6 +41,13 @@ export default function RouteListScreen({ navigation }: any) {
 
   const tabs = ['전체', '국내 여행', '해외 여행'];
 
+  const filtered = (() => {
+    const list = (routes ?? []) as RouteSummary[];
+    if (activeTab === '전체') return list;
+    const want = activeTab === '국내 여행' ? 'DOMESTIC' : 'INTERNATIONAL';
+    return list.filter((r) => (r as any).category === want);
+  })();
+
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case '쉬움':
@@ -92,7 +99,7 @@ export default function RouteListScreen({ navigation }: any) {
         {loading && (
           <Text style={{ padding: 16, color: '#6B7280' }}>로딩 중...</Text>
         )}
-        {((routes ?? []) as RouteSummary[]).map((route: RouteSummary) => {
+        {filtered.map((route: RouteSummary) => {
           // 여정의 랜드마크 이미지 사용
           const carouselImages = journeyImages[String(route.id)] || [];
 
