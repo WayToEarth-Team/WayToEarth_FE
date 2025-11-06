@@ -1,7 +1,19 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, TextInput } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  TouchableOpacity,
+  TextInput,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { PositiveAlert, NegativeAlert, MessageAlert } from "../components/ui/AlertDialog";
+import {
+  PositiveAlert,
+  NegativeAlert,
+  MessageAlert,
+} from "../components/ui/AlertDialog";
 import { Dimensions } from "react-native";
 import {
   getWeeklyStats,
@@ -24,7 +36,12 @@ export default function RecordScreen({ navigation }: any) {
   const [offset, setOffset] = useState<number>(0);
   const [hasMore, setHasMore] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
-  const [dialog, setDialog] = useState<{ open: boolean; title?: string; message?: string; kind?: 'positive'|'negative'|'message' }>({ open:false, kind:'message' });
+  const [dialog, setDialog] = useState<{
+    open: boolean;
+    title?: string;
+    message?: string;
+    kind?: "positive" | "negative" | "message";
+  }>({ open: false, kind: "message" });
   const width = Dimensions.get("window").width;
   const [previews, setPreviews] = useState<
     Record<number, { coords: { latitude: number; longitude: number }[] }>
@@ -78,10 +95,17 @@ export default function RecordScreen({ navigation }: any) {
                 latitude: p.latitude,
                 longitude: p.longitude,
               }));
-              const isFiniteNum = (v: any) => typeof v === 'number' && isFinite(v);
+              const isFiniteNum = (v: any) =>
+                typeof v === "number" && isFinite(v);
               const isValidLatLng = (lat: number, lng: number) =>
-                isFiniteNum(lat) && isFiniteNum(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
-              const pts = raw.filter((p) => isValidLatLng(p.latitude, p.longitude));
+                isFiniteNum(lat) &&
+                isFiniteNum(lng) &&
+                Math.abs(lat) <= 90 &&
+                Math.abs(lng) <= 180 &&
+                !(lat === 0 && lng === 0);
+              const pts = raw.filter((p) =>
+                isValidLatLng(p.latitude, p.longitude)
+              );
               if (pts.length)
                 setPreviews((prev) => ({ ...prev, [id]: { coords: pts } }));
             } catch {}
@@ -90,7 +114,6 @@ export default function RecordScreen({ navigation }: any) {
       } catch {}
     })();
   }, [records]);
-
 
   const formatDuration = (seconds?: number) => {
     if (!seconds || isNaN(seconds)) return "00:00:00";
@@ -114,7 +137,6 @@ export default function RecordScreen({ navigation }: any) {
     const recordDate = new Date(r.startedAt);
     return recordDate >= monday;
   }).length;
-
 
   if (loading) {
     return (
@@ -143,7 +165,12 @@ export default function RecordScreen({ navigation }: any) {
       };
 
       await client.put("/v1/users/me", payload);
-      setDialog({ open:true, kind:'positive', title:'완료', message:'주간 목표가 저장되었습니다.' });
+      setDialog({
+        open: true,
+        kind: "positive",
+        title: "완료",
+        message: "주간 목표가 저장되었습니다.",
+      });
       setIsEditingGoal(false);
     } catch (e: any) {
       console.warn(e);
@@ -151,15 +178,21 @@ export default function RecordScreen({ navigation }: any) {
         e?.response?.data?.message ||
         e?.message ||
         "주간 목표 저장에 실패했습니다.";
-      setDialog({ open:true, kind:'negative', title:'오류', message: msg });
+      setDialog({ open: true, kind: "negative", title: "오류", message: msg });
     } finally {
       setSavingGoal(false);
     }
   };
 
   // 스크롤 하단 감지
-  const isCloseToBottom = ({ layoutMeasurement, contentOffset, contentSize }: any) => {
-    return layoutMeasurement.height + contentOffset.y >= contentSize.height - 20;
+  const isCloseToBottom = ({
+    layoutMeasurement,
+    contentOffset,
+    contentSize,
+  }: any) => {
+    return (
+      layoutMeasurement.height + contentOffset.y >= contentSize.height - 20
+    );
   };
 
   // 추가 레코드 로드
@@ -277,14 +310,29 @@ export default function RecordScreen({ navigation }: any) {
 
   return (
     <SafeAreaView edges={["top"]} style={s.root}>
-      {dialog.open && dialog.kind === 'positive' && (
-        <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      {dialog.open && dialog.kind === "positive" && (
+        <PositiveAlert
+          visible
+          title={dialog.title}
+          message={dialog.message}
+          onClose={() => setDialog({ open: false, kind: "message" })}
+        />
       )}
-      {dialog.open && dialog.kind === 'negative' && (
-        <NegativeAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      {dialog.open && dialog.kind === "negative" && (
+        <NegativeAlert
+          visible
+          title={dialog.title}
+          message={dialog.message}
+          onClose={() => setDialog({ open: false, kind: "message" })}
+        />
       )}
-      {dialog.open && dialog.kind === 'message' && (
-        <MessageAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      {dialog.open && dialog.kind === "message" && (
+        <MessageAlert
+          visible
+          title={dialog.title}
+          message={dialog.message}
+          onClose={() => setDialog({ open: false, kind: "message" })}
+        />
       )}
       <ScrollView
         contentContainerStyle={{ padding: 16 }}
@@ -391,7 +439,9 @@ export default function RecordScreen({ navigation }: any) {
                         s.progressFillCompact,
                         {
                           width: `${Math.min(
-                            ((weekly?.totalDistance ?? 0) / Number(weeklyGoal)) * 100,
+                            ((weekly?.totalDistance ?? 0) /
+                              Number(weeklyGoal)) *
+                              100,
                             100
                           )}%`,
                         },
@@ -400,11 +450,13 @@ export default function RecordScreen({ navigation }: any) {
                   </View>
                   <View style={s.progressInfoRow}>
                     <Text style={s.progressInfo}>
-                      {(weekly?.totalDistance ?? 0).toFixed(1)} / {weeklyGoal} km
+                      {(weekly?.totalDistance ?? 0).toFixed(1)} / {weeklyGoal}{" "}
+                      km
                     </Text>
                     <Text style={s.progressPercent}>
                       {Math.round(
-                        ((weekly?.totalDistance ?? 0) / Number(weeklyGoal)) * 100
+                        ((weekly?.totalDistance ?? 0) / Number(weeklyGoal)) *
+                          100
                       )}
                       % 달성
                     </Text>
@@ -525,10 +577,19 @@ export default function RecordScreen({ navigation }: any) {
                 ) : null}
               </View>
               <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
                   <Text style={s.itemTitle}>{r.title || "러닝 기록"}</Text>
                   {r?.runningType ? (
-                    <View style={[s.badge, r.runningType === "JOURNEY" ? s.badgeJourney : s.badgeSingle]}>
+                    <View
+                      style={[
+                        s.badge,
+                        r.runningType === "JOURNEY"
+                          ? s.badgeJourney
+                          : s.badgeSingle,
+                      ]}
+                    >
                       <Text style={s.badgeText}>
                         {r.runningType === "JOURNEY" ? "여정" : "일반러닝"}
                       </Text>
@@ -824,9 +885,3 @@ const s = StyleSheet.create({
     backgroundColor: "#E5E7EB",
   },
 });
-
-
-
-
-
-
