@@ -44,6 +44,8 @@ export function useLiveRunTracker(runningType: "SINGLE" | "JOURNEY" = "SINGLE") 
   const prev = useRef<LatLng | null>(null);
   const subRef = useRef<Location.LocationSubscription | null>(null);
   const primeSubRef = useRef<Location.LocationSubscription | null>(null);
+  const primeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const primeAppStateSubRef = useRef<{ remove: () => void } | null>(null);
   const elapsedTimerRef = useRef<TimerId | null>(null);
   const mapCenterRef = useRef<((p: LatLng) => void) | undefined>(undefined);
   const appStateRef = useRef<string>(AppState.currentState);
@@ -229,7 +231,7 @@ export function useLiveRunTracker(runningType: "SINGLE" | "JOURNEY" = "SINGLE") 
     if (msEnough || kmEnough) {
       try {
         const paceSec = avgPaceSecPerKm(distanceRef.current, elapsedSec);
-        console.log("[RunTracker] 주기 업데이트 전송:", {
+        if (__DEV__) console.log("[RunTracker] 주기 업데이트 전송:", {
           sessionId: sid,
           distanceKm: distanceRef.current.toFixed(3),
           durationSec: elapsedSec,
@@ -250,7 +252,7 @@ export function useLiveRunTracker(runningType: "SINGLE" | "JOURNEY" = "SINGLE") 
         });
         lastUpdateAtRef.current = now;
         lastUpdateDistanceRef.current = distanceRef.current;
-        console.log("[RunTracker] 주기 업데이트 성공");
+        if (__DEV__) console.log("[RunTracker] 주기 업데이트 성공");
       } catch (e) {
         console.error("[RunTracker] 주기 업데이트 실패:", e);
         // 조용히 무시(다음 주기 때 재시도)
@@ -276,17 +278,17 @@ export function useLiveRunTracker(runningType: "SINGLE" | "JOURNEY" = "SINGLE") 
 
   /** ✅ 최적화된 시작 */
   const start = async (meta?: { journeyId?: string | number }) => {
-    console.log("[RunTracker] start() invoked");
+    if (__DEV__) console.log("[RunTracker] start() invoked");
     if (isInitializing) return; // 중복 방지
     setIsInitializing(true);
 
     try {
       // 1) 권한: 먼저 현재 상태 확인 후, 필요 시에만 요청
       let perm = await Location.getForegroundPermissionsAsync();
-      console.log("[RunTracker] location perm status(before):", perm?.status);
+      if (__DEV__) console.log("[RunTracker] location perm status(before):", perm?.status);
       if (perm.status !== "granted") {
         perm = await Location.requestForegroundPermissionsAsync();
-        console.log("[RunTracker] location perm status(after):", perm?.status);
+        if (__DEV__) console.log("[RunTracker] location perm status(after):", perm?.status);
         if (perm.status !== "granted") {
           console.warn("[RunTracker] location permission denied");
           setIsInitializing(false);
@@ -323,7 +325,7 @@ export function useLiveRunTracker(runningType: "SINGLE" | "JOURNEY" = "SINGLE") 
       pausedRef.current = false;
       setIsPaused(false);
       setIsRunning(true);
-      console.log("[RunTracker] state set to running");
+      if (__DEV__) console.log("[RunTracker] state set to running");
       startElapsed();
 
       // 2.0) 카운트다운 동안 가열(pre-warm) 스트림이 있다면 정리
@@ -331,6 +333,10 @@ export function useLiveRunTracker(runningType: "SINGLE" | "JOURNEY" = "SINGLE") 
         primeSubRef.current?.remove?.();
       } catch {}
       primeSubRef.current = null;
+      // 프라임 보조 타이머/리스너도 정리
+      if (primeTimerRef.current) { clearTimeout(primeTimerRef.current); primeTimerRef.current = null; }
+      try { primeAppStateSubRef.current?.remove?.(); } catch {}
+      primeAppStateSubRef.current = null;
 
       // 2.1) 세션 생성 (먼저 실행) - FGS 시작 전에 완료되어야 함
       try {
@@ -453,7 +459,7 @@ export function useLiveRunTracker(runningType: "SINGLE" | "JOURNEY" = "SINGLE") 
               } else {
                 pushPoint(
                   filtered,
-                  loc.coords.accuracy,
+                  (loc.coords.accuracy ?? undefined),
                   loc.coords.speed ?? undefined
                 );
               }
@@ -613,6 +619,26 @@ export function useLiveRunTracker(runningType: "SINGLE" | "JOURNEY" = "SINGLE") 
             centerMap(cachedLocationRef.current);
           }
         );
+
+        // 안전장치: 20초 후 자동 해제 (시작 안 했을 때 배터리 소모 방지)
+        if (primeTimerRef.current) clearTimeout(primeTimerRef.current);
+        primeTimerRef.current = setTimeout(() => {
+          try { primeSubRef.current?.remove?.(); } catch {}
+          primeSubRef.current = null;
+          primeTimerRef.current = null;
+        }, 20000);
+
+        // 백그라운드 전환 시 프라임 중단
+        try { primeAppStateSubRef.current?.remove?.(); } catch {}
+        primeAppStateSubRef.current = AppState.addEventListener('change', (s) => {
+          if (s !== 'active') {
+            try { primeSubRef.current?.remove?.(); } catch {}
+            primeSubRef.current = null;
+            if (primeTimerRef.current) { clearTimeout(primeTimerRef.current); primeTimerRef.current = null; }
+            try { primeAppStateSubRef.current?.remove?.(); } catch {}
+            primeAppStateSubRef.current = null;
+          }
+        });
       } catch {}
     },
 
