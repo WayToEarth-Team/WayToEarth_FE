@@ -1,5 +1,4 @@
-{
-  "cli": {
+{  "cli": {
     "version": ">= 16.17.4",
     "appVersionSource": "remote"
   },
@@ -15,11 +14,15 @@
     },
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk" },
+      "android": {
+        "buildType": "apk",
+        "withoutCredentials": false
+      },
       "env": {
         "GOOGLE_MAPS_API_KEY": "@GOOGLE_MAPS_API_KEY",
         "KAKAO_NATIVE_APP_KEY": "@KAKAO_NATIVE_APP_KEY"
-      }
+      },
+      "prebuildCommand": "echo 'Skipping prebuild - using existing android folder'"
     },
     "production": {
       "autoIncrement": true,

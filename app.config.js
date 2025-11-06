@@ -37,7 +37,7 @@ export default {
         "FOREGROUND_SERVICE_LOCATION",
         "POST_NOTIFICATIONS",
       ],
-      config: { googleMaps: { apiKey: process.env.ANDROID_MAPS_KEY } },
+      config: { googleMaps: { apiKey: process.env.GOOGLE_MAPS_API_KEY } },
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff",
@@ -54,6 +54,7 @@ export default {
           android: {
             kotlinVersion: "2.0.21",
             gradlePluginVersion: "8.6.1",
+            useNativeModules: true,
           },
         },
       ],
