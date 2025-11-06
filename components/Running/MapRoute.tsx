@@ -64,8 +64,21 @@ export default function MapRoute({
 
       try {
         setLocationLoading(true);
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
+        console.log('[MapRoute] Checking location permissions...');
+
+        // 먼저 권한 상태 확인 (요청하지 않음)
+        let perm = await Location.getForegroundPermissionsAsync();
+        console.log('[MapRoute] Current permission status:', perm.status);
+
+        // 권한이 없을 때만 요청
+        if (perm.status !== "granted") {
+          console.log('[MapRoute] Requesting permissions...');
+          perm = await Location.requestForegroundPermissionsAsync();
+          console.log('[MapRoute] Permission request result:', perm.status);
+        }
+
+        if (perm.status !== "granted") {
+          console.warn('[MapRoute] Location permission denied');
           Alert.alert("위치 권한이 필요합니다.");
           const defaultCenter = (last as RNLatLng) || {
             latitude: 37.5665,
@@ -77,9 +90,14 @@ export default function MapRoute({
           return;
         }
 
+        console.log('[MapRoute] Getting current position...');
         const loc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Low,
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 5000,
+          maximumAge: 10000,
         });
+        console.log('[MapRoute] Got location:', { lat: loc.coords.latitude, lng: loc.coords.longitude });
+
         if (!mounted) return;
 
         const center = {
@@ -89,6 +107,7 @@ export default function MapRoute({
 
         setInitial(center);
         setLocationLoading(false);
+        console.log('[MapRoute] Location set successfully');
         onMapReady?.();
 
         setTimeout(() => {
@@ -101,7 +120,32 @@ export default function MapRoute({
           }
         }, 100);
       } catch (e) {
-        console.warn("위치 가져오기 실패:", e);
+        console.error("[MapRoute] 위치 가져오기 실패:", e);
+
+        // 재시도: last known location 사용
+        try {
+          console.log('[MapRoute] Trying last known location...');
+          const lastKnown = await Location.getLastKnownPositionAsync({
+            maxAge: 60000,
+            requiredAccuracy: 100,
+          });
+
+          if (lastKnown && mounted) {
+            console.log('[MapRoute] Using last known location:', { lat: lastKnown.coords.latitude, lng: lastKnown.coords.longitude });
+            const center = {
+              latitude: lastKnown.coords.latitude,
+              longitude: lastKnown.coords.longitude,
+            };
+            setInitial(center);
+            setLocationLoading(false);
+            onMapReady?.();
+            return;
+          }
+        } catch (retryErr) {
+          console.error('[MapRoute] Last known location also failed:', retryErr);
+        }
+
+        console.warn('[MapRoute] Using default Seoul location');
         const defaultCenter = (last as RNLatLng) || {
           latitude: 37.5665,
           longitude: 126.978,
@@ -117,7 +161,8 @@ export default function MapRoute({
       mounted = false;
       if (followResumeTimer.current) clearTimeout(followResumeTimer.current);
     };
-  }, [useCurrentLocationOnMount, last, onMapReady]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 마운트 시 1회만 실행 (최적화)
 
   // 부모에서 카메라 이동 요청: 센터만 이동(줌 보존)
   useEffect(() => {

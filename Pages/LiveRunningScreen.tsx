@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useCallback, useEffect } from "react";
-import { StackActions } from "@react-navigation/native";
+import { StackActions, useFocusEffect } from "@react-navigation/native";
 import { navigationRef } from "../navigation/RootNavigation";
 import * as Location from "expo-location";
 import SafeLayout from "../components/Layout/SafeLayout";
@@ -59,6 +59,8 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
   const [activeTab, setActiveTab] = useState<'running' | 'journey'>('running');
   const [mapReady, setMapReady] = useState(false);
   const [countdownVisible, setCountdownVisible] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
+  const wasFocused = useRef(true);
 
   // 워치 모드 상태
   const [watchMode, setWatchMode] = useState(false);
@@ -69,6 +71,23 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
 
   // 날씨 정보
   const { weather, loading: weatherLoading } = useWeather();
+
+  // 다른 탭에서 돌아올 때만 지도 리프레시 (배터리 절약)
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('[LiveRunning] Tab focused, wasFocused:', wasFocused.current);
+      if (!wasFocused.current) {
+        console.log('[LiveRunning] ✅ Returned from another tab, refreshing map');
+        setMapKey(prev => prev + 1);
+      }
+      wasFocused.current = true;
+
+      return () => {
+        console.log('[LiveRunning] 👋 Leaving tab');
+        wasFocused.current = false;
+      };
+    }, [])
+  );
 
   // 러닝 세션 상태 업데이트 (일반 러닝)
   useEffect(() => {
@@ -188,7 +207,7 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
     });
 
     // wearRunningComplete 이벤트 리스너 추가 (워치에서 종료 버튼 누름)
-    const completeSub = emitter.addListener('wearRunningComplete', (payload: string) => {
+    const completeSub = emitter.addListener('wearRunningComplete', async (payload: string) => {
       console.log('[LiveRunning] Watch session completed:', payload);
 
       try {
@@ -212,6 +231,16 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
         import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
           AsyncStorage.removeItem('@running_session');
         });
+
+        // 위치를 강제로 다시 가져오기 (메인 페이지 지도를 위해)
+        console.log('[LiveRunning] Attempting to refresh location after watch complete...');
+        try {
+            const { default: Location } = await import('expo-location');
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+            console.log('[LiveRunning] Successfully refreshed location after watch complete:', loc.coords);
+        } catch (err) {
+            console.warn('[LiveRunning] Failed to refresh location after watch complete:', err);
+        }
 
         // 저장 확인 다이얼로그 표시
         setConfirmSave(true);
@@ -343,7 +372,20 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
       import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
         AsyncStorage.removeItem('@running_session');
       });
-    } catch {}
+
+      // 위치를 강제로 다시 가져오기 (메인 페이지로 돌아갈 때를 위해)
+      console.log('[LiveRunning] Attempting to refresh location before exiting...');
+      try {
+        const { default: Location } = await import('expo-location');
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        console.log('[LiveRunning] Successfully refreshed location in doExitWithoutSave:', loc.coords);
+      } catch (err) {
+        console.warn('[LiveRunning] Failed to refresh location before exiting:', err);
+      }
+
+    } catch (e) {
+      console.error('[LiveRunning] Error during pre-exit cleanup:', e);
+    }
 
     // 워치 모드 리셋
     setWatchMode(false);
@@ -366,9 +408,10 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
     requestAnimationFrame(async () => {
       try {
         await backgroundRunning.stopForegroundService();
-        if (!watchMode) {
-          await t.stop();
-        }
+        // t.stop()은 이미 위에서 호출되었으므로 중복 호출 방지
+        // if (!watchMode) {
+        //   await t.stop();
+        // }
       } catch (e) {
         console.error("러닝 정리 실패:", e);
       } finally {
@@ -429,8 +472,15 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
             ? Math.floor(t.elapsedSec / Math.max(t.distance, 0.000001))
             : null;
         const routePoints = t.route.map((p, i) => ({ latitude: p.latitude, longitude: p.longitude, sequence: i + 1 }));
+
+        // sessionId가 null인 경우 기본값 생성 (세션 생성이 완료되지 않은 경우)
+        const sessionId = t.sessionId || `phone-${Date.now()}`;
+        if (!t.sessionId) {
+          console.warn('[LiveRunning] sessionId is null, using fallback:', sessionId);
+        }
+
         const { runId } = await apiComplete({
-          sessionId: t.sessionId as string,
+          sessionId: sessionId,
           distanceMeters: Math.round(t.distance * 1000),
           durationSeconds: t.elapsedSec,
           averagePaceSeconds: avgPaceSec,
@@ -528,6 +578,7 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
         cancelText="저장 안 함"
       />
       <MapRoute
+        key={mapKey}
         route={watchMode && watchRunning ? watchRoutePoints : t.route}
         last={watchMode && watchRunning && watchRoutePoints.length > 0 ? watchRoutePoints[watchRoutePoints.length - 1] : t.last}
         liveMode

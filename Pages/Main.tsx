@@ -7,7 +7,7 @@ import {
   Animated,
   Easing,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import MapRoute from "../components/Running/MapRoute";
@@ -18,6 +18,27 @@ export default function Main() {
   const nav = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
+  const wasFocused = useRef(true); // 초기엔 focused 상태
+
+  // 페이지가 focus될 때만 (다른 페이지에서 돌아올 때만) 지도 리프레시
+  useFocusEffect(
+    React.useCallback(() => {
+      // focus될 때
+      if (!wasFocused.current) {
+        // 이전에 unfocus 상태였다면 (= 다른 페이지 갔다가 돌아온 경우)
+        console.log('[Main] Returned from another page, refreshing map');
+        setMapKey(prev => prev + 1);
+      }
+      wasFocused.current = true;
+
+      // unfocus될 때 (다른 페이지로 갈 때)
+      return () => {
+        console.log('[Main] Leaving page');
+        wasFocused.current = false;
+      };
+    }, [])
+  );
 
   // 날씨 정보
   const { weather, loading: weatherLoading } = useWeather();
@@ -135,6 +156,7 @@ export default function Main() {
       {/* 배경 지도 표시: 현재 위치 기준 (터치 비활성화) */}
       <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
         <MapRoute
+          key={mapKey}
           route={[]}
           last={null}
           useCurrentLocationOnMount
