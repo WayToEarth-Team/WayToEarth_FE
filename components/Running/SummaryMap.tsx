@@ -49,6 +49,8 @@ type Props = {
   strokeColor?: string;
   strokeWidth?: number;
   edgePadding?: { top: number; bottom: number; left: number; right: number };
+  useCurrentLocationOnMount?: boolean; // 기본값: false (불필요한 GPS 활성화 방지)
+  showUserLocation?: boolean; // 기본값: false
 };
 
 export default function SummaryMap({
@@ -59,6 +61,8 @@ export default function SummaryMap({
   strokeColor = "#2563eb",
   strokeWidth = 6,
   edgePadding = { top: 60, bottom: 60, left: 60, right: 60 },
+  useCurrentLocationOnMount = false,
+  showUserLocation = false,
 }: Props) {
   const mapRef = useRef<MapView>(null);
   const [ready, setReady] = useState(false);
@@ -71,16 +75,16 @@ export default function SummaryMap({
     [route, showKmMarkers]
   );
 
-  // ✅ 현재 위치 요청
+  // 현재 위치는 선택적으로만 요청 (기본 비활성화)
   useEffect(() => {
+    if (!useCurrentLocationOnMount) return;
     (async () => {
       try {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          Alert.alert("위치 권한 필요", "설정에서 위치 권한을 허용해주세요.");
-          return;
-        }
-        const loc = await Location.getCurrentPositionAsync({});
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+        // 캐시 우선 사용 → 불필요한 GPS 활성화 최소화
+        const last = await Location.getLastKnownPositionAsync().catch(() => null);
+        const loc = last ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
         setCurrentRegion({
           latitude: loc.coords.latitude,
           longitude: loc.coords.longitude,
@@ -88,10 +92,10 @@ export default function SummaryMap({
           longitudeDelta: 0.01,
         });
       } catch (e) {
-        console.warn("위치 가져오기 실패:", e);
+        // 조용히 무시
       }
     })();
-  }, []);
+  }, [useCurrentLocationOnMount]);
 
   // 최초 프레이밍 (route가 있으면 route 기준, 없으면 현 위치 기준)
   useEffect(() => {
@@ -132,7 +136,7 @@ export default function SummaryMap({
             longitudeDelta: 0.01,
           }
         }
-        showsUserLocation={true} // ✅ 내 위치 점 표시
+        showsUserLocation={showUserLocation}
         showsCompass={false}
         showsScale={false}
         toolbarEnabled={false}
