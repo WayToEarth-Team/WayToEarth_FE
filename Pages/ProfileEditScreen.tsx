@@ -22,6 +22,7 @@ import { checkNickname, getMyProfile } from "../utils/api/users";
 // import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function ProfileEditScreen({ navigation }: { navigation: any }) {
   // form state
@@ -358,7 +359,7 @@ export default function ProfileEditScreen({ navigation }: { navigation: any }) {
               style={{ width: 100, height: 100, borderRadius: 50 }}
             />
           ) : (
-            <Text style={styles.profileIcon}>👤</Text>
+            <Ionicons name="person-circle-outline" size={40} color="#666" />
           )}
         </View>
         <TouchableOpacity onPress={onChangePhoto} disabled={uploading}>

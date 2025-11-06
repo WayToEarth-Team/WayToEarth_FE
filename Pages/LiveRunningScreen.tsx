@@ -69,8 +69,12 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
   const [watchCompleteData, setWatchCompleteData] = useState<any>(null);
   const [watchRoutePoints, setWatchRoutePoints] = useState<Array<{latitude: number; longitude: number}>>([]);
 
-  // 날씨 정보
-  const { weather, loading: weatherLoading } = useWeather();
+  // 날씨 정보 (이 화면에서만 위치/날씨 활성화)
+  const { weather, loading: weatherLoading, enable: enableWeather, disable: disableWeather } = useWeather();
+  useEffect(() => {
+    try { enableWeather(); } catch {}
+    return () => { try { disableWeather(); } catch {} };
+  }, []);
 
   // 다른 탭에서 돌아올 때만 지도 리프레시 (배터리 절약)
   useFocusEffect(

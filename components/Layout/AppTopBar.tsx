@@ -1,5 +1,12 @@
 import React from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  ViewStyle,
+  TextStyle,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -8,6 +15,11 @@ type Props = {
   navigation: any;
   showBack?: boolean;
   onBack?: () => void;
+  backgroundColor?: string;
+  borderBottomColor?: string;
+  tintColor?: string; // 아이콘 색상
+  titleStyle?: TextStyle;
+  containerStyle?: ViewStyle;
 };
 
 export default function AppTopBar({
@@ -15,6 +27,11 @@ export default function AppTopBar({
   navigation,
   showBack,
   onBack,
+  backgroundColor = "#FFFFFF",
+  borderBottomColor = "#F3F4F6",
+  tintColor = "#111827",
+  titleStyle,
+  containerStyle,
 }: Props) {
   const canGoBack =
     typeof showBack === "boolean" ? showBack : !!navigation?.canGoBack?.();
@@ -27,21 +44,29 @@ export default function AppTopBar({
   };
 
   return (
-    <SafeAreaView edges={["top"]} style={{ backgroundColor: "#FFFFFF" }}>
-    <View style={[styles.container, { paddingTop: 12 }]}>
-      {canGoBack ? (
-        <Pressable
-          onPress={handleBack}
-          style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
-          hitSlop={8}
-        >
-          <Ionicons name="chevron-back" size={24} color="#111827" />
-        </Pressable>
-      ) : (
-        <View style={{ width: 24, height: 24, marginRight: 8 }} />
-      )}
-      <Text style={styles.title}>{title}</Text>
-    </View>
+    <SafeAreaView edges={["top"]} style={{ backgroundColor }}>
+      <View
+        style={[
+          styles.container,
+          { paddingTop: 12, backgroundColor, borderBottomColor },
+          containerStyle,
+        ]}
+      >
+        {canGoBack ? (
+          <Pressable
+            onPress={handleBack}
+            style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
+            hitSlop={8}
+          >
+            <Ionicons name="chevron-back" size={24} color={tintColor} />
+          </Pressable>
+        ) : (
+          <View style={{ width: 24, height: 24, marginRight: 8 }} />
+        )}
+        <Text style={[styles.title, { color: tintColor }, titleStyle]}>
+          {title}
+        </Text>
+      </View>
     </SafeAreaView>
   );
 }

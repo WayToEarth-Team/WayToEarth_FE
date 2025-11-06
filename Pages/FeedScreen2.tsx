@@ -16,7 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { avgPaceLabel } from "../utils/run";
-import { listFeeds, toggleFeedLike, FeedItem } from "../utils/api/feeds";
+import { listFeeds, toggleFeedLike, deleteFeed, FeedItem } from "../utils/api/feeds";
 import { getMyProfile } from "../utils/api/users";
 import { useFocusEffect } from "@react-navigation/native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -246,7 +246,38 @@ export default function FeedScreen({ navigation, route }: any) {
               <Text style={styles.likeCount}>{item.likeCount || 0}</Text>
             </Pressable>
 
-            <Text style={styles.viewsCount}>조회수 34</Text>
+            {myNickname && displayName === myNickname ? (
+              <Pressable
+                onPress={() => {
+                  Alert.alert(
+                    "삭제",
+                    "이 피드를 삭제하시겠습니까?",
+                    [
+                      { text: "취소", style: "cancel" },
+                      {
+                        text: "삭제",
+                        style: "destructive",
+                        onPress: async () => {
+                          try {
+                            await deleteFeed(item.id);
+                            setFeeds((prev) => prev.filter((f) => f.id !== item.id));
+                          } catch (e) {
+                            Alert.alert("오류", "삭제에 실패했습니다.");
+                          }
+                        },
+                      },
+                    ]
+                  );
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={({ pressed }) => [pressed && styles.pressed]}
+                accessibilityLabel="피드 삭제"
+              >
+                <Ionicons name="trash-outline" size={20} color="#EF4444" />
+              </Pressable>
+            ) : (
+              <View style={{ width: 20 }} />
+            )}
           </View>
 
           {/* Caption */}
@@ -432,10 +463,10 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: "rgba(255,255,255,0.95)",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
   metricsRowBetween: {
     flexDirection: "row",
@@ -443,7 +474,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   metricDistance: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "700",
     color: "#111827",
   },
@@ -484,10 +515,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#374151",
   },
-  viewsCount: {
-    fontSize: 12,
-    color: "#9CA3AF",
-  },
+  // removed viewsCount style
   caption: {
     fontSize: 14,
     color: "#374151",

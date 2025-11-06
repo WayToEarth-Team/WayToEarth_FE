@@ -12,6 +12,8 @@ type Props = {
   route: LatLng[];
   last: LatLng | null;
   liveMode?: boolean;
+  showUserLocation?: boolean;
+  showMyLocationButton?: boolean;
   onBindCenter?: (fn: (p: LatLng) => void) => void;
   onBindSnapshot?: (fn: () => Promise<string | null>) => void;
   useCurrentLocationOnMount?: boolean;
@@ -22,6 +24,8 @@ export default function MapRoute({
   route,
   last,
   liveMode = true,
+  showUserLocation,
+  showMyLocationButton,
   onBindCenter,
   onBindSnapshot,
   useCurrentLocationOnMount = true,
@@ -93,8 +97,6 @@ export default function MapRoute({
         console.log('[MapRoute] Getting current position...');
         const loc = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
-          timeInterval: 5000,
-          maximumAge: 10000,
         });
         console.log('[MapRoute] Got location:', { lat: loc.coords.latitude, lng: loc.coords.longitude });
 
@@ -220,8 +222,8 @@ export default function MapRoute({
         latitudeDelta: 0.01,
         longitudeDelta: 0.01,
       }}
-      showsUserLocation
-      showsMyLocationButton
+      showsUserLocation={typeof showUserLocation === 'boolean' ? showUserLocation : !!liveMode}
+      showsMyLocationButton={typeof showMyLocationButton === 'boolean' ? showMyLocationButton : !!liveMode}
       onMapReady={handleMapReady}
       loadingEnabled
       loadingIndicatorColor="#3B82F6"

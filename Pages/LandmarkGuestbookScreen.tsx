@@ -72,10 +72,13 @@ export default function LandmarkGuestbookScreen({
 
   const handleRefresh = () => {
     setRefreshing(true);
-    setPage(0);
     setHasMore(true);
-    setGuestbooks([]);
-    loadGuestbooks();
+    // page가 0이면 직접 로드, 아니면 0으로 리셋하여 useEffect 트리거
+    if (page === 0) {
+      loadGuestbooks();
+    } else {
+      setPage(0);
+    }
   };
 
   const handleLoadMore = () => {
@@ -160,7 +163,7 @@ export default function LandmarkGuestbookScreen({
   );
 
   const renderEmpty = () => {
-    if (loading && page === 0) {
+    if ((loading && page === 0) || refreshing) {
       return (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#8b4513" />
@@ -458,13 +461,13 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 24,
     bottom: 16,
-    gap: 3,
+    gap: 4,
     alignItems: "flex-end",
   },
   decorativeLine: {
-    width: 40,
+    width: 36,
     height: 1,
-    backgroundColor: "#e0e0e0",
+    backgroundColor: "#F1F5F9",
   },
   footerLoader: {
     paddingVertical: 20,

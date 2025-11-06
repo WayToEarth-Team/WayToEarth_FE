@@ -3,23 +3,25 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  TextInput,
 } from "react-native";
-import { PositiveAlert, NegativeAlert, MessageAlert } from "../components/ui/AlertDialog";
-import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  PositiveAlert,
+  NegativeAlert,
+  MessageAlert,
+} from "../components/ui/AlertDialog";
 import { Ionicons } from "@expo/vector-icons";
 import TopCrewItem from "../components/Crew/TopCrewItem";
-import CrewCard from "../components/Crew/CrewCard";
-import SearchBar from "../components/Crew/SearchBar";
-import MyCrewCard from "../components/Crew/MyCrewCard";
+import CrewGridItem from "../components/Crew/CrewGridItem";
 import { useCrewData } from "../hooks/useCrewData";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import CreateCrewSheet from "../components/Crew/CreateCrewSheet";
-import CrewPreviewSheet from "../components/Crew/CrewPreviewSheet";
+import CreateCrewDrawer from "../components/Crew/CreateCrewDrawer";
+import CrewPreviewDrawer from "../components/Crew/CrewPreviewDrawer";
 import CrewDetailModal from "../components/Crew/CrewDetailModal";
 
 export default function CrewScreen() {
@@ -44,9 +46,14 @@ export default function CrewScreen() {
     refresh,
     loadMore,
   } = useCrewData(search);
-  // 탭 내비게이터 사용: 개별 화면에서 하단 바를 렌더하지 않음
   const navigation = useNavigation<any>();
-  const [dialog, setDialog] = useState<{ open:boolean; title?:string; message?:string; kind?:'positive'|'negative'|'message' }>({ open:false, kind:'message' });
+  const [dialog, setDialog] = useState<{
+    open: boolean;
+    title?: string;
+    message?: string;
+    kind?: "positive" | "negative" | "message";
+  }>({ open: false, kind: "message" });
+
   useFocusEffect(
     React.useCallback(() => {
       refresh();
@@ -54,8 +61,35 @@ export default function CrewScreen() {
   );
 
   return (
-    <View style={s.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#3B82F6" translucent={false} />
+    <SafeAreaView style={s.safeContainer}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="#FFFFFF"
+        translucent={false}
+      />
+
+      {/* 상단 헤더 */}
+      <View style={s.header}>
+        <View style={s.headerTop}>
+          <View style={s.logo}>
+            <Text>크루</Text>
+          </View>
+        </View>
+
+        {/* 검색바 */}
+        <View style={s.searchContainer}>
+          <View style={s.searchBox}>
+            <TextInput
+              style={s.searchInput}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="대회, 러닝크루 검색"
+              placeholderTextColor="#9CA3AF"
+            />
+            <Ionicons name="search" size={20} color="#9CA3AF" />
+          </View>
+        </View>
+      </View>
 
       <ScrollView
         style={{ flex: 1 }}
@@ -63,145 +97,97 @@ export default function CrewScreen() {
         onScroll={({ nativeEvent }) => {
           const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
           const isCloseToBottom =
-            layoutMeasurement.height + contentOffset.y >= contentSize.height - 200;
+            layoutMeasurement.height + contentOffset.y >=
+            contentSize.height - 200;
           if (isCloseToBottom && !loadingMore && hasMore) {
             loadMore();
           }
         }}
         scrollEventThrottle={400}
       >
-        {/* 상단 랭킹 */}
-        <LinearGradient
-          colors={["#3B82F6", "#2563EB", "#1D4ED8"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={s.topWrap}
-        >
-          {(function orderTop() {
-            const a = topCrews;
-            if (!a || a.length === 0) return null;
-
-            // topCrews는 순서대로 [1등, 2등, 3등] 형태로 들어옴
-            // 화면 배치: [2등(왼쪽), 1등(중앙), 3등(오른쪽)]
-            // 1등은 항상 중앙에 표시, 2등/3등은 있을 때만 양옆에 표시
-
-            const first = a[0];   // 1등 (항상 존재)
-            const second = a[1];  // 2등 (없을 수 있음)
-            const third = a[2];   // 3등 (없을 수 있음)
-
-            // 3개 슬롯: [2등 자리, 1등 자리, 3등 자리]
-            const slots = [second, first, third];
-
-            return slots.map((c, idx) => {
-              if (!c) {
-                // 빈 슬롯: 공간만 차지하고 아무것도 렌더링하지 않음
-                return <View key={`empty-${idx}`} style={s.topItemWrap} />;
-              }
-
-              // idx=1이 1등(중앙)이므로 크게(lg), 나머지는 중간 크기(md)
-              const size = idx === 1 ? "lg" : "md";
-              // 1등(중앙)을 가장 높이, 2/3등은 조금 내려서 삼각형 배치
-              const offset = idx === 1 ? 20 : 40;
-
-              return (
-                <View key={c.id} style={[s.topItemWrap, { marginTop: offset }]}>
-                  <TopCrewItem
-                    rank={c.rank}
-                    distance={c.distance}
-                    name={c.name}
-                    image={c.imageUrl ? { uri: c.imageUrl } : undefined}
-                    size={size}
-                    onPress={() => {}}
-                  />
-                </View>
-              );
-            });
-          })()}
-        </LinearGradient>
-
-        {/* 목록 섹션 */}
+        {/* 크루 둘러보기 섹션 */}
         <View style={s.content}>
-          <View style={s.titleRow}>
-            <Ionicons name="people" size={24} color="#3B82F6" />
-            <Text style={s.title}>크루 목록</Text>
+          <View style={s.sectionHeader}>
+            <Text style={s.sectionTitle}>러닝크루 둘러보기</Text>
+            <TouchableOpacity onPress={() => setCreateOpen(true)}>
+              <Ionicons name="add-circle" size={28} color="#6366F1" />
+            </TouchableOpacity>
           </View>
-          <SearchBar
-            value={search}
-            onChangeText={setSearch}
-            onSearch={() => {}}
-          />
 
           {/* 내 크루가 없으면 생성 유도 */}
           {!myCrew && (
-            <View style={s.empty}>
-              <Text style={s.emptyIcon}>👥</Text>
-              <Text style={s.emptyText}>현재 크루가 없습니다</Text>
-              <TouchableOpacity
-                style={s.createBtn}
-                onPress={() => setCreateOpen(true)}
-              >
-                <Text style={s.createBtnText}>크루 생성</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={s.emptyCard}
+              onPress={() => setCreateOpen(true)}
+            >
+              <View style={s.emptyContent}>
+                <Ionicons
+                  name="people"
+                  size={48}
+                  color="#9CA3AF"
+                  style={{ marginBottom: 12 }}
+                />
+                <Text style={s.emptyTitle}>크루가 없습니다</Text>
+                <Text style={s.emptySubtitle}>새로운 크루를 만들어보세요</Text>
+              </View>
+              <View style={s.createBadge}>
+                <Ionicons name="add" size={16} color="#fff" />
+              </View>
+            </TouchableOpacity>
           )}
 
-          {/* 내 크루 고정 노출 (1번 위치) */}
-          {myCrew && (
-            <MyCrewCard
-              name={myCrew.name}
-              description={myCrew.description}
-              progress={myCrew.progress}
-              imageUrl={myCrew.imageUrl}
-              onPress={() => navigation.navigate("CrewDetail")}
-            />
-          )}
+          {/* 내 크루 별도 카드 제거: 그리드 첫 번째로 통합 */}
 
-          {/* 목록 */}
-          {crews.map((c) => (
-            <CrewCard
-              key={c.id}
-              name={c.name}
-              description={c.description}
-              progress={c.progress}
-              imageUrl={c.imageUrl}
-              onPress={() => {
-                // 크루 상세 화면은 항상 볼 수 있도록 허용
-                setSelected({
-                  id: c.id,
-                  name: c.name,
-                  description: c.description,
-                  progress: c.progress,
-                });
-                setPreviewOpen(false);
-                setDetailOpen(true);
-              }}
-            />
-          ))}
+          {/* 크루 목록: 2열 그리드 (이름 + 인원 + 프사) */}
+          <View style={s.gridWrap}>
+            {(myCrew ? [myCrew, ...crews] : crews).map((c, idx) => {
+              const isMine = Boolean(myCrew) && idx === 0;
+              const displayName = isMine ? "내 크루" : c.name;
+              const onPress = () => {
+                if (isMine) {
+                  navigation.navigate("CrewDetail");
+                } else {
+                  setSelected({
+                    id: c.id,
+                    name: c.name,
+                    description: c.description,
+                    progress: c.progress,
+                  });
+                  setPreviewOpen(false);
+                  setDetailOpen(true);
+                }
+              };
+              return (
+                <CrewGridItem
+                  key={`${c.id}-${isMine ? "mine" : "other"}`}
+                  name={displayName}
+                  progress={c.progress}
+                  imageUrl={c.imageUrl}
+                  onPress={onPress}
+                />
+              );
+            })}
+          </View>
 
-          {/* 로딩 인디케이터 */}
+          {/* 로딩 */}
           {loadingMore && (
             <View style={s.loadingMore}>
-              <ActivityIndicator size="small" color="#4A90E2" />
-              <Text style={s.loadingText}>크루 목록 불러오는 중...</Text>
+              <ActivityIndicator size="small" color="#6366F1" />
             </View>
           )}
 
-          {/* 더 이상 없음 표시 */}
           {!hasMore && crews.length > 0 && (
             <View style={s.endMessage}>
               <Text style={s.endText}>모든 크루를 불러왔습니다</Text>
             </View>
           )}
 
-          {/* 하단 여백 - 탭 네비게이션 가림 방지 */}
           <View style={s.bottomSpacer} />
         </View>
       </ScrollView>
 
-      {/* 탭 내비게이터 사용으로 하단 바는 전역에서 렌더링됨 */}
-
-      {/* 크루 생성 바텀 시트 */}
-      <CreateCrewSheet
+      {/* 드로어 & 모달 */}
+      <CreateCrewDrawer
         visible={createOpen}
         onClose={() => setCreateOpen(false)}
         onSubmit={async (name, description) => {
@@ -209,14 +195,21 @@ export default function CrewScreen() {
             if (!name?.trim()) return;
             await createMyCrew(name, description);
           } catch (e: any) {
-            const msg = e?.response?.data?.message || e?.message || "크루 생성에 실패했습니다. 잠시 후 다시 시도해주세요.";
-            setDialog({ open:true, kind:'negative', title:'생성 실패', message: msg });
+            const msg =
+              e?.response?.data?.message ||
+              e?.message ||
+              "크루 생성에 실패했습니다.";
+            setDialog({
+              open: true,
+              kind: "negative",
+              title: "생성 실패",
+              message: msg,
+            });
           }
         }}
       />
 
-      {/* 크루 미리보기 (내 크루 없을 때 다른 크루 클릭 시) */}
-      <CrewPreviewSheet
+      <CrewPreviewDrawer
         visible={previewOpen}
         onClose={() => setPreviewOpen(false)}
         name={selected?.name || ""}
@@ -236,22 +229,40 @@ export default function CrewScreen() {
                     intro
                   );
                   setPreviewOpen(false);
-                  // 승인 대기 안내
                   if ((res as any)?.pending) {
-                    setDialog({ open:true, kind:'message', title:'신청 완료', message:'관리자 승인 후 크루에 참여할 수 있습니다.' });
+                    setDialog({
+                      open: true,
+                      kind: "message",
+                      title: "신청 완료",
+                      message: "관리자 승인 후 크루에 참여할 수 있습니다.",
+                    });
                   } else {
-                    setDialog({ open:true, kind:'positive', title:'가입 완료', message:'크루에 가입되었습니다.' });
+                    setDialog({
+                      open: true,
+                      kind: "positive",
+                      title: "가입 완료",
+                      message: "크루에 가입되었습니다.",
+                    });
                   }
                 } catch (e: any) {
-                  const msg = e?.code === "JOIN_PENDING_EXISTS"
-                    ? "이미 해당 크루에 가입 신청이 접수되어 있습니다. 승인/거절 결과를 기다려주세요."
-                    : (e?.response?.data?.message || e?.message || "가입 신청에 실패했습니다.");
-                  setDialog({ open:true, kind:'negative', title:'신청 불가', message: msg });
+                  const msg =
+                    e?.code === "JOIN_PENDING_EXISTS"
+                      ? "이미 해당 크루에 가입 신청이 접수되어 있습니다."
+                      : e?.response?.data?.message ||
+                        e?.message ||
+                        "가입 신청에 실패했습니다.";
+                  setDialog({
+                    open: true,
+                    kind: "negative",
+                    title: "신청 불가",
+                    message: msg,
+                  });
                 }
               }
             : undefined
         }
       />
+
       <CrewDetailModal
         visible={detailOpen}
         crewId={selected?.id || ""}
@@ -261,9 +272,13 @@ export default function CrewScreen() {
         onApply={
           selected
             ? async (intro) => {
-                // 가입 신청 시점에 이미 크루가 있는지 체크
                 if (myCrew) {
-                  setDialog({ open:true, kind:'message', title:'가입 불가', message:'이미 가입된 크루가 있습니다. 크루는 하나만 가입할 수 있습니다.' });
+                  setDialog({
+                    open: true,
+                    kind: "message",
+                    title: "가입 불가",
+                    message: "이미 가입된 크루가 있습니다.",
+                  });
                   return;
                 }
 
@@ -279,98 +294,315 @@ export default function CrewScreen() {
                   );
                   setDetailOpen(false);
                   if ((res as any)?.pending) {
-                    setDialog({ open:true, kind:'message', title:'신청 완료', message:'관리자 승인 후 크루에 참여할 수 있습니다.' });
+                    setDialog({
+                      open: true,
+                      kind: "message",
+                      title: "신청 완료",
+                      message: "관리자 승인 후 크루에 참여할 수 있습니다.",
+                    });
                   } else {
-                    setDialog({ open:true, kind:'positive', title:'가입 완료', message:'크루에 가입되었습니다.' });
+                    setDialog({
+                      open: true,
+                      kind: "positive",
+                      title: "가입 완료",
+                      message: "크루에 가입되었습니다.",
+                    });
                   }
                 } catch (e: any) {
                   const msg =
                     e?.code === "JOIN_PENDING_EXISTS"
-                      ? "이미 해당 크루에 가입 신청이 접수되어 있습니다. 승인/거절 결과를 기다려주세요."
-                      : e?.response?.data?.message || e?.message || "가입 신청 중 오류가 발생했습니다.";
-                  setDialog({ open:true, kind:'negative', title:'신청 실패', message: msg });
+                      ? "이미 해당 크루에 가입 신청이 접수되어 있습니다."
+                      : e?.response?.data?.message ||
+                        e?.message ||
+                        "가입 신청 중 오류가 발생했습니다.";
+                  setDialog({
+                    open: true,
+                    kind: "negative",
+                    title: "신청 실패",
+                    message: msg,
+                  });
                 }
               }
             : undefined
         }
       />
-      {dialog.open && dialog.kind === 'positive' && (
-        <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+
+      {dialog.open && dialog.kind === "positive" && (
+        <PositiveAlert
+          visible
+          title={dialog.title}
+          message={dialog.message}
+          onClose={() => setDialog({ open: false, kind: "message" })}
+        />
       )}
-      {dialog.open && dialog.kind === 'negative' && (
-        <NegativeAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      {dialog.open && dialog.kind === "negative" && (
+        <NegativeAlert
+          visible
+          title={dialog.title}
+          message={dialog.message}
+          onClose={() => setDialog({ open: false, kind: "message" })}
+        />
       )}
-      {dialog.open && dialog.kind === 'message' && (
-        <MessageAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      {dialog.open && dialog.kind === "message" && (
+        <MessageAlert
+          visible
+          title={dialog.title}
+          message={dialog.message}
+          onClose={() => setDialog({ open: false, kind: "message" })}
+        />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  topWrap: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-    position: "relative",
-    overflow: "hidden",
-  },
-  topItemWrap: { width: "32%", alignItems: "center", zIndex: 1 },
-  content: {
-    flex: 1,
+  safeContainer: { flex: 1, backgroundColor: "#FFFFFF" },
+  header: {
     backgroundColor: "#fff",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: -20,
-    paddingTop: 20,
-    paddingHorizontal: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
   },
-  titleRow: {
+  rankingWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  rankingHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    marginBottom: 12,
+  },
+  rankingTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1F2937",
+    letterSpacing: -0.3,
+  },
+  topItemsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  topItemWrap: { width: "32%", alignItems: "center" },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
     marginBottom: 16,
   },
-  title: {
-    fontSize: 22,
+  logo: {
+    width: 40,
+    height: 40,
+  },
+  headerRight: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  searchContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: "#1F2937",
+  },
+  regionScroll: {
+    paddingLeft: 20,
+  },
+  regionContainer: {
+    paddingRight: 20,
+    gap: 8,
+  },
+  regionChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#fff",
+  },
+  regionChipActive: {
+    borderColor: "#6366F1",
+    backgroundColor: "#EEF2FF",
+  },
+  regionIcon: {
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  regionEmoji: {
+    fontSize: 16,
+  },
+  regionText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  regionTextActive: {
+    color: "#6366F1",
+  },
+  content: {
+    padding: 20,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
     fontWeight: "800",
     color: "#1F2937",
     letterSpacing: -0.5,
   },
-  empty: {
+  emptyCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 16,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: "#D1D5DB",
+    padding: 32,
     alignItems: "center",
-    paddingVertical: 32,
-    backgroundColor: "#FAFAFA",
-    borderRadius: 12,
-    marginBottom: 24,
+    marginBottom: 20,
+    position: "relative",
   },
-  emptyIcon: { fontSize: 48, marginBottom: 12 },
-  emptyText: { fontSize: 14, color: "#999", marginBottom: 16 },
-  createBtn: {
-    backgroundColor: "#000",
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  createBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" },
-  loadingMore: {
-    flexDirection: "row",
+  emptyContent: {
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 20,
-    gap: 8,
   },
-  loadingText: {
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginBottom: 4,
+  },
+  emptySubtitle: {
     fontSize: 13,
     color: "#6B7280",
+  },
+  createBadge: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#6366F1",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  gridWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  crewCard: {
+    width: "48%",
+    aspectRatio: 1,
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  cardContent: {
+    padding: 16,
+    flex: 1,
+    justifyContent: "space-between",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  regionBadge: {
+    backgroundColor: "#6366F1",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  regionBadgeDark: {
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+  },
+  regionBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  regionBadgeTextDark: {
+    color: "#fff",
+  },
+  bookmarkBtn: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  crewName: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#1F2937",
+    marginBottom: 4,
+    letterSpacing: -1,
+  },
+  crewNameDark: {
+    color: "#fff",
+  },
+  crewInfo: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  crewInfoDark: {
+    color: "rgba(255, 255, 255, 0.7)",
+  },
+  crewTime: {
+    fontSize: 11,
+    color: "#9CA3AF",
+  },
+  crewTimeDark: {
+    color: "rgba(255, 255, 255, 0.6)",
+  },
+  loadingMore: {
+    paddingVertical: 20,
+    alignItems: "center",
   },
   endMessage: {
     alignItems: "center",
@@ -381,6 +613,6 @@ const s = StyleSheet.create({
     color: "#9CA3AF",
   },
   bottomSpacer: {
-    height: 150,
+    height: 100,
   },
 });
