@@ -1,7 +1,24 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, StatusBar, ScrollView, TouchableOpacity, Image, ActivityIndicator, RefreshControl, AppState } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  StatusBar,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  ActivityIndicator,
+  RefreshControl,
+  AppState,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { PositiveAlert, NegativeAlert, MessageAlert, ConfirmAlert, DestructiveConfirm } from "../components/ui/AlertDialog";
+import {
+  PositiveAlert,
+  NegativeAlert,
+  MessageAlert,
+  ConfirmAlert,
+  DestructiveConfirm,
+} from "../components/ui/AlertDialog";
 import { Ionicons } from "@expo/vector-icons";
 import { getMyProfile, getUserProfile } from "../utils/api/users";
 import {
@@ -72,8 +89,19 @@ export default function CrewDetailScreen() {
   const [loadingMoreMembers, setLoadingMoreMembers] = useState(false);
 
   const isRefreshingRef = useRef(false);
-  const [alert, setAlert] = useState<{ open:boolean; title?:string; message?:string; kind?:'positive'|'negative'|'message' }>({ open:false, kind:'message' });
-  const [confirm, setConfirm] = useState<{ open:boolean; title?:string; message?:string; destructive?:boolean; onConfirm?: ()=>void }>({ open:false });
+  const [alert, setAlert] = useState<{
+    open: boolean;
+    title?: string;
+    message?: string;
+    kind?: "positive" | "negative" | "message";
+  }>({ open: false, kind: "message" });
+  const [confirm, setConfirm] = useState<{
+    open: boolean;
+    title?: string;
+    message?: string;
+    destructive?: boolean;
+    onConfirm?: () => void;
+  }>({ open: false });
 
   const refresh = async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -97,7 +125,14 @@ export default function CrewDetailScreen() {
         setRole(detail.role);
         setCrewImageUrl(detail.crew.imageUrl ?? null);
         console.log("[CREW_DETAIL] crew image:", detail.crew.imageUrl);
-        console.log("[CREW_DETAIL] members with profiles:", detail.members.map(m => ({ id: m.id, nick: m.nickname, profile: m.profileImage })));
+        console.log(
+          "[CREW_DETAIL] members with profiles:",
+          detail.members.map((m) => ({
+            id: m.id,
+            nick: m.nickname,
+            profile: m.profileImage,
+          }))
+        );
         if (selectedTab !== "멤버") {
           setMembers(detail.members as Member[]);
         }
@@ -131,10 +166,10 @@ export default function CrewDetailScreen() {
           const memberCount = detail.members?.length ?? 0;
           const active = summary?.totalActiveMembers ?? memberCount;
 
-          console.log('[CREW_DETAIL] Setting crew info:', {
+          console.log("[CREW_DETAIL] Setting crew info:", {
             memberCount,
             active,
-            dist
+            dist,
           });
 
           setCrewInfo({
@@ -151,10 +186,15 @@ export default function CrewDetailScreen() {
 
             if (mvpUserId) {
               // 이미 로드된 멤버 목록에서 프로필 찾기
-              const memberInList = detail.members.find(m => String(m.id) === String(mvpUserId));
+              const memberInList = detail.members.find(
+                (m) => String(m.id) === String(mvpUserId)
+              );
               if (memberInList?.profileImage) {
                 profileImage = memberInList.profileImage;
-                console.log('[CREW_DETAIL] MVP profile from member list:', profileImage);
+                console.log(
+                  "[CREW_DETAIL] MVP profile from member list:",
+                  profileImage
+                );
               } else {
                 // 폴백: 멤버 목록에 프로필이 없는 경우, 사용자 프로필 API로 조회
                 try {
@@ -162,15 +202,21 @@ export default function CrewDetailScreen() {
                   if (String(myProfile.id) === String(mvpUserId)) {
                     // MVP가 나인 경우
                     profileImage = myProfile.profile_image_url ?? null;
-                    console.log('[CREW_DETAIL] MVP is me, using my profile image:', profileImage);
+                    console.log(
+                      "[CREW_DETAIL] MVP is me, using my profile image:",
+                      profileImage
+                    );
                   } else {
                     // MVP가 다른 사람인 경우
                     const mvpProfile = await getUserProfile(String(mvpUserId));
                     profileImage = mvpProfile.profile_image_url ?? null;
-                    console.log('[CREW_DETAIL] MVP profile from user API:', profileImage);
+                    console.log(
+                      "[CREW_DETAIL] MVP profile from user API:",
+                      profileImage
+                    );
                   }
                 } catch (e) {
-                  console.warn('[CREW_DETAIL] Failed to load profile:', e);
+                  console.warn("[CREW_DETAIL] Failed to load profile:", e);
                 }
               }
             }
@@ -197,7 +243,12 @@ export default function CrewDetailScreen() {
           totalDistance: "0km",
           activeMembers: "0명",
         });
-        setAlert({ open:true, kind:'message', title:'내 크루 없음', message:'현재 가입된 크루가 없습니다.' });
+        setAlert({
+          open: true,
+          kind: "message",
+          title: "내 크루 없음",
+          message: "현재 가입된 크루가 없습니다.",
+        });
       }
     } finally {
       console.log("[CREW_DETAIL] refresh done");
@@ -205,7 +256,6 @@ export default function CrewDetailScreen() {
       isRefreshingRef.current = false;
     }
   };
-
 
   useEffect(() => {
     refresh();
@@ -225,9 +275,12 @@ export default function CrewDetailScreen() {
       // 즉시 소프트 리프레시
       refresh({ silent: true });
       // 포커스 중 폴링 (멤버 탭이면 더 짧게)
-      const interval = setInterval(() => {
-        if (!cancelled) refresh({ silent: true });
-      }, selectedTab === "멤버" ? 15000 : 30000);
+      const interval = setInterval(
+        () => {
+          if (!cancelled) refresh({ silent: true });
+        },
+        selectedTab === "멤버" ? 15000 : 30000
+      );
       return () => {
         cancelled = true;
         clearInterval(interval);
@@ -243,7 +296,9 @@ export default function CrewDetailScreen() {
       }
     });
     return () => {
-      try { sub.remove(); } catch {}
+      try {
+        sub.remove();
+      } catch {}
     };
   }, [crewId]);
 
@@ -272,7 +327,11 @@ export default function CrewDetailScreen() {
         setLoadingMoreMembers(true);
         try {
           const result = await getCrewMembers(crewId, 0, 20);
-          console.log('[CREW_DETAIL] Setting members (first page):', result.members.length, result.members);
+          console.log(
+            "[CREW_DETAIL] Setting members (first page):",
+            result.members.length,
+            result.members
+          );
           setMembers(result.members);
           setMemberPage(0);
           setHasMoreMembers(result.hasMore);
@@ -313,47 +372,13 @@ export default function CrewDetailScreen() {
 
   return (
     <SafeAreaView edges={["top"]} style={s.container}>
-      <Alerts alert={alert} setAlert={setAlert} confirm={confirm} setConfirm={setConfirm} />
+      <Alerts
+        alert={alert}
+        setAlert={setAlert}
+        confirm={confirm}
+        setConfirm={setConfirm}
+      />
       <StatusBar barStyle="light-content" />
-
-      {/* 헤더 */}
-      <View style={[s.blueHeader, { paddingTop: insets.top + 8 }]}>
-        <View style={s.headerTop}>
-          <View style={{ width: 24 }} />
-          <Text style={s.headerTitle}>크루</Text>
-          <TouchableOpacity
-            style={s.searchIcon}
-            onPress={() => {
-              setAlert({ open:true, kind:'message', title:'채팅 이동', message: crewId ? `크루(${crewName || ""}) 채팅으로 이동 시도` : '크루 정보를 불러오지 못했습니다.' });
-              if (!crewId) {
-                setAlert({ open:true, kind:'negative', title:'채팅 이동 불가', message:'크루 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.' });
-                return;
-              }
-              const params: any = { crewId: crewId, crewName };
-              const state: any = (navigation as any)?.getState?.();
-              const canHere =
-                Array.isArray(state?.routeNames) &&
-                state.routeNames.includes("CrewChat");
-              if (canHere) {
-                (navigation as any).navigate("CrewChat", params);
-              } else {
-                const parent = (navigation as any)?.getParent?.();
-                if (parent) {
-                  parent.navigate("CrewChat", params);
-                } else {
-                  setAlert({ open:true, kind:'negative', title:'채팅 이동 불가', message:'네비게이션 경로를 찾을 수 없습니다.' });
-                }
-              }
-            }}
-          >
-            <Ionicons
-              name="chatbubble-ellipses-outline"
-              size={22}
-              color="#fff"
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
 
       <ScrollView
         style={s.scrollView}
@@ -369,37 +394,97 @@ export default function CrewDetailScreen() {
         onScroll={({ nativeEvent }) => {
           const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
           const isCloseToBottom =
-            layoutMeasurement.height + contentOffset.y >= contentSize.height - 200;
-          if (isCloseToBottom && selectedTab === "멤버" && !loadingMoreMembers && hasMoreMembers) {
+            layoutMeasurement.height + contentOffset.y >=
+            contentSize.height - 200;
+          if (
+            isCloseToBottom &&
+            selectedTab === "멤버" &&
+            !loadingMoreMembers &&
+            hasMoreMembers
+          ) {
             loadMoreMembers();
           }
         }}
         scrollEventThrottle={400}
       >
-        {/* 크루 정보 카드 */}
+        {/* 크루 정보 카드 (그리드 스타일과 유사한 미니멀 카드) */}
         <View style={s.crewInfoCard}>
           <View style={s.crewHeader}>
             <View style={s.crewAvatarContainer}>
               {crewImageUrl ? (
                 <Image
-                  source={{ uri: crewImageUrl, cache: 'force-cache' }}
+                  source={{ uri: crewImageUrl, cache: "force-cache" }}
                   style={s.crewAvatar}
                   resizeMode="cover"
-                  onError={(e) => console.log('[CREW_DETAIL] Crew image error:', e.nativeEvent.error)}
+                  onError={(e) =>
+                    console.log(
+                      "[CREW_DETAIL] Crew image error:",
+                      e.nativeEvent.error
+                    )
+                  }
                 />
               ) : (
                 <View style={s.crewAvatarPlaceholder}>
-                  <Ionicons name="people" size={28} color="#fff" />
+                  <Ionicons name="people" size={28} color="#94A3B8" />
                 </View>
               )}
             </View>
-            <View style={s.crewHeaderText}>
-              <Text style={s.crewName}>{crewName}</Text>
-              <Text style={s.crewSubInfo}>
+            <Text style={s.crewName}>{crewName}</Text>
+            <View style={s.countRow}>
+              <Ionicons name="people" size={14} color="#6B7280" />
+              <Text style={s.countText}>
                 {loading ? "로딩 중..." : crewInfo.members || "멤버 0명"}
-                {crewInfo.roleLabel ? ` • ${crewInfo.roleLabel}` : ""}
               </Text>
             </View>
+            <TouchableOpacity
+              style={s.chatBtn}
+              onPress={() => {
+                setAlert({
+                  open: true,
+                  kind: "message",
+                  title: "채팅 이동",
+                  message: crewId
+                    ? `크루(${crewName || ""}) 채팅으로 이동 시도`
+                    : "크루 정보를 불러오지 못했습니다.",
+                });
+                if (!crewId) {
+                  setAlert({
+                    open: true,
+                    kind: "negative",
+                    title: "채팅 이동 불가",
+                    message:
+                      "크루 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
+                  });
+                  return;
+                }
+                const params: any = { crewId: crewId, crewName };
+                const state: any = (navigation as any)?.getState?.();
+                const canHere =
+                  Array.isArray(state?.routeNames) &&
+                  state.routeNames.includes("CrewChat");
+                if (canHere) {
+                  (navigation as any).navigate("CrewChat", params);
+                } else {
+                  const parent = (navigation as any)?.getParent?.();
+                  if (parent) {
+                    parent.navigate("CrewChat", params);
+                  } else {
+                    setAlert({
+                      open: true,
+                      kind: "negative",
+                      title: "채팅 이동 불가",
+                      message: "네비게이션 경로를 찾을 수 없습니다.",
+                    });
+                  }
+                }
+              }}
+            >
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={20}
+                color="#6366F1"
+              />
+            </TouchableOpacity>
           </View>
 
           <View style={s.statsRow}>
@@ -486,14 +571,31 @@ export default function CrewDetailScreen() {
                             // 500/409 등 재시도 플로우: 상세 재조회 후 이미 멤버라면 성공으로 간주
                             try {
                               const detail = await getMyCrewDetail();
-                              const already = detail?.members?.some(m => a.userId && String(m.id) === String(a.userId));
+                              const already = detail?.members?.some(
+                                (m) =>
+                                  a.userId && String(m.id) === String(a.userId)
+                              );
                               if (already) {
                                 await refresh({ silent: true });
                               } else {
-                                setAlert({ open:true, kind:'negative', title:'승인 실패', message: e?.response?.data?.message || '서버 오류로 승인에 실패했습니다. 잠시 후 다시 시도해주세요.' });
+                                setAlert({
+                                  open: true,
+                                  kind: "negative",
+                                  title: "승인 실패",
+                                  message:
+                                    e?.response?.data?.message ||
+                                    "서버 오류로 승인에 실패했습니다. 잠시 후 다시 시도해주세요.",
+                                });
                               }
                             } catch {
-                              setAlert({ open:true, kind:'negative', title:'승인 실패', message: e?.response?.data?.message || '서버 오류로 승인에 실패했습니다. 잠시 후 다시 시도해주세요.' });
+                              setAlert({
+                                open: true,
+                                kind: "negative",
+                                title: "승인 실패",
+                                message:
+                                  e?.response?.data?.message ||
+                                  "서버 오류로 승인에 실패했습니다. 잠시 후 다시 시도해주세요.",
+                              });
                             }
                           }
                         }}
@@ -518,7 +620,7 @@ export default function CrewDetailScreen() {
             )}
             {/* 크루 통계 */}
             <View style={s.statsSection}>
-              <View style={s.statsSectionHeader}>
+              {/* <View style={s.statsSectionHeader}>
                 <Text style={s.statsSectionTitle}>크루 통계</Text>
                 <View style={s.filterButtons}>
                   <TouchableOpacity style={s.filterBtn}>
@@ -528,7 +630,7 @@ export default function CrewDetailScreen() {
                     <Text style={s.filterBtnInactiveText}>월간</Text>
                   </TouchableOpacity>
                 </View>
-              </View>
+              </View> */}
 
               {/* 월간 요약을 추가 카드로 확장하려면 여기서 확장 */}
             </View>
@@ -544,10 +646,18 @@ export default function CrewDetailScreen() {
                   <View style={s.mvpAvatarContainer}>
                     {mvpMember.profileImage ? (
                       <Image
-                        source={{ uri: mvpMember.profileImage, cache: 'force-cache' }}
+                        source={{
+                          uri: mvpMember.profileImage,
+                          cache: "force-cache",
+                        }}
                         style={s.mvpAvatar}
                         resizeMode="cover"
-                        onError={(e) => console.log('[CREW_DETAIL] MVP image error:', e.nativeEvent.error)}
+                        onError={(e) =>
+                          console.log(
+                            "[CREW_DETAIL] MVP image error:",
+                            e.nativeEvent.error
+                          )
+                        }
                       />
                     ) : (
                       <View style={s.mvpAvatarPlaceholder}>
@@ -575,7 +685,12 @@ export default function CrewDetailScreen() {
           <View style={s.membersSection}>
             <Text style={s.sectionTitle}>멤버 목록 ({members.length}명)</Text>
             {members.map((m) => {
-              console.log('[MEMBER_RENDER] Rendering member:', m.nickname, 'hasImage:', !!m.profileImage);
+              console.log(
+                "[MEMBER_RENDER] Rendering member:",
+                m.nickname,
+                "hasImage:",
+                !!m.profileImage
+              );
               const isSelf =
                 (myUserId && String(m.id) === String(myUserId)) ||
                 m.nickname === "나";
@@ -587,12 +702,23 @@ export default function CrewDetailScreen() {
                         <Image
                           source={{
                             uri: m.profileImage,
-                            cache: 'force-cache'
+                            cache: "force-cache",
                           }}
                           style={s.memberAvatar}
                           resizeMode="cover"
-                          onLoad={() => console.log('[MEMBER] Image loaded for:', m.nickname)}
-                          onError={(e) => console.log('[MEMBER] Image error for:', m.nickname, e.nativeEvent.error)}
+                          onLoad={() =>
+                            console.log(
+                              "[MEMBER] Image loaded for:",
+                              m.nickname
+                            )
+                          }
+                          onError={(e) =>
+                            console.log(
+                              "[MEMBER] Image error for:",
+                              m.nickname,
+                              e.nativeEvent.error
+                            )
+                          }
                         />
                       ) : (
                         <View style={s.memberAvatarPlaceholder}>
@@ -603,7 +729,9 @@ export default function CrewDetailScreen() {
                     <View style={s.memberTextInfo}>
                       <Text style={s.memberName}>
                         {m.nickname}
-                        {m.role === "ADMIN" && <Text style={s.adminBadge}> 관리자</Text>}
+                        {m.role === "ADMIN" && (
+                          <Text style={s.adminBadge}> 관리자</Text>
+                        )}
                       </Text>
                       <Text style={s.memberSub}>
                         최근 러닝: {formatLastRunning(m.lastRunningDate)}
@@ -618,7 +746,7 @@ export default function CrewDetailScreen() {
                           onPress={() => {
                             setConfirm({
                               open: true,
-                              title: '관리자 임명',
+                              title: "관리자 임명",
                               message: `${m.nickname} 님을 매니저(관리자)로 임명하시겠습니까?`,
                               destructive: false,
                               onConfirm: async () => {
@@ -641,7 +769,7 @@ export default function CrewDetailScreen() {
                           onPress={() => {
                             setConfirm({
                               open: true,
-                              title: '권한 해제',
+                              title: "권한 해제",
                               message: `${m.nickname} 님의 매니저 권한을 해제하시겠습니까?`,
                               destructive: true,
                               onConfirm: async () => {
@@ -661,7 +789,7 @@ export default function CrewDetailScreen() {
                           onPress={() => {
                             setConfirm({
                               open: true,
-                              title: '권한 이임',
+                              title: "권한 이임",
                               message: `${m.nickname} 님에게 운영 권한을 이임하시겠습니까?`,
                               destructive: true,
                               onConfirm: async () => {
@@ -685,7 +813,7 @@ export default function CrewDetailScreen() {
                           onPress={() => {
                             setConfirm({
                               open: true,
-                              title: '확인',
+                              title: "확인",
                               message: `${m.nickname} 님을 내보낼까요?`,
                               destructive: true,
                               onConfirm: async () => {
@@ -741,7 +869,11 @@ export default function CrewDetailScreen() {
               >
                 <View style={s.settingItemLeft}>
                   <View style={[s.settingIcon, { backgroundColor: "#EFF6FF" }]}>
-                    <Ionicons name="settings-outline" size={20} color="#4A7FE8" />
+                    <Ionicons
+                      name="settings-outline"
+                      size={20}
+                      color="#4A7FE8"
+                    />
                   </View>
                   <Text style={s.settingItemText}>크루 정보 관리</Text>
                 </View>
@@ -755,12 +887,18 @@ export default function CrewDetailScreen() {
                 onPress={() => {
                   setConfirm({
                     open: true,
-                    title: '크루 폐쇄',
-                    message: '정말로 크루를 폐쇄하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+                    title: "크루 폐쇄",
+                    message:
+                      "정말로 크루를 폐쇄하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
                     destructive: true,
                     onConfirm: async () => {
                       await closeCrew(crewId);
-                      setAlert({ open:true, kind:'positive', title:'완료', message:'크루가 폐쇄되었습니다.' });
+                      setAlert({
+                        open: true,
+                        kind: "positive",
+                        title: "완료",
+                        message: "크루가 폐쇄되었습니다.",
+                      });
                       // 폐쇄 후 뒤로 가기 (크루 목록 화면으로)
                       navigation.goBack();
                     },
@@ -776,21 +914,40 @@ export default function CrewDetailScreen() {
                 onPress={() => {
                   setConfirm({
                     open: true,
-                    title: '크루 탈퇴',
-                    message: '크루를 탈퇴하시겠습니까?',
+                    title: "크루 탈퇴",
+                    message: "크루를 탈퇴하시겠습니까?",
                     destructive: true,
                     onConfirm: async () => {
                       try {
                         await leaveCrew(crewId);
-                        setAlert({ open:true, kind:'positive', title:'완료', message:'크루에서 탈퇴했습니다.' });
+                        setAlert({
+                          open: true,
+                          kind: "positive",
+                          title: "완료",
+                          message: "크루에서 탈퇴했습니다.",
+                        });
                         // 탈퇴 후 뒤로 가기 (크루 목록 화면으로)
                         navigation.goBack();
                       } catch (e: any) {
-                        const msg = e?.response?.data?.message || e?.message || '잠시 후 다시 시도해주세요.';
+                        const msg =
+                          e?.response?.data?.message ||
+                          e?.message ||
+                          "잠시 후 다시 시도해주세요.";
                         if (/크루장|OWNER|소유자/.test(String(msg))) {
-                          setAlert({ open:true, kind:'message', title:'탈퇴 불가', message:'크루장은 바로 탈퇴할 수 없습니다. 멤버에게 소유권을 양도한 뒤 탈퇴하거나, 크루를 폐쇄하세요.' });
+                          setAlert({
+                            open: true,
+                            kind: "message",
+                            title: "탈퇴 불가",
+                            message:
+                              "크루장은 바로 탈퇴할 수 없습니다. 멤버에게 소유권을 양도한 뒤 탈퇴하거나, 크루를 폐쇄하세요.",
+                          });
                         } else {
-                          setAlert({ open:true, kind:'negative', title:'탈퇴 실패', message: msg });
+                          setAlert({
+                            open: true,
+                            kind: "negative",
+                            title: "탈퇴 실패",
+                            message: msg,
+                          });
                         }
                       }
                     },
@@ -812,34 +969,56 @@ export default function CrewDetailScreen() {
 function Alerts({ alert, setAlert, confirm, setConfirm }: any) {
   return (
     <>
-      {alert?.open && alert.kind === 'positive' && (
-        <PositiveAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
-      )}
-      {alert?.open && alert.kind === 'negative' && (
-        <NegativeAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
-      )}
-      {alert?.open && alert.kind === 'message' && (
-        <MessageAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
-      )}
-      {confirm?.open && (confirm?.destructive ? (
-        <DestructiveConfirm
+      {alert?.open && alert.kind === "positive" && (
+        <PositiveAlert
           visible
-          title={confirm.title}
-          message={confirm.message}
-          onClose={() => setConfirm({ open:false })}
-          onCancel={() => setConfirm({ open:false })}
-          onConfirm={async () => { await confirm.onConfirm?.(); setConfirm({ open:false }); }}
+          title={alert.title}
+          message={alert.message}
+          onClose={() => setAlert({ open: false, kind: "message" })}
         />
-      ) : (
-        <ConfirmAlert
+      )}
+      {alert?.open && alert.kind === "negative" && (
+        <NegativeAlert
           visible
-          title={confirm.title}
-          message={confirm.message}
-          onClose={() => setConfirm({ open:false })}
-          onCancel={() => setConfirm({ open:false })}
-          onConfirm={async () => { await confirm.onConfirm?.(); setConfirm({ open:false }); }}
+          title={alert.title}
+          message={alert.message}
+          onClose={() => setAlert({ open: false, kind: "message" })}
         />
-      ))}
+      )}
+      {alert?.open && alert.kind === "message" && (
+        <MessageAlert
+          visible
+          title={alert.title}
+          message={alert.message}
+          onClose={() => setAlert({ open: false, kind: "message" })}
+        />
+      )}
+      {confirm?.open &&
+        (confirm?.destructive ? (
+          <DestructiveConfirm
+            visible
+            title={confirm.title}
+            message={confirm.message}
+            onClose={() => setConfirm({ open: false })}
+            onCancel={() => setConfirm({ open: false })}
+            onConfirm={async () => {
+              await confirm.onConfirm?.();
+              setConfirm({ open: false });
+            }}
+          />
+        ) : (
+          <ConfirmAlert
+            visible
+            title={confirm.title}
+            message={confirm.message}
+            onClose={() => setConfirm({ open: false })}
+            onCancel={() => setConfirm({ open: false })}
+            onConfirm={async () => {
+              await confirm.onConfirm?.();
+              setConfirm({ open: false });
+            }}
+          />
+        ))}
     </>
   );
 }
@@ -865,50 +1044,85 @@ const s = StyleSheet.create({
   searchIconText: { fontSize: 22 },
   scrollView: { flex: 1 },
 
-  // 크루 정보 카드
+  // 크루 정보 카드 - 그리드 스타일과 유사한 화이트 카드
   crewInfoCard: {
-    backgroundColor: "#5B8FEE",
+    backgroundColor: "#FFFFFF",
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: 16,
     padding: 20,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    position: "relative",
   },
-  crewHeader: { flexDirection: "row", marginBottom: 20 },
+  crewHeader: {
+    alignItems: "center",
+    marginBottom: 16,
+  },
   crewAvatarContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     overflow: "hidden",
-    marginRight: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3F4F6",
+    marginBottom: 10,
   },
   crewAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
   },
   crewAvatarPlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "rgba(255,255,255,0.3)",
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#F3F4F6",
     justifyContent: "center",
     alignItems: "center",
   },
-  crewHeaderText: { flex: 1, justifyContent: "center" },
-  crewName: { fontSize: 18, fontWeight: "700", color: "#fff", marginBottom: 4 },
-  crewSubInfo: { fontSize: 13, color: "rgba(255,255,255,0.8)" },
+  crewName: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#111827",
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  countRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  countText: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "700",
+  },
+  chatBtn: {
+    position: "absolute",
+    right: 12,
+    top: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#EEF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   statsRow: {
     flexDirection: "row",
     justifyContent: "space-around",
   },
   statItem: { alignItems: "center" },
   statValue: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "800",
-    color: "#fff",
-    marginBottom: 4,
+    color: "#111827",
+    marginBottom: 2,
   },
-  statLabel: { fontSize: 12, color: "rgba(255,255,255,0.8)" },
+  statLabel: { fontSize: 12, color: "#6B7280" },
 
   // 가입 신청
   applicationCard: {

@@ -9,10 +9,12 @@ import {
   RefreshControl,
   ActivityIndicator,
   Image,
-  Alert,
   Platform,
   SafeAreaView,
 } from "react-native";
+import { PositiveAlert, NegativeAlert, MessageAlert, ConfirmAlert } from "../components/ui/AlertDialog";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import {
   getMyProfile,
   getMySummary,
@@ -22,6 +24,7 @@ import {
 } from "../utils/api/users";
 import { useFocusEffect } from "@react-navigation/native";
 import SafeLayout from "../components/Layout/SafeLayout";
+import { Ionicons } from "@expo/vector-icons";
 import AppTopBar from "../components/Layout/AppTopBar";
 import { clearTokens } from "../utils/auth/tokenManager";
 import { deactivateToken } from "../utils/notifications";
@@ -37,11 +40,15 @@ export default function ProfileScreen({
   navigation: any;
   route: any;
 }) {
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight?.() ?? 0;
   const [me, setMe] = useState<UserProfile | null>(null);
   const [summary, setSummary] = useState<UserSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const retriedRef = React.useRef(false);
+  const [dialog, setDialog] = useState<{ open: boolean; title?: string; message?: string; kind?: "positive" | "negative" | "message" }>({ open: false, kind: "message" });
+  const [confirm, setConfirm] = useState<{ open: boolean; title?: string; message?: string; destructive?: boolean; onConfirm?: () => void }>({ open: false });
 
   const fetchData = useCallback(async () => {
     try {
@@ -55,10 +62,7 @@ export default function ProfileScreen({
       console.log("✅ /v1/users/me/summary 응답:", sumRes);
     } catch (err: any) {
       console.warn(err);
-      Alert.alert(
-        "오류",
-        err?.response?.data?.message || "정보를 불러오지 못했습니다."
-      );
+      setDialog({ open: true, kind: "negative", title: "오류", message: err?.response?.data?.message || "정보를 불러오지 못했습니다." });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -106,100 +110,51 @@ export default function ProfileScreen({
   }, [fetchData]);
 
   const handleLogout = useCallback(async () => {
-    Alert.alert("로그아웃", "정말 로그아웃 하시겠어요?", [
-      { text: "취소", style: "cancel" },
-      {
-        text: "로그아웃",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            // 서버 로그아웃 (Authorization 필요)
-            // 1) FCM 토큰 비활성화 (인증 필요하므로 먼저 수행)
-            await deactivateToken();
-            // 2) 서버 로그아웃 (세션 무효화)
-            try {
-              await apiLogout();
-            } catch {}
-          } catch (error) {
-            console.error("로그아웃 실패:", error);
-            Alert.alert("오류", "로그아웃 중 문제가 발생했습니다.");
-          } finally {
-            // 로컬 토큰 정리 및 로그인 화면 이동
-            try {
-              await clearTokens();
-            } catch {}
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "Login" }],
-            });
-          }
-        },
+    setConfirm({
+      open: true,
+      title: "로그아웃",
+      message: "정말 로그아웃 하시겠어요?",
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deactivateToken();
+          try { await apiLogout(); } catch {}
+        } catch (error) {
+          setDialog({ open: true, kind: "negative", title: "오류", message: "로그아웃 중 문제가 발생했습니다." });
+        } finally {
+          try { await clearTokens(); } catch {}
+          navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+        }
       },
-    ]);
+    });
   }, [navigation]);
 
   const handleDeleteAccount = useCallback(() => {
-    Alert.alert(
-      "회원 탈퇴",
-      "정말 탈퇴하시겠습니까?\n\n모든 데이터가 영구적으로 삭제되며 복구할 수 없습니다.\n- 러닝 기록\n- 크루 정보\n- 피드 게시물\n- 방명록\n- 엠블럼",
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: "탈퇴",
-          style: "destructive",
-          onPress: () => {
-            // 2차 확인
-            Alert.alert(
-              "최종 확인",
-              "정말로 탈퇴하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
-              [
-                { text: "취소", style: "cancel" },
-                {
-                  text: "탈퇴",
-                  style: "destructive",
-                  onPress: async () => {
-                    try {
-                      // 1) FCM 토큰 비활성화 (인증 필요하므로 먼저 수행)
-                      try {
-                        await deactivateToken();
-                      } catch (e) {
-                        console.warn("FCM 토큰 비활성화 실패:", e);
-                      }
-
-                      // 2) 서버에 회원 탈퇴 요청
-                      await deleteMyAccount();
-
-                      // 3) 로컬 토큰 정리
-                      try {
-                        await clearTokens();
-                      } catch {}
-
-                      // 4) 로그인 화면으로 이동
-                      navigation.reset({
-                        index: 0,
-                        routes: [{ name: "Login" }],
-                      });
-
-                      // 5) 탈퇴 완료 메시지
-                      setTimeout(() => {
-                        Alert.alert("탈퇴 완료", "회원 탈퇴가 완료되었습니다.");
-                      }, 500);
-                    } catch (error: any) {
-                      console.error("회원 탈퇴 실패:", error);
-                      Alert.alert(
-                        "오류",
-                        error?.response?.data?.message ||
-                          "회원 탈퇴 중 문제가 발생했습니다."
-                      );
-                    }
-                  },
-                },
-              ]
-            );
-          },
-        },
-      ]
-    );
+    setConfirm({
+      open: true,
+      title: "회원 탈퇴",
+      message:
+        "정말 탈퇴하시겠습니까?\n\n모든 데이터가 영구적으로 삭제되며 복구할 수 없습니다.\n- 러닝 기록\n- 크루 정보\n- 피드 게시물\n- 방명록\n- 엠블럼",
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          try { await deactivateToken(); } catch (e) { console.warn("FCM 토큰 비활성화 실패:", e); }
+          await deleteMyAccount();
+          try { await clearTokens(); } catch {}
+          navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+          setDialog({ open: true, kind: "positive", title: "탈퇴 완료", message: "회원 탈퇴가 완료되었습니다." });
+        } catch (error: any) {
+          console.error("회원 탈퇴 실패:", error);
+          const raw = error?.response?.data?.message || error?.message || "";
+          // 크루장(OWNER)인 경우 백엔드에서 에러를 주면 친절한 메시지로 대체
+          const isCrewOwner = /크루장|OWNER|소유자|crew owner|transfer ownership/i.test(String(raw));
+          const message = isCrewOwner
+            ? "크루장은 바로 탈퇴할 수 없습니다.\n크루 소유권을 다른 멤버에게 이양하거나 크루를 폐쇄한 뒤 다시 시도해주세요."
+            : raw || "회원 탈퇴 중 문제가 발생했습니다.";
+          setDialog({ open: true, kind: "negative", title: "탈퇴 실패", message });
+        }
+      },
+    });
   }, [navigation]);
 
   // 필드 매핑
@@ -249,7 +204,13 @@ export default function ProfileScreen({
   if (loading) {
     return (
       <SafeLayout withBottomInset={false} withTopInset={false}>
-        <AppTopBar title="내 정보" navigation={navigation} />
+        <AppTopBar
+          title="내 정보"
+          navigation={navigation}
+          backgroundColor="#4A7FE8"
+          borderBottomColor="#3C6FD0"
+          tintColor="#FFFFFF"
+        />
         <View style={[styles.container, styles.loadingContainer]}>
           <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>불러오는 중...</Text>
@@ -261,7 +222,33 @@ export default function ProfileScreen({
   return (
     <SafeLayout withBottomInset={false} withTopInset={false}>
       <View style={styles.container}>
-        <AppTopBar title="내 정보" navigation={navigation} />
+        {/* Alerts */}
+        {dialog.open && dialog.kind === "positive" && (
+          <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open: false, kind: "message" })} />
+        )}
+        {dialog.open && dialog.kind === "negative" && (
+          <NegativeAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open: false, kind: "message" })} />
+        )}
+        {dialog.open && dialog.kind === "message" && (
+          <MessageAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open: false, kind: "message" })} />
+        )}
+        <ConfirmAlert
+          visible={!!confirm.open}
+          title={confirm.title}
+          message={confirm.message}
+          onClose={() => setConfirm({ open: false })}
+          onConfirm={async () => {
+            const fn = confirm.onConfirm;
+            setConfirm({ open: false });
+            try { await fn?.(); } catch {}
+          }}
+        />
+        <AppTopBar
+          title="내 정보"
+          navigation={navigation}
+          backgroundColor="#F5F5F5"
+          borderBottomColor="#F5F5F5"
+        />
 
         <ScrollView
           style={{ flex: 1 }}
@@ -272,6 +259,7 @@ export default function ProfileScreen({
           contentInsetAdjustmentBehavior={
             Platform.OS === "ios" ? "automatic" : "never"
           }
+          contentContainerStyle={{ paddingBottom: insets.bottom + tabBarHeight + 80 }}
         >
           {/* 프로필 섹션 */}
           <View style={styles.profileSection}>
@@ -288,7 +276,7 @@ export default function ProfileScreen({
                     />
                   ) : (
                     <View style={styles.avatarPlaceholder}>
-                      <Text style={styles.avatarEmoji}>😊</Text>
+                      <Ionicons name="person-outline" size={36} color="#666" />
                     </View>
                   )}
                 </View>
@@ -389,8 +377,7 @@ export default function ProfileScreen({
 
           {/* 설정 메뉴 - 위 카드로 통합 */}
 
-          {/* 하단 여백 */}
-          <View style={styles.bottomSpacing} />
+          {/* 동적 하단 여백은 contentContainerStyle로 대체 */}
         </ScrollView>
 
         {/* 하단 네비게이션 */}

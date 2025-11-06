@@ -52,14 +52,8 @@ export default function TabBarAdapter({
     refreshHidden();
     const sub = AppState.addEventListener("change", () => refreshHidden());
 
-    // 화면 포커스 시에도 체크 (러닝 종료 후 다른 탭으로 이동 시)
-    const unsubscribeFocus = navigation.addListener("state", () => {
-      refreshHidden();
-    });
-
     return () => {
       sub.remove();
-      unsubscribeFocus();
     };
   }, [route?.name, navigation]);
 

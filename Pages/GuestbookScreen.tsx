@@ -58,10 +58,13 @@ export default function GuestbookScreen({ navigation }: { navigation?: any }) {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    setPage(0);
     setHasMore(true);
-    setGuestbooks([]);
-    loadGuestbooks();
+    // page가 0이면 직접 로드, 그렇지 않으면 page를 0으로 리셋하여 useEffect 트리거
+    if (page === 0) {
+      loadGuestbooks();
+    } else {
+      setPage(0);
+    }
   };
 
   const handleLoadMore = () => {
@@ -182,7 +185,8 @@ export default function GuestbookScreen({ navigation }: { navigation?: any }) {
   );
 
   const renderEmpty = () => {
-    if (loading && page === 0) {
+    // 당김 새로고침 중이거나 첫 로딩 중이면 스피너 표시
+    if ((loading && page === 0) || refreshing) {
       return (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#8b4513" />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, StatusBar, ActivityIndicator, TouchableOpacity, Alert, ScrollView } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getOrCreateOverallFeedback,
   getFriendlyErrorMessage,
@@ -29,6 +29,7 @@ const AIFeedbackScreen: React.FC<AIFeedbackScreenProps> = ({
   navigation,
 }) => {
   const { completedCount, latestRecordId } = route.params;
+  const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<AIFeedback | null>(null);
@@ -132,7 +133,10 @@ const AIFeedbackScreen: React.FC<AIFeedbackScreenProps> = ({
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(120, insets.bottom + 140) },
+        ]}
       >
         {/* Feedback Card */}
         <View style={styles.feedbackCard}>
@@ -182,7 +186,7 @@ const AIFeedbackScreen: React.FC<AIFeedbackScreenProps> = ({
       </ScrollView>
 
       {/* Bottom Button */}
-      <View style={styles.bottomContainer}>
+      <View style={[styles.bottomContainer, { paddingBottom: Math.max(20, insets.bottom + 12) }]}>
         <TouchableOpacity
           style={styles.closeButton}
           onPress={() => navigation.goBack()}
