@@ -13,6 +13,7 @@ import * as Location from "expo-location";
 import MapRoute from "../components/Running/MapRoute";
 import WeatherWidget from "../components/Running/WeatherWidget";
 import { useWeather } from "../contexts/WeatherContext";
+import { InteractionManager } from "react-native";
 
 export default function Main() {
   const nav = useNavigation<any>();
@@ -41,7 +42,16 @@ export default function Main() {
   );
 
   // 날씨 정보
-  const { weather, loading: weatherLoading } = useWeather();
+  const { weather, loading: weatherLoading, enable: enableWeather, disable: disableWeather } = useWeather();
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      try { enableWeather(); } catch {}
+    });
+    return () => {
+      try { disableWeather(); } catch {}
+      task.cancel?.();
+    };
+  }, []);
 
   // 메인 페이지 진입 시 위치 권한 미리 요청
   useEffect(() => {
@@ -159,8 +169,10 @@ export default function Main() {
           key={mapKey}
           route={[]}
           last={null}
-          useCurrentLocationOnMount
-          liveMode
+          useCurrentLocationOnMount={false}
+          liveMode={false}
+          showUserLocation={false}
+          showMyLocationButton={false}
         />
       </View>
 

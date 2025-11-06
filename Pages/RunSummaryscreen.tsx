@@ -1,7 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, Pressable, TextInput, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  ScrollView,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { PositiveAlert, NegativeAlert, MessageAlert } from "../components/ui/AlertDialog";
+import {
+  PositiveAlert,
+  NegativeAlert,
+  MessageAlert,
+} from "../components/ui/AlertDialog";
 import { Ionicons } from "@expo/vector-icons";
 // ✅ 올바른 경로로 수정
 import { apiComplete } from "../utils/api/running";
@@ -23,14 +34,25 @@ export default function RunSummaryScreen({ route, navigation }: any) {
     runId: runIdFromParams,
   } = route.params || {};
 
-  const [title, setTitle] = useState("금요일 오전 러닝");
+  const [title, setTitle] = useState("제목을 입력하세요");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [dialog, setDialog] = useState<{ open:boolean; title?:string; message?:string; kind?:'positive'|'negative'|'message' }>({ open:false, kind:'message' });
+  const [dialog, setDialog] = useState<{
+    open: boolean;
+    title?: string;
+    message?: string;
+    kind?: "positive" | "negative" | "message";
+  }>({ open: false, kind: "message" });
   const [routeForMap, setRouteForMap] = useState<any[]>(
-    (routePath?.length && (routePath[0]?.lat != null || routePath[0]?.lng != null))
-      ? routePath.map((p: any) => ({ latitude: p.latitude ?? p.lat, longitude: p.longitude ?? p.lng }))
-      : (Array.isArray(routePath) ? routePath : [])
+    routePath?.length &&
+      (routePath[0]?.lat != null || routePath[0]?.lng != null)
+      ? routePath.map((p: any) => ({
+          latitude: p.latitude ?? p.lat,
+          longitude: p.longitude ?? p.lng,
+        }))
+      : Array.isArray(routePath)
+      ? routePath
+      : []
   );
 
   const initialRunId =
@@ -121,7 +143,12 @@ export default function RunSummaryScreen({ route, navigation }: any) {
         runIdRef.current = runId;
       } catch (e) {
         console.error("[RunSummary] 저장 실패:", e);
-        setDialog({ open:true, kind:'negative', title:'저장 실패', message:'네트워크 상태를 확인하고 다시 시도해주세요.' });
+        setDialog({
+          open: true,
+          kind: "negative",
+          title: "저장 실패",
+          message: "네트워크 상태를 확인하고 다시 시도해주세요.",
+        });
       } finally {
         setSaving(false);
       }
@@ -143,16 +170,17 @@ export default function RunSummaryScreen({ route, navigation }: any) {
   useEffect(() => {
     if (runIdRef.current !== null || !sessionId || saving) return;
 
-    console.log('[RunSummary] Polling for runId with sessionId:', sessionId);
+    if (__DEV__)
+      console.log("[RunSummary] Polling for runId with sessionId:", sessionId);
 
     const pollInterval = setInterval(async () => {
       try {
         // sessionId로 러닝 기록 조회 시도
         // TODO: 서버에 sessionId로 runId 조회 API가 있으면 사용
         // 현재는 getRunningRecordDetail이 runId만 받으므로, 대신 1초 후 재시도
-        console.log('[RunSummary] Still waiting for runId...');
+        if (__DEV__) console.log("[RunSummary] Still waiting for runId...");
       } catch (e) {
-        console.log('[RunSummary] Failed to poll runId:', e);
+        if (__DEV__) console.log("[RunSummary] Failed to poll runId:", e);
       }
     }, 2000);
 
@@ -160,7 +188,7 @@ export default function RunSummaryScreen({ route, navigation }: any) {
     setTimeout(() => {
       clearInterval(pollInterval);
       if (runIdRef.current === null) {
-        console.warn('[RunSummary] Failed to get runId after 10s');
+        if (__DEV__) console.warn("[RunSummary] Failed to get runId after 10s");
       }
     }, 10000);
 
@@ -175,11 +203,14 @@ export default function RunSummaryScreen({ route, navigation }: any) {
         const id = runIdRef.current;
         if (!id) return;
         const detail = await getRunningRecordDetail(id);
-        const pts = (detail.routePoints || []).map((p: any) => ({ latitude: p.latitude, longitude: p.longitude }));
+        const pts = (detail.routePoints || []).map((p: any) => ({
+          latitude: p.latitude,
+          longitude: p.longitude,
+        }));
         if (pts.length) setRouteForMap(pts);
       } catch (e) {
         // 경로가 없어도 화면은 계속 동작
-        console.log('[RunSummary] Failed to fetch route details:', e);
+        console.log("[RunSummary] Failed to fetch route details:", e);
       }
     })();
   }, [runIdRef.current]);
@@ -187,7 +218,12 @@ export default function RunSummaryScreen({ route, navigation }: any) {
   const onSharePress = async () => {
     // runId가 없으면 저장이 완료될 때까지 대기
     if (runIdRef.current === null && saving) {
-      setDialog({ open:true, kind:'message', title:'잠시만요', message:'기록 저장 중입니다...' });
+      setDialog({
+        open: true,
+        kind: "message",
+        title: "잠시만요",
+        message: "기록 저장 중입니다...",
+      });
       return;
     }
 
@@ -195,25 +231,48 @@ export default function RunSummaryScreen({ route, navigation }: any) {
     if (runIdRef.current === null && sessionId) {
       try {
         // sessionId로 runId 조회 (서버에 이미 저장되어 있어야 함)
-        console.log('[RunSummary] Fetching runId from server with sessionId:', sessionId);
-        setDialog({ open:true, kind:'message', title:'잠시만요', message:'러닝 기록을 조회 중입니다...' });
+        console.log(
+          "[RunSummary] Fetching runId from server with sessionId:",
+          sessionId
+        );
+        setDialog({
+          open: true,
+          kind: "message",
+          title: "잠시만요",
+          message: "러닝 기록을 조회 중입니다...",
+        });
 
         // 잠시 대기 후 재시도 (서버 저장이 완료될 시간 확보)
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
         // 저장 완료 확인
         if (runIdRef.current === null) {
-          setDialog({ open:true, kind:'negative', title:'오류', message:'러닝 기록을 찾을 수 없습니다. 잠시 후 다시 시도해주세요.' });
+          setDialog({
+            open: true,
+            kind: "negative",
+            title: "오류",
+            message: "러닝 기록을 찾을 수 없습니다. 잠시 후 다시 시도해주세요.",
+          });
           return;
         }
       } catch (e) {
-        setDialog({ open:true, kind:'negative', title:'오류', message:'러닝 기록 조회에 실패했습니다.' });
+        setDialog({
+          open: true,
+          kind: "negative",
+          title: "오류",
+          message: "러닝 기록 조회에 실패했습니다.",
+        });
         return;
       }
     }
 
     if (runIdRef.current === null) {
-      setDialog({ open:true, kind:'message', title:'잠시만요', message:'기록 저장 후 다시 시도해주세요.' });
+      setDialog({
+        open: true,
+        kind: "message",
+        title: "잠시만요",
+        message: "기록 저장 후 다시 시도해주세요.",
+      });
       return;
     }
 
@@ -240,14 +299,29 @@ export default function RunSummaryScreen({ route, navigation }: any) {
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: "#fff" }}>
-      {dialog.open && dialog.kind === 'positive' && (
-        <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      {dialog.open && dialog.kind === "positive" && (
+        <PositiveAlert
+          visible
+          title={dialog.title}
+          message={dialog.message}
+          onClose={() => setDialog({ open: false, kind: "message" })}
+        />
       )}
-      {dialog.open && dialog.kind === 'negative' && (
-        <NegativeAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      {dialog.open && dialog.kind === "negative" && (
+        <NegativeAlert
+          visible
+          title={dialog.title}
+          message={dialog.message}
+          onClose={() => setDialog({ open: false, kind: "message" })}
+        />
       )}
-      {dialog.open && dialog.kind === 'message' && (
-        <MessageAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
+      {dialog.open && dialog.kind === "message" && (
+        <MessageAlert
+          visible
+          title={dialog.title}
+          message={dialog.message}
+          onClose={() => setDialog({ open: false, kind: "message" })}
+        />
       )}
       <ScrollView showsVerticalScrollIndicator={false}>
         <View

@@ -5,8 +5,8 @@ export type RootParamList = Record<string, any>;
 export const navigationRef = createNavigationContainerRef<RootParamList>();
 
 export function navigate(name: string, params?: any) {
-  if (navigationRef.isReady()) {
-    navigationRef.navigate(name as never, params as never);
+  if ((navigationRef as any).isReady?.()) {
+    (navigationRef as any).navigate(name, params);
   }
 }
 
@@ -20,8 +20,7 @@ export function navigateToJourneyRun() {
 }
 
 export function resetTo(name: string, params?: any) {
-  if (navigationRef.isReady()) {
-    navigationRef.dispatch(StackActions.replace(name as never, params as never));
+  if ((navigationRef as any).isReady?.()) {
+    (navigationRef as any).dispatch(StackActions.replace(name as any, params as any));
   }
 }
-
