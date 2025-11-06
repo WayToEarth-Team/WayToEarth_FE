@@ -28,6 +28,8 @@ export default function RecordScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [weekly, setWeekly] = useState<any | null>(null);
   const [weeklyGoal, setWeeklyGoal] = useState<string>("");
+  // 서버에 저장되어 있는 주간 목표(취소 시 복원 용도)
+  const [savedWeeklyGoal, setSavedWeeklyGoal] = useState<string>("");
   const [savingGoal, setSavingGoal] = useState(false);
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [totalRunningCount, setTotalRunningCount] = useState<number>(0);
@@ -68,7 +70,9 @@ export default function RecordScreen({ navigation }: any) {
 
         // Load weekly goal and total running count from profile
         const v = (me as any)?.weekly_goal_distance;
-        setWeeklyGoal(v != null && !Number.isNaN(Number(v)) ? String(v) : "");
+        const goalStr = v != null && !Number.isNaN(Number(v)) ? String(v) : "";
+        setWeeklyGoal(goalStr);
+        setSavedWeeklyGoal(goalStr);
         setTotalRunningCount((me as any)?.total_running_count ?? 0);
       } catch (e) {
         console.warn(e);
@@ -156,6 +160,21 @@ export default function RecordScreen({ navigation }: any) {
       const weeklyGoalNumber =
         weeklyGoal?.trim() === "" ? undefined : Number(weeklyGoal);
 
+      // 커스텀 검증: 1000km 이상 설정 시 사용자 친화 메시지 출력 후 중단
+      if (
+        typeof weeklyGoalNumber === "number" &&
+        !Number.isNaN(weeklyGoalNumber) &&
+        weeklyGoalNumber >= 1000
+      ) {
+        setDialog({
+          open: true,
+          kind: "negative",
+          title: "입력 오류",
+          message: "주간목표에 맞는 키로수를 설정해주세요",
+        });
+        return;
+      }
+
       const payload = {
         weekly_goal_distance:
           typeof weeklyGoalNumber === "number" &&
@@ -172,13 +191,36 @@ export default function RecordScreen({ navigation }: any) {
         message: "주간 목표가 저장되었습니다.",
       });
       setIsEditingGoal(false);
+      // 저장 성공 시 기준값 갱신 (취소 복원 지점 업데이트)
+      setSavedWeeklyGoal(
+        typeof weeklyGoalNumber === "number" && !Number.isNaN(weeklyGoalNumber)
+          ? String(weeklyGoalNumber)
+          : ""
+      );
+      // 강제 리렌더링(그래프/요약 등 의존 뷰가 즉시 반영되도록)
+      setWeekly((prev: any) => (prev ? { ...prev } : prev));
     } catch (e: any) {
-      console.warn(e);
-      const msg =
-        e?.response?.data?.message ||
-        e?.message ||
-        "주간 목표 저장에 실패했습니다.";
-      setDialog({ open: true, kind: "negative", title: "오류", message: msg });
+      const status = e?.response?.status as number | undefined;
+      const data = e?.response?.data || {};
+      const errObj = (data as any)?.error || {};
+      const details: string = errObj?.details || (data as any)?.details || "";
+      const rawMsg: string = errObj?.message || (data as any)?.message || e?.message || "";
+      const code: string = (errObj?.code || (data as any)?.code || "").toString();
+
+      // 백엔드 검증 메시지 해석 → 사용자 친화 문구로 변환
+      let message = rawMsg || "주간 목표 저장에 실패했습니다.";
+      const toManyWeeklyGoalMsg = "주간목표에 맞는 키로수를 설정해주세요";
+      if (
+        status === 400 && (
+          /INVALID_PARAMETER/i.test(code) ||
+          /weeklyGoalDistance/i.test(details) ||
+          /weekly|goal|distance|주간|목표/i.test(rawMsg) ||
+          /less than or equal to 999\.99|out of range|too large|max/i.test(details)
+        )
+      ) {
+        message = toManyWeeklyGoalMsg;
+      }
+      setDialog({ open: true, kind: "negative", title: "입력 오류", message });
     } finally {
       setSavingGoal(false);
     }
@@ -407,7 +449,11 @@ export default function RecordScreen({ navigation }: any) {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => setIsEditingGoal(false)}
+                  onPress={() => {
+                    // 취소 시 입력값 되돌리고 편집 종료
+                    setWeeklyGoal(savedWeeklyGoal);
+                    setIsEditingGoal(false);
+                  }}
                   style={s.cancelButton}
                 >
                   <Text style={s.cancelButtonText}>취소</Text>
@@ -420,18 +466,22 @@ export default function RecordScreen({ navigation }: any) {
                 <View style={{ flex: 1 }}>
                   <Text style={s.goalLabelCompact}>주간 목표</Text>
                   <Text style={s.goalValueCompact}>
-                    {weeklyGoal ? `${weeklyGoal} km` : "목표 미설정"}
+                    {savedWeeklyGoal ? `${savedWeeklyGoal} km` : "목표 미설정"}
                   </Text>
                 </View>
                 <TouchableOpacity
-                  onPress={() => setIsEditingGoal(true)}
+                  onPress={() => {
+                    // 편집 시작 시 서버 기준값으로 입력값 초기화
+                    setWeeklyGoal(savedWeeklyGoal);
+                    setIsEditingGoal(true);
+                  }}
                   style={s.editButton}
                 >
                   <Text style={s.editButtonText}>설정</Text>
                 </TouchableOpacity>
               </View>
 
-              {weeklyGoal && Number(weeklyGoal) > 0 && (
+              {savedWeeklyGoal && Number(savedWeeklyGoal) > 0 && (
                 <>
                   <View style={s.progressBarCompact}>
                     <View
@@ -440,7 +490,7 @@ export default function RecordScreen({ navigation }: any) {
                         {
                           width: `${Math.min(
                             ((weekly?.totalDistance ?? 0) /
-                              Number(weeklyGoal)) *
+                              Number(savedWeeklyGoal)) *
                               100,
                             100
                           )}%`,
@@ -450,12 +500,12 @@ export default function RecordScreen({ navigation }: any) {
                   </View>
                   <View style={s.progressInfoRow}>
                     <Text style={s.progressInfo}>
-                      {(weekly?.totalDistance ?? 0).toFixed(1)} / {weeklyGoal}{" "}
+                      {(weekly?.totalDistance ?? 0).toFixed(1)} / {savedWeeklyGoal}{" "}
                       km
                     </Text>
                     <Text style={s.progressPercent}>
                       {Math.round(
-                        ((weekly?.totalDistance ?? 0) / Number(weeklyGoal)) *
+                        ((weekly?.totalDistance ?? 0) / Number(savedWeeklyGoal)) *
                           100
                       )}
                       % 달성

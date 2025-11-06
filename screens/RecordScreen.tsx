@@ -17,6 +17,8 @@ export default function RecordScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [weekly, setWeekly] = useState<any | null>(null);
   const [weeklyGoal, setWeeklyGoal] = useState<string>("");
+  // 서버에 저장된 주간 목표(표시/진척도는 이 값을 기준으로 렌더링)
+  const [savedWeeklyGoal, setSavedWeeklyGoal] = useState<string>("");
   const [savingGoal, setSavingGoal] = useState(false);
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [records, setRecords] = useState<any[]>([]);
@@ -37,7 +39,9 @@ export default function RecordScreen({ navigation }: any) {
         setOffset(first.length);
         setHasMore(first.length === pageSize);
         const v = (me as any)?.weekly_goal_distance;
-        setWeeklyGoal(v != null && !Number.isNaN(Number(v)) ? String(v) : "");
+        const goalStr = v != null && !Number.isNaN(Number(v)) ? String(v) : "";
+        setWeeklyGoal(goalStr);
+        setSavedWeeklyGoal(goalStr);
       } catch (e) {
         console.warn(e);
       } finally {
@@ -80,13 +84,45 @@ export default function RecordScreen({ navigation }: any) {
     try {
       setSavingGoal(true);
       const weeklyGoalNumber = weeklyGoal?.trim() === "" ? undefined : Number(weeklyGoal);
+
+      // 사전 검증: 1000km 이상이면 사용자 친화 메시지로 차단
+      if (
+        typeof weeklyGoalNumber === "number" &&
+        !Number.isNaN(weeklyGoalNumber) &&
+        weeklyGoalNumber >= 1000
+      ) {
+        setDialog({ open: true, kind: "negative", title: "입력 오류", message: "주간목표에 맞는 키로수를 설정해주세요" });
+        return;
+      }
+
       const payload = { weekly_goal_distance: typeof weeklyGoalNumber === "number" && !Number.isNaN(weeklyGoalNumber) ? weeklyGoalNumber : undefined };
       await client.put("/v1/users/me", payload);
       setDialog({ open: true, kind: "positive", title: "완료", message: "주간 목표가 저장되었습니다." });
       setIsEditingGoal(false);
+      // 저장 성공 시 표시 기준값 갱신
+      setSavedWeeklyGoal(
+        typeof weeklyGoalNumber === "number" && !Number.isNaN(weeklyGoalNumber)
+          ? String(weeklyGoalNumber)
+          : ""
+      );
     } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || "주간 목표 저장에 실패했습니다.";
-      setDialog({ open: true, kind: "negative", title: "오류", message: msg });
+      const status = e?.response?.status as number | undefined;
+      const data = e?.response?.data || {};
+      const errObj = (data as any)?.error || {};
+      const details: string = errObj?.details || (data as any)?.details || "";
+      const rawMsg: string = errObj?.message || (data as any)?.message || e?.message || "";
+      const code: string = (errObj?.code || (data as any)?.code || "").toString();
+      let message = rawMsg || "주간 목표 저장에 실패했습니다.";
+      if (
+        status === 400 && (
+          /INVALID_PARAMETER/i.test(code) ||
+          /weeklyGoalDistance/i.test(details) ||
+          /less than or equal to 999\.99|out of range|too large|max/i.test(details)
+        )
+      ) {
+        message = "주간목표에 맞는 키로수를 설정해주세요";
+      }
+      setDialog({ open: true, kind: "negative", title: "입력 오류", message });
     } finally {
       setSavingGoal(false);
     }
@@ -160,11 +196,16 @@ export default function RecordScreen({ navigation }: any) {
           <GoalCard
             weekly={weekly}
             weeklyGoal={weeklyGoal}
+            displayGoal={savedWeeklyGoal}
             setWeeklyGoal={setWeeklyGoal}
             isEditingGoal={isEditingGoal}
             setIsEditingGoal={setIsEditingGoal}
             savingGoal={savingGoal}
             onSave={saveWeeklyGoal}
+            onCancel={() => {
+              setWeeklyGoal(savedWeeklyGoal);
+              setIsEditingGoal(false);
+            }}
           />
         </View>
 

@@ -4,25 +4,30 @@ import { View, Text, TouchableOpacity, TextInput } from "react-native";
 type Props = {
   weekly: any | null;
   weeklyGoal: string;
+  // 비편집 시 표시/진척도 기준이 되는 저장된 목표값
+  displayGoal?: string;
   setWeeklyGoal: (v: string) => void;
   isEditingGoal: boolean;
   setIsEditingGoal: (v: boolean) => void;
   savingGoal: boolean;
   onSave: () => void;
+  onCancel?: () => void;
 };
 
 export default function GoalCard({
   weekly,
   weeklyGoal,
+  displayGoal,
   setWeeklyGoal,
   isEditingGoal,
   setIsEditingGoal,
   savingGoal,
   onSave,
+  onCancel,
 }: Props) {
   const total = Number(weekly?.totalDistance ?? 0);
-  const goalNum = Number(weeklyGoal || 0);
-  const percent = goalNum > 0 ? Math.min(100, Math.round((total / goalNum) * 100)) : 0;
+  const goalDisplayNum = Number((displayGoal ?? weeklyGoal) || 0);
+  const percent = goalDisplayNum > 0 ? Math.min(100, Math.round((total / goalDisplayNum) * 100)) : 0;
 
   return (
     <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }}>
@@ -39,7 +44,7 @@ export default function GoalCard({
       </View>
 
       {!isEditingGoal ? (
-        <Text style={{ fontSize: 28, fontWeight: "800", color: "#111" }}>{goalNum > 0 ? goalNum : "-"}</Text>
+        <Text style={{ fontSize: 28, fontWeight: "800", color: "#111" }}>{goalDisplayNum > 0 ? goalDisplayNum : "-"}</Text>
       ) : (
         <View style={{ gap: 12 }}>
           <Text style={{ fontSize: 18, fontWeight: "700", color: "#111" }}>목표 거리 입력</Text>
@@ -56,7 +61,7 @@ export default function GoalCard({
             <TouchableOpacity style={{ flex: 1, backgroundColor: "#111", paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10, alignItems: "center" }} onPress={onSave} disabled={savingGoal}>
               <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>{savingGoal ? "저장 중..." : "저장"}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={{ flex: 1, backgroundColor: "#E5E7EB", paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10, alignItems: "center" }} onPress={() => setIsEditingGoal(false)}>
+            <TouchableOpacity style={{ flex: 1, backgroundColor: "#E5E7EB", paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10, alignItems: "center" }} onPress={() => (onCancel ? onCancel() : setIsEditingGoal(false))}>
               <Text style={{ color: "#6B7280", fontSize: 14, fontWeight: "600" }}>취소</Text>
             </TouchableOpacity>
           </View>
@@ -73,4 +78,3 @@ export default function GoalCard({
     </View>
   );
 }
-
