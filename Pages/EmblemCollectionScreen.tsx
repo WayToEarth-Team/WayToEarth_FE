@@ -1,15 +1,6 @@
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  Image,
-  ActivityIndicator,
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Image, ActivityIndicator } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { NegativeAlert } from "../components/ui/AlertDialog";
 import type { Achievement, Summary, EmblemFilter } from "../types/emblem";
 import { getEmblemSummary, getEmblemCatalog } from "../utils/api/emblems";
@@ -104,7 +95,7 @@ const EmblemCollectionScreen: React.FC<{ navigation?: any }> = ({
 
   if (loading) {
     return (
-      <SafeAreaView style={s.container}>
+      <SafeAreaView edges={["top"]} style={s.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
         <View style={s.loading}>
           <ActivityIndicator size="large" />
@@ -115,7 +106,7 @@ const EmblemCollectionScreen: React.FC<{ navigation?: any }> = ({
   }
 
   return (
-    <SafeAreaView style={s.container}>
+    <SafeAreaView edges={["top"]} style={s.container}>
       {alert.open && (
         <NegativeAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false })} />
       )}

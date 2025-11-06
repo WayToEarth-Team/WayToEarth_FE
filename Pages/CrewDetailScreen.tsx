@@ -1,17 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  ActivityIndicator,
-  RefreshControl,
-  AppState,
-} from "react-native";
+import { View, Text, StyleSheet, StatusBar, ScrollView, TouchableOpacity, Image, ActivityIndicator, RefreshControl, AppState } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { PositiveAlert, NegativeAlert, MessageAlert, ConfirmAlert, DestructiveConfirm } from "../components/ui/AlertDialog";
 import { Ionicons } from "@expo/vector-icons";
 import { getMyProfile, getUserProfile } from "../utils/api/users";
@@ -323,7 +312,7 @@ export default function CrewDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={s.container}>
+    <SafeAreaView edges={["top"]} style={s.container}>
       <Alerts alert={alert} setAlert={setAlert} confirm={confirm} setConfirm={setConfirm} />
       <StatusBar barStyle="light-content" />
 

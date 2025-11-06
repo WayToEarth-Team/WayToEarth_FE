@@ -1,13 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  TextInput,
-  SafeAreaView,
-  ScrollView,
-} from "react-native";
+import { View, Text, StyleSheet, Pressable, TextInput, ScrollView } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { PositiveAlert, NegativeAlert, MessageAlert } from "../components/ui/AlertDialog";
 import { Ionicons } from "@expo/vector-icons";
 // ✅ 올바른 경로로 수정
@@ -246,7 +239,7 @@ export default function RunSummaryScreen({ route, navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: "#fff" }}>
       {dialog.open && dialog.kind === 'positive' && (
         <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
       )}

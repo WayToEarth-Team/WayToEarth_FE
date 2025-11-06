@@ -1,7 +1,20 @@
 // hooks/journey/useBackgroundRunning.ts
 // Notifee를 사용한 백그라운드 러닝 세션 관리 (여정 러닝 + 일반 러닝 공용)
 import { useEffect, useRef } from 'react';
-import notifee, { AndroidImportance, AndroidCategory, AuthorizationStatus } from '@notifee/react-native';
+// Lazy-load Notifee to avoid crashes on Expo Go or environments
+// without the native module. Use Dev Client/prebuilt for full support.
+let notifee: any | null = null;
+let AndroidImportance: any | null = null;
+let AndroidCategory: any | null = null;
+let AuthorizationStatus: any | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const mod = require('@notifee/react-native');
+  notifee = mod?.default ?? mod;
+  AndroidImportance = mod?.AndroidImportance ?? null;
+  AndroidCategory = mod?.AndroidCategory ?? null;
+  AuthorizationStatus = mod?.AuthorizationStatus ?? null;
+} catch {}
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, PermissionsAndroid, Platform } from 'react-native';
 import * as Location from 'expo-location';
@@ -51,9 +64,12 @@ export function useBackgroundRunning() {
         }
       }
 
-      // Notifee 권한 확인
-      const settings = await notifee.requestPermission();
-      return settings.authorizationStatus >= AuthorizationStatus.AUTHORIZED;
+      // Notifee 권한 확인 (모듈이 없으면 true로 간주: Dev Client 필요)
+      if (notifee && AuthorizationStatus) {
+        const settings = await notifee.requestPermission();
+        return settings.authorizationStatus >= AuthorizationStatus.AUTHORIZED;
+      }
+      return true;
     } catch (error) {
       console.error('알림 권한 요청 실패:', error);
       return false;
@@ -63,6 +79,7 @@ export function useBackgroundRunning() {
   // 알림 채널 생성 (Android 필수) - 백업 용도로 남겨둠
   const createNotificationChannels = async () => {
     try {
+      if (!notifee || !AndroidImportance) return;
       await notifee.createChannel({
         id: ONGOING_CHANNEL_ID,
         name: '러닝 진행(무음)',
@@ -82,6 +99,7 @@ export function useBackgroundRunning() {
   // 내부: 진행 중 알림(알림 쉐이드 고정) 표시/갱신
   const renderOngoing = async (session: RunningSessionState, effectiveDurationSec?: number) => {
     try {
+      if (!notifee || !AndroidImportance || !AndroidCategory) return;
       const title = session.type === 'journey' && session.journeyTitle
         ? `🏃 ${session.journeyTitle} 러닝 중`
         : `🏃 일반 러닝 중`;
@@ -260,6 +278,7 @@ export function useBackgroundRunning() {
   // 랜드마크 도달 알림
   const showLandmarkNotification = async (landmarkName: string) => {
     try {
+      if (!notifee || !AndroidImportance) return;
       await notifee.displayNotification({
         title: `🎉 ${landmarkName} 도착!`,
         body: '랜드마크에 방명록을 남겨보세요.',

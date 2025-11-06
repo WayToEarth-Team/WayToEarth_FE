@@ -1,18 +1,13 @@
 import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  TouchableOpacity,
-} from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 
 const LoginSuccessScreen: React.FC = () => {
   const navigation: any = useNavigation();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={["top"]} style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>🎉 로그인 성공!</Text>
         <Text style={styles.subtitle}>

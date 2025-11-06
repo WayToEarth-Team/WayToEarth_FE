@@ -1,15 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  SafeAreaView,
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import type { UserProfile } from "../utils/api/users";
@@ -129,7 +120,7 @@ export default function CrewChatScreen() {
   const data = useMemo(() => messages.sort((a, b) => a.createdAt - b.createdAt), [messages]);
 
   return (
-    <SafeAreaView style={s.container}>
+    <SafeAreaView edges={["top"]} style={s.container}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
           <Ionicons name="chevron-back" size={24} color="#111" />

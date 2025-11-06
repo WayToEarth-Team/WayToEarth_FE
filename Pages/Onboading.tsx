@@ -1,13 +1,6 @@
 import React, { useEffect, useRef } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-  Animated,
-  Dimensions,
-} from "react-native";
+import { View, Text, StyleSheet, StatusBar, Animated, Dimensions } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { ensureAccessToken } from "../utils/auth/tokenManager";
 import { getMyProfile } from "../utils/api/users";
 import { useNavigation } from "@react-navigation/native";
@@ -180,7 +173,7 @@ export default function Onboading() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={["top"]} style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <View style={styles.topLine} />
       <View style={styles.content}>

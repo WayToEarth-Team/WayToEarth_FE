@@ -4,7 +4,12 @@
 export type JourneyId = string;
 export type LandmarkOrder = number;
 
-export type JourneyCategory = "nature" | "city" | "mountain" | "coast" | "custom";
+export type JourneyCategory =
+  | "nature"
+  | "city"
+  | "mountain"
+  | "coast"
+  | "custom";
 export type JourneyDifficulty = "beginner" | "intermediate" | "advanced";
 
 export interface Journey {
@@ -78,4 +83,3 @@ export interface Stamp {
   reports?: number;
   createdAt: string;
 }
-

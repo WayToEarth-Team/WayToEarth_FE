@@ -1,15 +1,6 @@
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-  ActivityIndicator,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
-} from "react-native";
+import { View, Text, StyleSheet, StatusBar, ActivityIndicator, TouchableOpacity, Alert, ScrollView } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   getOrCreateOverallFeedback,
   getFriendlyErrorMessage,
@@ -92,7 +83,7 @@ const AIFeedbackScreen: React.FC<AIFeedbackScreenProps> = ({
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={["top"]} style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#fff" />
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#000" />
@@ -107,7 +98,7 @@ const AIFeedbackScreen: React.FC<AIFeedbackScreenProps> = ({
 
   if (error) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={["top"]} style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#fff" />
         <View style={styles.centerContainer}>
           <Text style={styles.errorIcon}>😅</Text>
@@ -127,7 +118,7 @@ const AIFeedbackScreen: React.FC<AIFeedbackScreenProps> = ({
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={["top"]} style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
       {/* Header */}

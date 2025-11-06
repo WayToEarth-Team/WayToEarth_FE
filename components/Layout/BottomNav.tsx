@@ -1,12 +1,8 @@
 // BottomNavigation.tsx
 import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-} from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useBottomBarHeight } from "./BottomBarHeightContext";
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from "@expo/vector-icons/Feather";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -42,10 +38,18 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
   isRunningScreen = false,
 }) => {
   const ACTIVE = "#000000";
+  const { setHeight } = useBottomBarHeight();
+  const insets = useSafeAreaInsets();
+
+  // 안정적인 높이: 콘텐츠 고정 높이 + 하단 인셋
+  React.useEffect(() => {
+    const stable = Math.round(BOTTOM_NAV_MIN_HEIGHT + (insets.bottom || 0));
+    setHeight(stable);
+  }, [insets.bottom, setHeight]);
 
   return (
     <View pointerEvents="box-none" style={styles.absoluteBottom}>
-      <SafeAreaView style={[
+      <SafeAreaView edges={["bottom"]} style={[
         styles.container,
         !isRunningScreen && styles.containerNormal
       ]}>

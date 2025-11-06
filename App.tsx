@@ -2,8 +2,10 @@
 import * as WebBrowser from "expo-web-browser";
 WebBrowser.maybeCompleteAuthSession();
 import React, { useEffect } from "react";
-import { NativeModules } from "react-native";
+import { NativeModules, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+// safe-area not required here; keep padding minimal for tab bar only
 import { navigationRef } from "./navigation/RootNavigation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createStackNavigator, CardStyleInterpolators, TransitionSpecs } from "@react-navigation/stack";
@@ -17,6 +19,9 @@ import {
   setupTokenRefreshListener,
 } from "./utils/notifications";
 import { WeatherProvider } from "./contexts/WeatherContext";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./utils/queryClient";
+import { setupReactQueryFocus } from "./utils/reactQueryFocus";
 
 import Onboading from "./Pages/Onboading";
 import OnboardingScreen from "./Pages/OnboardingScreen";
@@ -58,10 +63,7 @@ const Tab = createBottomTabNavigator();
 // MainTabs: 하단 탭 네비게이터 (팀원 구조)
 function MainTabs() {
   return (
-    <Tab.Navigator
-      tabBar={(props) => <TabBarAdapter {...props} />}
-      screenOptions={{ headerShown: false }}
-    >
+    <Tab.Navigator tabBar={(props) => <TabBarAdapter {...props} />} screenOptions={{ headerShown: false }}>
       <Tab.Screen name="LiveRunningScreen" component={LiveRunningScreen} />
       <Tab.Screen name="Feed" component={Feed2} />
       <Tab.Screen name="Record" component={Record} />
@@ -72,17 +74,21 @@ function MainTabs() {
 }
 
 export default function App() {
+  // React Query가 RN 포커스를 인지하도록 설정(1회)
+  setupReactQueryFocus();
   useEffect(() => {
-    // ===== 워치 모듈 디버깅 =====
-    console.log("===== NATIVE MODULES CHECK =====");
-    console.log("All modules:", Object.keys(NativeModules));
-    console.log("WayToEarthWear:", NativeModules.WayToEarthWear);
-    if (NativeModules.WayToEarthWear) {
-      console.log("WayToEarthWear methods:", Object.keys(NativeModules.WayToEarthWear));
-    } else {
-      console.error("❌ WayToEarthWear module NOT FOUND!");
+    if (__DEV__) {
+      // 개발 중에만 네이티브 모듈 점검 로그 표시
+      console.log("===== NATIVE MODULES CHECK =====");
+      console.log("All modules:", Object.keys(NativeModules));
+      console.log("WayToEarthWear:", NativeModules.WayToEarthWear);
+      if (NativeModules.WayToEarthWear) {
+        console.log("WayToEarthWear methods:", Object.keys(NativeModules.WayToEarthWear));
+      } else {
+        console.error("❌ WayToEarthWear module NOT FOUND!");
+      }
+      console.log("================================");
     }
-    console.log("================================");
 
     // Firebase FCM 토큰 등록 (Expo 서버 거치지 않음)
     (async () => {
@@ -90,7 +96,6 @@ export default function App() {
       if (token) {
         // 백엔드에 토큰 전송 (로그인 후에 호출하는 것이 더 좋음)
         // await sendTokenToServer(token);
-        console.log("Firebase FCM 토큰 발급 완료:", token);
       }
     })();
 
@@ -124,7 +129,9 @@ export default function App() {
   };
 
   return (
-    <WeatherProvider>
+    <QueryClientProvider client={queryClient}>
+      <WeatherProvider>
+        <SafeAreaProvider>
       <NavigationContainer ref={navigationRef} onReady={handleNavReady}>
         <Stack.Navigator
           initialRouteName={"Onboading"}
@@ -220,7 +227,9 @@ export default function App() {
           options={{ headerShown: false }}
         />
       </Stack.Navigator>
-    </NavigationContainer>
-    </WeatherProvider>
+      </NavigationContainer>
+        </SafeAreaProvider>
+      </WeatherProvider>
+    </QueryClientProvider>
   );
 }

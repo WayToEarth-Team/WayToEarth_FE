@@ -9,8 +9,8 @@ import {
   Platform,
   KeyboardAvoidingView,
   ScrollView,
-  SafeAreaView,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { createFeed } from "../utils/api/feeds";
 import * as ImagePicker from "expo-image-picker";
 import { PositiveAlert, NegativeAlert, MessageAlert } from "../components/ui/AlertDialog";
@@ -67,9 +67,6 @@ export default function FeedComposeScreen({ route, navigation }: any) {
     }
     try {
       setSubmitting(true);
-      console.log("[FeedCompose] 피드 생성 시도 - runId:", normalizedRunId);
-      console.log("[FeedCompose] content:", content);
-      console.log("[FeedCompose] photoUrl:", photoUrl);
       await createFeed({ runningRecordId: normalizedRunId, content, photoUrl });
       setDialog({ open: true, kind: 'positive', title: "공유 완료", message: "피드가 업로드되었습니다." });
       // 탭 네비게이터의 Feed 탭으로 이동 (중첩 네비게이션)
@@ -95,7 +92,7 @@ export default function FeedComposeScreen({ route, navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={s.root}>
+    <SafeAreaView edges={["top"]} style={s.root}>
       {dialog.open && dialog.kind === 'positive' && (
         <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open:false, kind:'message' })} />
       )}
