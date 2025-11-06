@@ -200,9 +200,21 @@ export default function RecordScreen({ navigation }: any) {
           <Ionicons name="flask-outline" size={22} color="#6B21A8" />
         </TouchableOpacity>
       ) : (
-        <View style={[s.fabDisabled, { bottom: tabBarHeight + insets.bottom + 16 }]} accessibilityLabel="AI 평가 비활성화">
+        <TouchableOpacity
+          style={[s.fabDisabled, { bottom: tabBarHeight + insets.bottom + 16 }]}
+          activeOpacity={0.85}
+          accessibilityLabel="AI 평가 비활성화"
+          onPress={() =>
+            setDialog({
+              open: true,
+              kind: "message",
+              title: "AI 분석 이용 안내",
+              message: "5회 이상 러닝 기록이 있어야 AI 분석 피드백을 받을 수 있습니다.",
+            })
+          }
+        >
           <Ionicons name="lock-closed-outline" size={20} color="#6B7280" />
-        </View>
+        </TouchableOpacity>
       )}
     </SafeAreaView>
   );

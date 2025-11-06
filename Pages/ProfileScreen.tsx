@@ -28,6 +28,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AppTopBar from "../components/Layout/AppTopBar";
 import { clearTokens } from "../utils/auth/tokenManager";
 import { deactivateToken } from "../utils/notifications";
+import { getMyCrewDetail } from "../utils/api/crews";
 import { logout as apiLogout } from "../utils/api/auth";
 
 const number = (v: number | null | undefined, digits = 1) =>
@@ -145,13 +146,34 @@ export default function ProfileScreen({
           setDialog({ open: true, kind: "positive", title: "탈퇴 완료", message: "회원 탈퇴가 완료되었습니다." });
         } catch (error: any) {
           console.error("회원 탈퇴 실패:", error);
-          const raw = error?.response?.data?.message || error?.message || "";
+          const status = error?.response?.status as number | undefined;
+          let raw = error?.response?.data?.message || error?.message || "";
           // 크루장(OWNER)인 경우 백엔드에서 에러를 주면 친절한 메시지로 대체
           const isCrewOwner = /크루장|OWNER|소유자|crew owner|transfer ownership/i.test(String(raw));
-          const message = isCrewOwner
-            ? "크루장은 바로 탈퇴할 수 없습니다.\n크루 소유권을 다른 멤버에게 이양하거나 크루를 폐쇄한 뒤 다시 시도해주세요."
-            : raw || "회원 탈퇴 중 문제가 발생했습니다.";
-          setDialog({ open: true, kind: "negative", title: "탈퇴 실패", message });
+          if (isCrewOwner) {
+            setDialog({
+              open: true,
+              kind: "negative",
+              title: "탈퇴 실패",
+              message:
+                "크루장은 바로 탈퇴할 수 없습니다.\n크루 소유권을 다른 멤버에게 이양하거나 크루를 폐쇄한 뒤 다시 시도해주세요.",
+            });
+          } else {
+            // 400인데 원문이 기술적이면(axios 기본 문구) → 내 크루 권한을 조회해 크루장 여부를 재확인
+            let message = (status === 400 && raw) ? raw : "";
+            if (!message || /status code 400/i.test(message)) {
+              try {
+                const detail = await getMyCrewDetail();
+                const ownerLike = (detail?.role === 'ADMIN') ||
+                  (detail?.members || []).some((m: any) => m?.role === 'ADMIN' || m?.isOwner);
+                if (ownerLike) {
+                  message = "크루장은 바로 탈퇴할 수 없습니다.\n크루 소유권을 다른 멤버에게 이양하거나 크루를 폐쇄한 뒤 다시 시도해주세요.";
+                }
+              } catch {}
+            }
+            if (!message) message = raw || "회원 탈퇴 중 문제가 발생했습니다.";
+            setDialog({ open: true, kind: "negative", title: "탈퇴 실패", message });
+          }
         }
       },
     });
