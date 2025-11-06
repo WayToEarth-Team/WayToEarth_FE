@@ -210,6 +210,11 @@ export default function MapRoute({
   const init = initial ||
     (last as RNLatLng) || { latitude: 37.5665, longitude: 126.978 };
 
+  const isFiniteNum = (v: any) => typeof v === 'number' && isFinite(v);
+  const isValidLatLng = (p: RNLatLng) =>
+    p && isFiniteNum((p as any).latitude) && isFiniteNum((p as any).longitude) && Math.abs((p as any).latitude) <= 90 && Math.abs((p as any).longitude) <= 180 && !(((p as any).latitude === 0) && ((p as any).longitude === 0));
+  const cleanRoute: RNLatLng[] = Array.isArray(route) ? (route as RNLatLng[]).filter(isValidLatLng) : [];
+
   return (
     <MapView
       ref={mapRef}
@@ -240,9 +245,9 @@ export default function MapRoute({
           title="위치"
         />
       )}
-      {route.length > 1 && (
+      {cleanRoute.length > 1 && (
         <Polyline
-          coordinates={route as RNLatLng[]}
+          coordinates={cleanRoute}
           strokeWidth={5}
           strokeColor="#2563eb"
         />

@@ -235,7 +235,6 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
         // 위치를 강제로 다시 가져오기 (메인 페이지 지도를 위해)
         console.log('[LiveRunning] Attempting to refresh location after watch complete...');
         try {
-            const { default: Location } = await import('expo-location');
             const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
             console.log('[LiveRunning] Successfully refreshed location after watch complete:', loc.coords);
         } catch (err) {
@@ -376,7 +375,6 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
       // 위치를 강제로 다시 가져오기 (메인 페이지로 돌아갈 때를 위해)
       console.log('[LiveRunning] Attempting to refresh location before exiting...');
       try {
-        const { default: Location } = await import('expo-location');
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
         console.log('[LiveRunning] Successfully refreshed location in doExitWithoutSave:', loc.coords);
       } catch (err) {

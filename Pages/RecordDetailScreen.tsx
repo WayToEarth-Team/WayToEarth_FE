@@ -172,10 +172,22 @@ const RecordDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     recordDetail?.photoUrl ||
     recordDetail?.imageUrl ||
     recordDetail?.snapshotUrl;
-  const routeCoords = (recordDetail?.routePoints || []).map((p: any) => ({
+  const routeCoordsRaw = (recordDetail?.routePoints || []).map((p: any) => ({
     latitude: p.latitude,
     longitude: p.longitude,
+    sequence: (p as any)?.sequence,
   }));
+  const isFiniteNum = (v: any) => typeof v === 'number' && isFinite(v);
+  const isValidLatLng = (lat: number, lng: number) =>
+    isFiniteNum(lat) && isFiniteNum(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
+  const routeCoords = routeCoordsRaw
+    .filter((p) => isValidLatLng(p.latitude, p.longitude))
+    .sort((a, b) => {
+      const as = isFiniteNum(a.sequence) ? Number(a.sequence) : 0;
+      const bs = isFiniteNum(b.sequence) ? Number(b.sequence) : 0;
+      return as - bs;
+    })
+    .map(({ latitude, longitude }) => ({ latitude, longitude }));
 
   // 안전한 표시용 값 계산
   const distanceKm: number =

@@ -64,11 +64,15 @@ export default function SummaryMap({
   const [ready, setReady] = useState(false);
   const [currentRegion, setCurrentRegion] = useState<Region | null>(null);
 
-  const start = route?.[0];
-  const end = route?.[route.length - 1];
+  const isFiniteNum = (v: any) => typeof v === 'number' && isFinite(v);
+  const isValidLatLng = (p: LatLng) =>
+    p && isFiniteNum(p.latitude) && isFiniteNum(p.longitude) && Math.abs(p.latitude) <= 90 && Math.abs(p.longitude) <= 180 && !(p.latitude === 0 && p.longitude === 0);
+  const cleanRoute: LatLng[] = Array.isArray(route) ? route.filter(isValidLatLng) : [];
+  const start = cleanRoute?.[0];
+  const end = cleanRoute?.[cleanRoute.length - 1];
   const kmMarkers = useMemo(
-    () => (showKmMarkers ? computeKmMarkers(route || []) : []),
-    [route, showKmMarkers]
+    () => (showKmMarkers ? computeKmMarkers(cleanRoute || []) : []),
+    [cleanRoute, showKmMarkers]
   );
 
   // ✅ 현재 위치 요청
@@ -96,18 +100,18 @@ export default function SummaryMap({
   // 최초 프레이밍 (route가 있으면 route 기준, 없으면 현 위치 기준)
   useEffect(() => {
     if (!ready) return;
-    if (route && route.length > 0) {
+    if (cleanRoute && cleanRoute.length > 0) {
       setTimeout(() => {
-        if (route.length === 1) {
+        if (cleanRoute.length === 1) {
           const r: Region = {
-            latitude: route[0].latitude,
-            longitude: route[0].longitude,
+            latitude: cleanRoute[0].latitude,
+            longitude: cleanRoute[0].longitude,
             latitudeDelta: 0.005,
             longitudeDelta: 0.005,
           };
           mapRef.current?.animateToRegion(r, 300);
         } else {
-          mapRef.current?.fitToCoordinates(route, {
+          mapRef.current?.fitToCoordinates(cleanRoute, {
             edgePadding,
             animated: true,
           });
@@ -138,9 +142,9 @@ export default function SummaryMap({
         toolbarEnabled={false}
       >
         {start && <Marker coordinate={start} title="Start" pinColor="green" />}
-        {route?.length > 1 && (
+        {cleanRoute?.length > 1 && (
           <Polyline
-            coordinates={route}
+            coordinates={cleanRoute}
             strokeWidth={strokeWidth}
             strokeColor={strokeColor}
           />

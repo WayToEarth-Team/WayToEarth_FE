@@ -74,10 +74,14 @@ export default function RecordScreen({ navigation }: any) {
             if (previews[id]) return;
             try {
               const d = await getRunningRecordDetail(id);
-              const pts = (d.routePoints || []).map((p) => ({
+              const raw = (d.routePoints || []).map((p: any) => ({
                 latitude: p.latitude,
                 longitude: p.longitude,
               }));
+              const isFiniteNum = (v: any) => typeof v === 'number' && isFinite(v);
+              const isValidLatLng = (lat: number, lng: number) =>
+                isFiniteNum(lat) && isFiniteNum(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
+              const pts = raw.filter((p) => isValidLatLng(p.latitude, p.longitude));
               if (pts.length)
                 setPreviews((prev) => ({ ...prev, [id]: { coords: pts } }));
             } catch {}

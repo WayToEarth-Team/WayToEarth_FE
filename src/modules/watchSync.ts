@@ -86,13 +86,22 @@ export function initWatchSync() {
         const heartRate = isFinite(Number(p.heartRate)) ? Number(p.heartRate) : undefined;
         const paceSeconds = isFinite(Number(p.paceSeconds)) ? Number(p.paceSeconds) : undefined;
         const cp = p.currentPoint || {};
-        const currentPoint = {
-          latitude: Number(cp.latitude) || 0,
-          longitude: Number(cp.longitude) || 0,
-          sequence: isFinite(Number(cp.sequence)) ? Number(cp.sequence) : undefined,
-          t: isFinite(Number(cp.t)) ? Number(cp.t) : Math.floor(Date.now()/1000),
-          acc: isFinite(Number(cp.acc)) ? Number(cp.acc) : undefined,
-        };
+        const latRaw = Number(cp.latitude);
+        const lngRaw = Number(cp.longitude);
+        const isFiniteNum = (v: any) => typeof v === 'number' && isFinite(v);
+        const isValidLatLng = (lat: number, lng: number) =>
+          isFiniteNum(lat) && isFiniteNum(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
+
+        const hasValidPoint = isValidLatLng(latRaw, lngRaw);
+        const currentPoint = hasValidPoint
+          ? {
+              latitude: latRaw,
+              longitude: lngRaw,
+              sequence: isFinite(Number(cp.sequence)) ? Number(cp.sequence) : undefined,
+              t: isFinite(Number(cp.t)) ? Number(cp.t) : Math.floor(Date.now() / 1000),
+              acc: isFinite(Number(cp.acc)) ? Number(cp.acc) : undefined,
+            }
+          : undefined as any;
 
         // Update realtime state for UI
         realtimeData = {
@@ -116,17 +125,21 @@ export function initWatchSync() {
           }
         });
 
-        // Send to backend API
-        const body = {
-          sessionId,
-          distanceMeters,
-          durationSeconds,
-          averagePaceSeconds,
-          calories,
-          currentPoint,
-        } as any;
-        debugLog('[API] running/update payload:', body);
-        apiUpdate(body).catch(err => debugLog('[API ERR] update:', err?.message));
+        // Send to backend API (only when we have a valid currentPoint)
+        if (currentPoint && isValidLatLng(currentPoint.latitude, currentPoint.longitude)) {
+          const body = {
+            sessionId,
+            distanceMeters,
+            durationSeconds,
+            averagePaceSeconds,
+            calories,
+            currentPoint,
+          } as any;
+          debugLog('[API] running/update payload:', body);
+          apiUpdate(body).catch(err => debugLog('[API ERR] update:', err?.message));
+        } else {
+          debugLog('[API] running/update skipped: invalid or missing currentPoint');
+        }
       } catch (e) {
         debugLog('[EVT ERR] realtime parse:', (e as Error).message);
       }
@@ -144,17 +157,27 @@ export function initWatchSync() {
         const averageHeartRate = isFinite(Number(run.averageHeartRate)) ? Number(run.averageHeartRate) : null;
         const maxHeartRate = isFinite(Number(run.maxHeartRate)) ? Number(run.maxHeartRate) : null;
         const routePointsRaw: any[] = Array.isArray(run.routePoints) ? run.routePoints : [];
-        const routePoints = routePointsRaw.map((p, i) => ({
-          latitude: Number(p.latitude) || 0,
-          longitude: Number(p.longitude) || 0,
-          sequence: isFinite(Number(p.sequence)) ? Number(p.sequence) : (i + 1),
-          timestampSeconds: isFinite(Number(p.timestampSeconds)) ? Number(p.timestampSeconds) : undefined,
-          heartRate: isFinite(Number(p.heartRate)) ? Number(p.heartRate) : undefined,
-          paceSeconds: isFinite(Number(p.paceSeconds)) ? Number(p.paceSeconds) : undefined,
-          altitude: isFinite(Number(p.altitude)) ? Number(p.altitude) : undefined,
-          accuracy: isFinite(Number(p.accuracy)) ? Number(p.accuracy) : undefined,
-          cumulativeDistanceMeters: isFinite(Number(p.cumulativeDistanceMeters)) ? Number(p.cumulativeDistanceMeters) : undefined,
-        }));
+        const num = (v: any) => (isFinite(Number(v)) ? Number(v) : NaN);
+        const isValidLatLng2 = (lat: number, lng: number) =>
+          isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
+        const routePoints = routePointsRaw
+          .map((p, i) => {
+            const lat = num(p.latitude);
+            const lng = num(p.longitude);
+            return {
+              latitude: lat,
+              longitude: lng,
+              sequence: isFinite(Number(p.sequence)) ? Number(p.sequence) : i + 1,
+              timestampSeconds: isFinite(Number(p.timestampSeconds)) ? Number(p.timestampSeconds) : undefined,
+              heartRate: isFinite(Number(p.heartRate)) ? Number(p.heartRate) : undefined,
+              paceSeconds: isFinite(Number(p.paceSeconds)) ? Number(p.paceSeconds) : undefined,
+              altitude: isFinite(Number(p.altitude)) ? Number(p.altitude) : undefined,
+              accuracy: isFinite(Number(p.accuracy)) ? Number(p.accuracy) : undefined,
+              cumulativeDistanceMeters: isFinite(Number(p.cumulativeDistanceMeters)) ? Number(p.cumulativeDistanceMeters) : undefined,
+            };
+          })
+          .filter((p) => isValidLatLng2(p.latitude, p.longitude))
+          .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
         const body = {
           sessionId: String(run.sessionId),
           distanceMeters,
