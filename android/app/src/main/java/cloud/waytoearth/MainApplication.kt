@@ -27,6 +27,7 @@ class MainApplication : Application(), ReactApplication {
             // Packages that cannot be autolinked yet can be added manually here, for example:
             // Add in-app ReactPackage (not autolinked) for watch integration
             packages.add(WayToEarthWearPackage())
+            android.util.Log.d("MainApplication", "📦 WayToEarthWearPackage added. Total packages: ${packages.size}")
             return packages
           }
 

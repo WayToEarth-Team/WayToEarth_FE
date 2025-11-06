@@ -51,9 +51,13 @@ class WayToEarthWearModule(private val reactContext: ReactApplicationContext) : 
         private const val PATH_RESPONSE_RESUMED = "/waytoearth/response/resumed"
     }
 
-    override fun getName() = "WayToEarthWear"
+    override fun getName(): String {
+        Log.d(TAG, "🔧 WayToEarthWear module getName() called")
+        return "WayToEarthWear"
+    }
 
     init {
+        Log.d(TAG, "🚀 WayToEarthWearModule initialized")
         reactContext.addLifecycleEventListener(this)
         registerBroadcastReceiver()
     }

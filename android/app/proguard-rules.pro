@@ -21,6 +21,16 @@
 -keep class com.facebook.react.bridge.** { *; }
 -keep class com.facebook.react.modules.core.** { *; }
 
+# @ReactMethod 어노테이션 보호
+-keepattributes *Annotation*
+-keepclassmembers class * {
+    @com.facebook.react.bridge.ReactMethod <methods>;
+}
+
+# React Native 모듈 보호
+-keep,allowobfuscation @interface com.facebook.react.bridge.ReactMethod
+-keep @com.facebook.react.bridge.ReactModule class * { *; }
+
 # Google Play Services Wearable 보호
 -keep class com.google.android.gms.wearable.** { *; }
 
