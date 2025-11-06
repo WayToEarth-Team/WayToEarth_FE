@@ -1,17 +1,6 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  StatusBar,
-} from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
-// import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import React, { useState, useEffect, useMemo } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import useRouteList from "../hooks/journey/useJourneyRouteList";
 import type { RouteSummary } from "../utils/api/journeyRoutes";
 import { getJourneyLandmarks } from "../utils/api/landmarks";
@@ -25,9 +14,7 @@ export default function RouteListScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState("전체");
   const { data: routes, loading } = useRouteList();
-  const [journeyImages, setJourneyImages] = useState<Record<string, string[]>>(
-    {}
-  );
+  const [journeyImages, setJourneyImages] = useState<Record<string, string[]>>({});
 
   const tabs = ["전체", "국내 여행", "해외 여행"];
 
@@ -47,68 +34,36 @@ export default function RouteListScreen({ navigation }: any) {
   const getProgressPercentage = (route: RouteSummary | any) => {
     const p = Number(route?.userProgressPercent ?? NaN);
     if (Number.isFinite(p)) return Math.round(Math.max(0, Math.min(100, p)));
-    const completed = Number(route?.completed ?? 0);
-    const total = Number(route?.total ?? 0);
+    const completed = Number((route as any)?.completed ?? 0);
+    const total = Number((route as any)?.total ?? 0);
     return total > 0 ? Math.round((completed / total) * 100) : 0;
   };
 
   useEffect(() => {
     if (!routes || routes.length === 0) return;
-
-    const loadJourneyImages = async () => {
+    (async () => {
       const imagesMap: Record<string, string[]> = {};
-
-      for (const route of routes) {
+      for (const r of routes) {
         try {
-          const landmarks = await getJourneyLandmarks(Number(route.id));
-          const imageUrls = landmarks
+          const lms = await getJourneyLandmarks(Number(r.id));
+          const urls = (lms || [])
             .map((lm) => lm.imageUrl)
-            .filter((url): url is string => !!url?.trim());
-
-          if (imageUrls.length > 0) {
-            imagesMap[String(route.id)] = imageUrls;
-          }
+            .filter((u): u is string => !!u?.trim());
+          if (urls.length) imagesMap[String(r.id)] = urls;
         } catch (err) {
-          console.error(`[RouteList] 여정 ${route.id} 이미지 로드 실패:`, err);
+          if (__DEV__) console.warn("[RouteList] landmark images failed:", err);
         }
       }
-
       setJourneyImages(imagesMap);
-    };
-
-    loadJourneyImages();
+    })();
   }, [routes]);
 
-  const tabs = ['전체', '국내 여행', '해외 여행'];
-
-  const filtered = (() => {
+  const filtered = useMemo(() => {
     const list = (routes ?? []) as RouteSummary[];
-    if (activeTab === '전체') return list;
-    const want = activeTab === '국내 여행' ? 'DOMESTIC' : 'INTERNATIONAL';
-    return list.filter((r) => (r as any).category === want);
-  })();
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case '쉬움':
-        return '#10B981';
-      case '보통':
-        return '#F59E0B';
-      case '어려움':
-        return '#EF4444';
-      default:
-        return '#6B7280';
-    }
-  };
-
-  const getProgressPercentage = (route: RouteSummary | any) => {
-    const p = Number(route?.userProgressPercent ?? NaN);
-    if (Number.isFinite(p)) return Math.round(Math.max(0, Math.min(100, p)));
-    // fallback to legacy ratio if present
-    const completed = Number((route as any).completed ?? 0);
-    const total = Number((route as any).total ?? 0);
-    return total > 0 ? Math.round((completed / total) * 100) : 0;
-  };
+    if (activeTab === "전체") return list;
+    const want = activeTab === "국내 여행" ? "DOMESTIC" : "INTERNATIONAL";
+    return list.filter((r: any) => r?.category === want);
+  }, [routes, activeTab]);
 
   return (
     <SafeAreaView edges={["top"]} style={styles.container}>
@@ -147,18 +102,8 @@ export default function RouteListScreen({ navigation }: any) {
         </View>
       </View>
 
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-      >
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
         {loading && <Text style={styles.loadingText}>로딩 중...</Text>}
-
-        {(routes ?? []).map((route: RouteSummary) => {
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {loading && (
-          <Text style={{ padding: 16, color: '#6B7280' }}>로딩 중...</Text>
-        )}
         {filtered.map((route: RouteSummary) => {
           // 여정의 랜드마크 이미지 사용
           const carouselImages = journeyImages[String(route.id)] || [];
