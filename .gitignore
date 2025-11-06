@@ -15,20 +15,25 @@ build/
 .expo-web/
 web-build/
 
-# iOS / Android 네이티브 생성물
+# iOS 네이티브 생성물
 ios/
-android/
 Pods/
 *.xcworkspace
 *.xcuserdatad
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
+
+# Android 빌드 산출물만 제외 (소스는 포함)
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/.cxx/
 *.keystore
 *.jks
-*.gradle/
-gradle/
 **/build/
 *.apk
+*.aab
 
 # 환경/OS
 .env
