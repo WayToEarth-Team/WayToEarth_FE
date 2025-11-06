@@ -43,7 +43,7 @@ import Profile from "./Pages/ProfileScreen";
 import ProfileEdit from "./Pages/ProfileEditScreen";
 
 import Emblem from "./Pages/EmblemCollectionScreen";
-import Record from "./Pages/RecordScreen";
+import Record from "./screens/RecordScreen";
 import RecordDetailScreen from "./Pages/RecordDetailScreen";
 import AIFeedbackScreen from "./Pages/AIFeedbackScreen";
 import LoginSuccessScreen from "./Pages/LoginSuccessScreen";
@@ -120,9 +120,9 @@ export default function App() {
         AsyncStorage.removeItem("@pending_nav").catch(() => {});
         // target은 'live' | 'journey'
         if (target === 'journey') {
-          navigationRef.navigate('JourneyRunningScreen' as never, (params || {}) as never);
+          (navigationRef as any).navigate('JourneyRunningScreen', params || {});
         } else {
-          navigationRef.navigate('MainTabs' as never, { screen: 'LiveRunningScreen', ...(params || {}) } as never);
+          (navigationRef as any).navigate('MainTabs', { screen: 'LiveRunningScreen', ...(params || {}) });
         }
       }
     } catch {}
@@ -198,10 +198,7 @@ export default function App() {
           name="RecordDetailScreen"
           component={RecordDetailScreen}
         />
-        <Stack.Screen
-          name="AIFeedbackScreen"
-          component={AIFeedbackScreen}
-        />
+        <Stack.Screen name="AIFeedbackScreen" component={AIFeedbackScreen as any} />
 
         {/* 방명록 화면들 */}
         <Stack.Screen
@@ -209,11 +206,7 @@ export default function App() {
           component={GuestbookScreen}
           options={{ title: "방명록 피드" }}
         />
-        <Stack.Screen
-          name="LandmarkGuestbookScreen"
-          component={LandmarkGuestbookScreen}
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="LandmarkGuestbookScreen" component={LandmarkGuestbookScreen as any} options={{ headerShown: false }} />
         <Stack.Screen
           name="MyGuestbookScreen"
           component={MyGuestbookScreen}
@@ -221,11 +214,7 @@ export default function App() {
         />
 
         {/* 랜드마크 스토리 화면 */}
-        <Stack.Screen
-          name="LandmarkStoryScreen"
-          component={LandmarkStoryScreen}
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="LandmarkStoryScreen" component={LandmarkStoryScreen as any} options={{ headerShown: false }} />
       </Stack.Navigator>
       </NavigationContainer>
         </SafeAreaProvider>

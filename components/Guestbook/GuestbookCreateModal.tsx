@@ -1,19 +1,7 @@
 // components/Guestbook/GuestbookCreateModal.tsx
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  Modal,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  ActivityIndicator,
-  Switch,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from "react-native";
+import { View, Text, Modal, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Switch, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { PositiveAlert, NegativeAlert, MessageAlert, DestructiveConfirm, ConfirmAlert } from "../ui/AlertDialog";
 import {
   createGuestbook,

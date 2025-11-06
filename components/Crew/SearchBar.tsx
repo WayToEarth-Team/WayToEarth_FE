@@ -18,7 +18,12 @@ export default function SearchBar({ value, onChangeText, onSearch }: Props) {
   return (
     <View style={s.container}>
       <View style={s.inputWrapper}>
-        <Ionicons name="search" size={20} color="#9CA3AF" style={s.searchIcon} />
+        <Ionicons
+          name="search"
+          size={20}
+          color="#9CA3AF"
+          style={s.searchIcon}
+        />
         <TextInput
           value={value}
           onChangeText={onChangeText}
@@ -46,7 +51,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#F9FAFB",
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: "#E5E7EB",
     borderRadius: 16,
     paddingHorizontal: 16,

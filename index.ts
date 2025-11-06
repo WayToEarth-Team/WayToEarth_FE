@@ -107,14 +107,11 @@ if (Platform.OS === "android" && notifee) {
           }
 
           // If navigation is ready, navigate immediately; otherwise save pending target
-          if (navigationRef.isReady()) {
+          if ((navigationRef as any).isReady?.()) {
             if (target === "journey") {
-              navigationRef.navigate("JourneyRunningScreen" as never);
+              (navigationRef as any).navigate("JourneyRunningScreen");
             } else {
-              navigationRef.navigate(
-                "MainTabs" as never,
-                { screen: "LiveRunningScreen" } as never
-              );
+              (navigationRef as any).navigate("MainTabs", { screen: "LiveRunningScreen" });
             }
           } else {
             await AsyncStorage.setItem(

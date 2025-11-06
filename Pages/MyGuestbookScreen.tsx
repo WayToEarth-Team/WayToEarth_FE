@@ -1,7 +1,17 @@
-// Pages/MyGuestbookScreen.tsx
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Image } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  Image,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   getMyGuestbooks,
   getGuestbookErrorMessage,
@@ -18,25 +28,16 @@ interface MyGuestbookScreenProps {
   navigation: any;
 }
 
-/**
- * 내 방명록 목록 화면
- * - 내가 작성한 모든 방명록 표시 (공개/비공개 모두)
- * - 페이징 없음 (전체 목록)
- * - Pull to Refresh
- * - 공개/비공개 배지 표시
- */
 export default function MyGuestbookScreen({
   route,
   navigation,
 }: MyGuestbookScreenProps) {
   const [userId, setUserId] = useState<number | null>(null);
-
   const [guestbooks, setGuestbooks] = useState<GuestbookResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 사용자 프로필 로드
   useEffect(() => {
     (async () => {
       try {
@@ -54,7 +55,6 @@ export default function MyGuestbookScreen({
     })();
   }, []);
 
-  // userId가 설정되면 방명록 로드
   useEffect(() => {
     if (userId) {
       loadGuestbooks();
@@ -85,7 +85,6 @@ export default function MyGuestbookScreen({
   };
 
   const handleItemPress = (item: GuestbookResponse) => {
-    // 랜드마크별 방명록 화면으로 이동
     navigation.navigate("LandmarkGuestbookScreen", {
       landmarkId: item.landmark.id,
       landmarkName: item.landmark.name,
@@ -94,11 +93,10 @@ export default function MyGuestbookScreen({
 
   const formatDate = (timestamp: string): string => {
     const date = new Date(timestamp);
-    return date.toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const day = date.getDate().toString().padStart(2, "0");
+    return `${year}.${month}.${day}`;
   };
 
   const renderGuestbookItem = ({
@@ -109,151 +107,160 @@ export default function MyGuestbookScreen({
     index: number;
   }) => (
     <TouchableOpacity
-      style={styles.guestbookItem}
+      style={s.card}
       onPress={() => handleItemPress(item)}
       activeOpacity={0.7}
     >
-      {/* 랜드마크 이미지 */}
-      {item.landmark.imageUrl ? (
-        <Image
-          source={{ uri: item.landmark.imageUrl }}
-          style={styles.landmarkImage}
-        />
-      ) : (
-        <View style={[styles.landmarkImage, styles.landmarkImagePlaceholder]}>
-          <Text style={styles.landmarkImageEmoji}>🏯</Text>
-        </View>
-      )}
+      {/* 이미지 섹션 */}
+      <View style={s.imageContainer}>
+        {item.landmark.imageUrl ? (
+          <Image
+            source={{ uri: item.landmark.imageUrl }}
+            style={s.landmarkImage}
+          />
+        ) : (
+          <LinearGradient
+            colors={["#A855F7", "#EC4899"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={s.landmarkImage}
+          >
+            <Ionicons name="location" size={48} color="rgba(255,255,255,0.5)" />
+          </LinearGradient>
+        )}
 
-      {/* 내용 */}
-      <View style={styles.itemContent}>
-        {/* 번호 배지 */}
-        <View style={styles.numberBadge}>
-          <Text style={styles.numberText}>{guestbooks.length - index}</Text>
-        </View>
+        {/* 이미지 오버레이 */}
+        <LinearGradient
+          colors={["transparent", "rgba(0,0,0,0.6)"]}
+          style={s.imageOverlay}
+        >
+          <View style={s.locationBadge}>
+            <Ionicons name="location-sharp" size={12} color="#fff" />
+            <Text style={s.locationText} numberOfLines={1}>
+              {item.landmark.cityName}
+            </Text>
+          </View>
+        </LinearGradient>
 
-        {/* 랜드마크 정보 */}
-        <View style={styles.landmarkInfo}>
-          <Text style={styles.landmarkName} numberOfLines={1}>
-            🏯 {item.landmark.name}
+        {/* 공개/비공개 배지 */}
+        <View style={s.statusBadge}>
+          <Ionicons
+            name={item.isPublic ? "eye" : "eye-off"}
+            size={14}
+            color={item.isPublic ? "#10B981" : "#6B7280"}
+          />
+        </View>
+      </View>
+
+      {/* 콘텐츠 섹션 */}
+      <View style={s.cardContent}>
+        <View style={s.titleRow}>
+          <Text style={s.landmarkName} numberOfLines={1}>
+            {item.landmark.name}
           </Text>
-          <Text style={styles.landmarkLocation}>
-            {item.landmark.cityName}, {item.landmark.countryCode}
-          </Text>
+          <Text style={s.dateText}>{formatDate(item.createdAt)}</Text>
         </View>
 
-        {/* 메시지 */}
-        <Text style={styles.message} numberOfLines={3}>
+        <Text style={s.message} numberOfLines={2}>
           {item.message}
         </Text>
 
-        {/* 하단 메타 정보 */}
-        <View style={styles.meta}>
-          <Text style={styles.timestamp}>{formatDate(item.createdAt)}</Text>
-
-          {/* 공개/비공개 배지 */}
-          <View
-            style={[
-              styles.badge,
-              item.isPublic ? styles.badgePublic : styles.badgePrivate,
-            ]}
-          >
-            <Text
-              style={[
-                styles.badgeText,
-                item.isPublic ? styles.badgeTextPublic : styles.badgeTextPrivate,
-              ]}
-            >
-              {item.isPublic ? "공개" : "비공개"}
-            </Text>
+        <View style={s.footer}>
+          <View style={s.countryBadge}>
+            <Text style={s.countryText}>{item.landmark.countryCode}</Text>
           </View>
-        </View>
-
-        {/* 하단 장식선 */}
-        <View style={styles.decorativeLines}>
-          <View style={styles.decorativeLine} />
-          <View style={styles.decorativeLine} />
-          <View style={styles.decorativeLine} />
+          <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
         </View>
       </View>
     </TouchableOpacity>
   );
 
   const renderHeader = () => (
-    <View style={styles.headerCard}>
-      {/* 왼쪽 장식 패널 */}
-      <View style={styles.decorativePanel}>
-        <View style={styles.decorativePanelLine} />
-        <View style={styles.decorativePanelLine} />
-        <View style={styles.decorativePanelLine} />
-      </View>
+    <View style={s.statsCard}>
+      <LinearGradient
+        colors={["#6366F1", "#8B5CF6"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={s.statsGradient}
+      >
+        <View style={s.statsContent}>
+          <View style={s.statsIcon}>
+            <Ionicons name="book" size={32} color="#fff" />
+          </View>
+          <View style={s.statsText}>
+            <Text style={s.statsTitle}>나의 여행 기록</Text>
+            <Text style={s.statsCount}>{guestbooks.length}개의 방명록</Text>
+          </View>
+        </View>
 
-      {/* 정보 영역 */}
-      <View style={styles.headerContent}>
-        <Text style={styles.headerEmoji}>📖 나의 여행 기록</Text>
-        <Text style={styles.headerSubtitle}>방문한 랜드마크들</Text>
-        <Text style={styles.headerCount}>총 {guestbooks.length}개의 기록</Text>
-      </View>
+        {/* 장식 요소 */}
+        <View style={s.decoration}>
+          <View style={s.decorationCircle} />
+          <View style={[s.decorationCircle, { opacity: 0.6 }]} />
+          <View style={[s.decorationCircle, { opacity: 0.3 }]} />
+        </View>
+      </LinearGradient>
     </View>
   );
 
   const renderEmpty = () => {
-    if (loading && !refreshing) {
+    if (loading || refreshing) {
       return (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#8b4513" />
-          <Text style={styles.loadingText}>방명록을 불러오는 중...</Text>
+        <View style={s.centerContainer}>
+          <ActivityIndicator size="large" color="#6366F1" />
+          <Text style={s.loadingText}>방명록을 불러오는 중...</Text>
         </View>
       );
     }
 
     if (error) {
       return (
-        <View style={styles.centerContainer}>
-          <Text style={styles.errorIcon}>😅</Text>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
-            <Text style={styles.retryButtonText}>다시 시도</Text>
+        <View style={s.centerContainer}>
+          <View style={s.errorIconBg}>
+            <Ionicons name="alert-circle" size={48} color="#EF4444" />
+          </View>
+          <Text style={s.errorText}>{error}</Text>
+          <TouchableOpacity style={s.retryButton} onPress={handleRefresh}>
+            <Ionicons name="refresh" size={20} color="#fff" />
+            <Text style={s.retryButtonText}>다시 시도</Text>
           </TouchableOpacity>
         </View>
       );
     }
 
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.emptyIcon}>📝</Text>
-        <Text style={styles.emptyText}>
-          아직 작성한 방명록이 없습니다.
-        </Text>
-        <Text style={styles.emptySubText}>
-          랜드마크를 방문하고 첫 방명록을 남겨보세요!
+      <View style={s.centerContainer}>
+        <View style={s.emptyIconBg}>
+          <Ionicons name="book-outline" size={64} color="#9CA3AF" />
+        </View>
+        <Text style={s.emptyTitle}>아직 방명록이 없습니다</Text>
+        <Text style={s.emptyText}>
+          랜드마크를 방문하고{"\n"}첫 방명록을 남겨보세요!
         </Text>
       </View>
     );
   };
 
   return (
-    <SafeAreaView edges={["top"]} style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
+    <SafeAreaView edges={["top"]} style={s.container}>
+      {/* 헤더 */}
+      <View style={s.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          style={styles.backButton}
+          style={s.backButton}
         >
-          <Text style={styles.backButtonText}>←</Text>
+          <Ionicons name="chevron-back" size={24} color="#1F2937" />
         </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>내 방명록</Text>
+        <View style={s.headerCenter}>
+          <Text style={s.headerTitle}>내 방명록</Text>
           {guestbooks.length > 0 && (
-            <Text style={styles.headerSubtitleText}>
-              총 {guestbooks.length}개
-            </Text>
+            <Text style={s.headerSubtitle}>총 {guestbooks.length}개</Text>
           )}
         </View>
-        <View style={styles.headerSpacer} />
+        <View style={s.headerSpacer} />
       </View>
 
-      {/* 방명록 목록 */}
+      {/* 리스트 */}
       <FlatList
         data={guestbooks}
         keyExtractor={(item) => item.id.toString()}
@@ -264,282 +271,292 @@ export default function MyGuestbookScreen({
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor="#8b4513"
+            tintColor="#6366F1"
           />
         }
         contentContainerStyle={
-          guestbooks.length === 0 ? styles.emptyListContainer : styles.listContent
+          guestbooks.length === 0 ? s.emptyListContainer : s.listContent
         }
+        showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f3f0",
+    backgroundColor: "#FAFAFA",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#f5f3f0",
     paddingHorizontal: 20,
-    paddingVertical: 20,
-    height: 80,
+    paddingVertical: 16,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#F9FAFB",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
   },
-  backButtonText: {
-    fontSize: 18,
-    color: "#8b4513",
-  },
-  headerTitleContainer: {
+  headerCenter: {
     flex: 1,
     alignItems: "center",
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#8b4513",
+    color: "#1F2937",
     marginBottom: 2,
   },
-  headerSubtitleText: {
+  headerSubtitle: {
     fontSize: 12,
-    color: "#a0522d",
+    color: "#9CA3AF",
+    fontWeight: "500",
   },
   headerSpacer: {
     width: 40,
   },
-  headerCard: {
-    backgroundColor: "#8b4513",
-    borderRadius: 12,
+  statsCard: {
     marginHorizontal: 20,
-    marginTop: 10,
-    marginBottom: 20,
-    height: 130,
-    flexDirection: "row",
-    shadowColor: "#000",
+    marginTop: 16,
+    marginBottom: 24,
+    borderRadius: 20,
+    overflow: "hidden",
+    shadowColor: "#6366F1",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 5,
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  statsGradient: {
+    padding: 24,
+    position: "relative",
     overflow: "hidden",
   },
-  decorativePanel: {
-    width: 60,
-    backgroundColor: "#654321",
-    justifyContent: "center",
+  statsContent: {
+    flexDirection: "row",
     alignItems: "center",
-    gap: 9,
+    gap: 16,
+    zIndex: 1,
   },
-  decorativePanelLine: {
-    width: 30,
-    height: 2,
-    backgroundColor: "#d4af37",
+  statsIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  headerContent: {
+  statsText: {
     flex: 1,
-    backgroundColor: "#f4f1e8",
-    padding: 20,
-    justifyContent: "space-between",
   },
-  headerEmoji: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#8b4513",
-    lineHeight: 32,
+  statsTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#fff",
+    marginBottom: 4,
+    letterSpacing: -0.5,
   },
-  headerSubtitle: {
+  statsCount: {
     fontSize: 14,
-    color: "#a0522d",
-    marginTop: 4,
+    color: "rgba(255,255,255,0.9)",
+    fontWeight: "600",
   },
-  headerCount: {
-    fontSize: 12,
-    color: "#8b4513",
-    fontStyle: "italic",
-    textAlign: "right",
-    marginTop: 8,
+  decoration: {
+    display: 'none',
+  },
+  decorationCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.3)",
   },
   emptyListContainer: {
     flexGrow: 1,
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
   centerContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 32,
-    paddingVertical: 60,
+    paddingHorizontal: 40,
+    paddingVertical: 80,
   },
   loadingText: {
-    fontSize: 16,
-    color: "#a0522d",
-    marginTop: 12,
+    fontSize: 15,
+    color: "#6B7280",
+    marginTop: 16,
+    fontWeight: "500",
   },
-  errorIcon: {
-    fontSize: 64,
-    marginBottom: 16,
+  errorIconBg: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: "#FEE2E2",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
   },
   errorText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#8b4513",
+    color: "#EF4444",
     textAlign: "center",
     marginBottom: 24,
     lineHeight: 24,
   },
   retryButton: {
-    backgroundColor: "#8b4513",
-    borderRadius: 25,
-    paddingHorizontal: 32,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#6366F1",
+    borderRadius: 12,
+    paddingHorizontal: 24,
     paddingVertical: 14,
   },
   retryButtonText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
   },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
+  emptyIconBg: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 24,
   },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#8b4513",
-    textAlign: "center",
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1F2937",
     marginBottom: 8,
   },
-  emptySubText: {
-    fontSize: 14,
-    color: "#a0522d",
+  emptyText: {
+    fontSize: 15,
+    color: "#6B7280",
     textAlign: "center",
-    lineHeight: 20,
+    lineHeight: 22,
   },
-  guestbookItem: {
-    backgroundColor: "#fffef7",
+  card: {
+    backgroundColor: "#fff",
     marginHorizontal: 20,
     marginBottom: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: "hidden",
-    borderLeftWidth: 4,
-    borderLeftColor: "#d4af37",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 2,
+    elevation: 3,
+  },
+  imageContainer: {
+    position: "relative",
+    width: "100%",
+    height: 180,
   },
   landmarkImage: {
     width: "100%",
-    height: 160,
-    backgroundColor: "#e9ecef",
-  },
-  landmarkImagePlaceholder: {
-    justifyContent: "center",
+    height: "100%",
+    backgroundColor: "#F3F4F6",
     alignItems: "center",
-    backgroundColor: "#f4f1e8",
+    justifyContent: "center",
   },
-  landmarkImageEmoji: {
-    fontSize: 64,
-  },
-  itemContent: {
-    padding: 16,
-  },
-  numberBadge: {
+  imageOverlay: {
     position: "absolute",
-    right: 16,
-    top: 16,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+    justifyContent: "flex-end",
+    padding: 12,
+  },
+  locationBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    alignSelf: "flex-start",
+  },
+  locationText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  statusBadge: {
+    position: "absolute",
+    top: 12,
+    right: 12,
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#8b4513",
+    backgroundColor: "rgba(255,255,255,0.95)",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  numberText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "700",
+  cardContent: {
+    padding: 16,
   },
-  landmarkInfo: {
-    marginBottom: 12,
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
   },
   landmarkName: {
-    fontSize: 16,
+    flex: 1,
+    fontSize: 17,
     fontWeight: "700",
-    color: "#8b4513",
-    marginBottom: 2,
+    color: "#1F2937",
+    marginRight: 8,
   },
-  landmarkLocation: {
-    fontSize: 13,
-    color: "#a0522d",
-    fontStyle: "italic",
+  dateText: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    fontWeight: "500",
   },
   message: {
-    fontSize: 15,
-    color: "#5d4037",
-    lineHeight: 22,
+    fontSize: 14,
+    color: "#6B7280",
+    lineHeight: 20,
     marginBottom: 12,
   },
-  meta: {
+  footer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  timestamp: {
-    fontSize: 13,
-    color: "#a0522d",
-  },
-  badge: {
+  countryBadge: {
+    backgroundColor: "#F3F4F6",
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 8,
   },
-  badgePublic: {
-    backgroundColor: "#8b4513",
-  },
-  badgePrivate: {
-    backgroundColor: "#f3f4f6",
-    borderWidth: 1,
-    borderColor: "#d4af37",
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  badgeTextPublic: {
-    color: "#fff",
-  },
-  badgeTextPrivate: {
-    color: "#8b4513",
-  },
-  decorativeLines: {
-    position: "absolute",
-    right: 16,
-    bottom: 16,
-    gap: 3,
-    alignItems: "flex-end",
-  },
-  decorativeLine: {
-    width: 40,
-    height: 1,
-    backgroundColor: "#e0e0e0",
+  countryText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#6B7280",
+    letterSpacing: 0.5,
   },
 });

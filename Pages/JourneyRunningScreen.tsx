@@ -163,8 +163,12 @@ export default function JourneyRunningScreen(props?: RouteParams) {
     }
   }, [landmarkMenuVisible, menuLandmark, userId]);
 
-  // 날씨 정보
-  const { weather, loading: weatherLoading } = useWeather();
+  // 날씨 정보 (이 화면에서만 위치/날씨 활성화)
+  const { weather, loading: weatherLoading, enable: enableWeather, disable: disableWeather } = useWeather();
+  useEffect(() => {
+    try { enableWeather(); } catch {}
+    return () => { try { disableWeather(); } catch {} };
+  }, []);
 
   // 다음 랜드마크 계산
   // 도달한 랜드마크 ID 목록을 훅의 landmarksWithReached에서 파생
