@@ -1,4 +1,4 @@
-Ôªøapply plugin: "com.android.application"
+apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 apply plugin: "com.google.gms.google-services"
@@ -103,15 +103,31 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        // Release signing that supports both real release keystore and dev fallback.
+        release {
+            // If release keystore props are provided (in gradle.properties or env), use them.
+            // Otherwise, fall back to debug keystore so preview builds work without extra setup.
+            if (project.hasProperty('WAY_RELEASE_STORE_FILE') &&
+                project.hasProperty('WAY_RELEASE_STORE_PASSWORD') &&
+                project.hasProperty('WAY_RELEASE_KEY_ALIAS') &&
+                project.hasProperty('WAY_RELEASE_KEY_PASSWORD')) {
+                storeFile file(WAY_RELEASE_STORE_FILE)
+                storePassword WAY_RELEASE_STORE_PASSWORD
+                keyAlias WAY_RELEASE_KEY_ALIAS
+                keyPassword WAY_RELEASE_KEY_PASSWORD
+            } else {
+                initWith signingConfigs.debug
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Sign with release config (falls back to debug keystore when props are missing)
+            signingConfig signingConfigs.release
+            debuggable true  // keep preview-friendly debugging enabled unless you turn it off for prod
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
@@ -149,30 +165,30 @@ android {
 }
 
 dependencies {
-    // The version of react-native is set by the React Native Gradle Plugin
+    // React Native core
     implementation("com.facebook.react:react-android")
 
-    def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
-    def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";
-    def isWebpAnimatedEnabled = (findProperty('expo.webp.animated') ?: "") == "true";
+    // Google Play Services Wearable (?ÑÏàò!)
+    implementation("com.google.android.gms:play-services-wearable:18.1.0")
 
-    if (isGifEnabled) {
-        // For animated gif support
-        implementation("com.facebook.fresco:animated-gif:${expoLibs.versions.fresco.get()}")
-    }
+    // Kotlin coroutines (WayToEarthWearModule?êÏÑú ?¨Ïö©)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
-    if (isWebpEnabled) {
-        // For webp support
-        implementation("com.facebook.fresco:webpsupport:${expoLibs.versions.fresco.get()}")
-        if (isWebpAnimatedEnabled) {
-            // Animated webp support
-            implementation("com.facebook.fresco:animated-webp:${expoLibs.versions.fresco.get()}")
-        }
-    }
+    // Gson (JSON ?åÏã±??
+    implementation("com.google.code.gson:gson:2.10.1")
 
+    // LocalBroadcastManager (WearMessageListenerService?êÏÑú ?¨Ïö©)
+    implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
+
+    // JSC or Hermes
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
     }
 }
+
+// Expo autolinking (React Native ?ºÏù¥Î∏åÎü¨Î¶¨Îì§ ?êÎèô Ï∂îÍ?)
+apply from: new File(["node", "--print", "require.resolve('expo/package.json')"].execute(null, rootDir).text.trim(), "../scripts/autolinking.gradle")
+

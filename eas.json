@@ -13,10 +13,10 @@
       "android": { "buildType": "apk" }
     },
     "preview": {
-      "developmentClient": true,
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       },
       "env": {
         "GOOGLE_MAPS_API_KEY": "@GOOGLE_MAPS_API_KEY",

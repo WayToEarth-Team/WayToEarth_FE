@@ -29,11 +29,18 @@ android/app/build/
 android/build/
 android/local.properties
 android/.cxx/
-*.keystore
-*.jks
 **/build/
 *.apk
 *.aab
+
+# Android signing (debug keystore는 포함, release keystore는 제외)
+*.jks
+# Allow debug.keystore for team collaboration
+!android/app/debug.keystore
+
+# Local Android signing (do not commit)
+android/keystore.properties
+android/keystores/
 
 # 환경/OS
 .env
@@ -43,6 +50,12 @@ android/.cxx/
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
+
+# Windows reserved file name
+nul
+
+# Credentials (do not commit)
+credentials.json
 
 # Local study materials: keep folder tracked but ignore its contents
 study/*

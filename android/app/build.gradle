@@ -82,6 +82,15 @@ def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInRelea
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// Load local keystore properties if available (not committed)
+def keystorePropsFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropsFile.exists()) {
+    new FileInputStream(keystorePropsFile).withCloseable { stream ->
+        keystoreProperties.load(stream)
+    }
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
 
@@ -103,16 +112,34 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        // Release signing: prefer local keystore.properties, then project props, else fallback to debug.
+        release {
+            if (keystoreProperties['storeFile'] && keystoreProperties['storePassword'] && keystoreProperties['keyAlias'] && keystoreProperties['keyPassword']) {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            } else if (project.hasProperty('WAY_RELEASE_STORE_FILE') &&
+                project.hasProperty('WAY_RELEASE_STORE_PASSWORD') &&
+                project.hasProperty('WAY_RELEASE_KEY_ALIAS') &&
+                project.hasProperty('WAY_RELEASE_KEY_PASSWORD')) {
+                storeFile file(WAY_RELEASE_STORE_FILE)
+                storePassword WAY_RELEASE_STORE_PASSWORD
+                keyAlias WAY_RELEASE_KEY_ALIAS
+                keyPassword WAY_RELEASE_KEY_PASSWORD
+            } else {
+                initWith signingConfigs.debug
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
-            debuggable true  // Enable debugging for preview builds
+            // Sign with release config (falls back to debug keystore when props are missing)
+            signingConfig signingConfigs.release
+            debuggable true  // keep preview-friendly debugging enabled unless you turn it off for prod
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
@@ -160,7 +187,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
-    // Gson (JSON 파싱용)
+    // Gson (JSON 파싱)
     implementation("com.google.code.gson:gson:2.10.1")
 
     // LocalBroadcastManager (WearMessageListenerService에서 사용)
@@ -176,3 +203,4 @@ dependencies {
 
 // Expo autolinking (React Native 라이브러리들 자동 추가)
 apply from: new File(["node", "--print", "require.resolve('expo/package.json')"].execute(null, rootDir).text.trim(), "../scripts/autolinking.gradle")
+
