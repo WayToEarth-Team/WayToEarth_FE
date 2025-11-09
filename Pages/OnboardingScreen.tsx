@@ -49,6 +49,8 @@ export default function OnboardingScreen() {
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [nickname, setNickname] = useState("");
   const [residence, setResidence] = useState("");
+  const [height, setHeight] = useState("");
+  const [weight, setWeight] = useState("");
   const [ageGroup, setAgeGroup] = useState<AgeGroup | null>(null);
   const [gender, setGender] = useState<Gender | null>(null);
   const [weeklyGoal, setWeeklyGoal] = useState("");
@@ -193,9 +195,18 @@ export default function OnboardingScreen() {
     if (step === 0) return true; // 프로필 사진 선택(선택사항)
     if (step === 1) return nickname.trim().length >= 2 && !nicknameError && !nicknameChecking;
     if (step === 2) return residence.trim().length > 0;
-    if (step === 3) return ageGroup !== null;
-    if (step === 4) return gender !== null;
-    if (step === 5) {
+    if (step === 3) {
+      // 키/몸무게 (선택사항으로 처리)
+      if (!height && !weight) return true;
+      const h = parseFloat(height);
+      const w = parseFloat(weight);
+      const heightValid = !height || (!isNaN(h) && h >= 100 && h <= 250);
+      const weightValid = !weight || (!isNaN(w) && w >= 30 && w <= 200);
+      return heightValid && weightValid;
+    }
+    if (step === 4) return ageGroup !== null;
+    if (step === 5) return gender !== null;
+    if (step === 6) {
       const goal = parseFloat(weeklyGoal);
       return !isNaN(goal) && goal >= 0.1 && goal <= 999.99;
     }
@@ -255,6 +266,8 @@ export default function OnboardingScreen() {
       console.log('[ONBOARDING] Form data:', {
         nickname: nickname.trim(),
         residence: residence.trim(),
+        height: height ? parseFloat(height) : undefined,
+        weight: weight ? parseFloat(weight) : undefined,
         age_group: ageGroup,
         gender: gender,
         weekly_goal_distance: parseFloat(weeklyGoal),
@@ -265,6 +278,8 @@ export default function OnboardingScreen() {
         residence: residence.trim(),
         age_group: ageGroup!,
         gender: gender!,
+        height: height ? parseFloat(height) : undefined,
+        weight: weight ? parseFloat(weight) : undefined,
         weekly_goal_distance: parseFloat(weeklyGoal),
         profile_Image_Url: profileImageUrl || undefined,
       });
@@ -282,7 +297,7 @@ export default function OnboardingScreen() {
   // 렌더링 함수들
   const renderProgressBar = () => (
     <View style={styles.progressContainer}>
-      {[0, 1, 2, 3, 4, 5].map((i) => (
+      {[0, 1, 2, 3, 4, 5, 6].map((i) => (
         <View
           key={i}
           style={[styles.progressDot, i <= step && styles.progressDotActive]}
@@ -414,6 +429,70 @@ export default function OnboardingScreen() {
         { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
       ]}
     >
+      <Text style={styles.stepTitle}>신체 정보를 입력해주세요</Text>
+      <Text style={styles.stepSubtitle}>정확한 칼로리 계산을 위해 사용됩니다 (선택사항)</Text>
+
+      <View style={styles.bodyInfoContainer}>
+        <View style={styles.bodyInfoRow}>
+          <View style={styles.bodyInfoItem}>
+            <Text style={styles.bodyInfoLabel}>키</Text>
+            <View style={styles.bodyInputWrapper}>
+              <TextInput
+                style={styles.bodyInput}
+                placeholder="170"
+                value={height}
+                onChangeText={(text) => {
+                  const filtered = text.replace(/[^0-9.]/g, "");
+                  setHeight(filtered);
+                }}
+                keyboardType="decimal-pad"
+                maxLength={5}
+              />
+              <Text style={styles.bodyUnit}>cm</Text>
+            </View>
+            <Text style={styles.bodyInfoHint}>100-250cm</Text>
+          </View>
+
+          <View style={styles.bodyInfoItem}>
+            <Text style={styles.bodyInfoLabel}>몸무게</Text>
+            <View style={styles.bodyInputWrapper}>
+              <TextInput
+                style={styles.bodyInput}
+                placeholder="65"
+                value={weight}
+                onChangeText={(text) => {
+                  const filtered = text.replace(/[^0-9.]/g, "");
+                  setWeight(filtered);
+                }}
+                keyboardType="decimal-pad"
+                maxLength={5}
+              />
+              <Text style={styles.bodyUnit}>kg</Text>
+            </View>
+            <Text style={styles.bodyInfoHint}>30-200kg</Text>
+          </View>
+        </View>
+      </View>
+
+      <TouchableOpacity
+        style={[styles.primaryButton, !canProceed() && styles.buttonDisabled]}
+        onPress={handleNext}
+        disabled={!canProceed()}
+      >
+        <Text style={styles.primaryButtonText}>
+          {!height && !weight ? "건너뛰기" : "다음"}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+
+  const renderStep4 = () => (
+    <Animated.View
+      style={[
+        styles.stepContainer,
+        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+      ]}
+    >
       <Text style={styles.stepTitle}>연령대를 선택해주세요</Text>
       <Text style={styles.stepSubtitle}>통계 및 추천에 활용됩니다</Text>
 
@@ -449,7 +528,7 @@ export default function OnboardingScreen() {
     </Animated.View>
   );
 
-  const renderStep4 = () => (
+  const renderStep5 = () => (
     <Animated.View
       style={[
         styles.stepContainer,
@@ -496,7 +575,7 @@ export default function OnboardingScreen() {
     </Animated.View>
   );
 
-  const renderStep5 = () => (
+  const renderStep6 = () => (
     <Animated.View
       style={[
         styles.stepContainer,
@@ -568,6 +647,8 @@ export default function OnboardingScreen() {
         return renderStep4();
       case 5:
         return renderStep5();
+      case 6:
+        return renderStep6();
       default:
         return null;
     }
@@ -840,5 +921,50 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#fff",
+  },
+  bodyInfoContainer: {
+    marginBottom: 32,
+  },
+  bodyInfoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 16,
+  },
+  bodyInfoItem: {
+    flex: 1,
+  },
+  bodyInfoLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  bodyInputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  bodyInput: {
+    fontSize: 40,
+    fontWeight: "bold",
+    color: "#333",
+    textAlign: "center",
+    minWidth: 100,
+    borderBottomWidth: 3,
+    borderBottomColor: "#4A90E2",
+    paddingVertical: 8,
+  },
+  bodyUnit: {
+    fontSize: 24,
+    fontWeight: "600",
+    color: "#888",
+    marginLeft: 8,
+  },
+  bodyInfoHint: {
+    fontSize: 12,
+    color: "#999",
+    textAlign: "center",
   },
 });
