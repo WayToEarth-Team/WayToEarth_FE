@@ -53,6 +53,8 @@ export type OnboardingInput = {
   residence: string;
   age_group: string; // "10대" | "20대" | "30대" | "40대" | "50대" | "60대 이상"
   gender: string; // "남성" | "여성" | "기타"
+  height?: number; // 키(cm): 100 ~ 250
+  weight?: number; // 몸무게(kg): 30 ~ 200
   weekly_goal_distance: number; // Swagger: 최소 0.1
   profile_Image_Url?: string;
   profile_image_key?: string;
@@ -73,6 +75,8 @@ export async function submitOnboarding(input: OnboardingInput) {
     residence: (input.residence ?? "").trim(),
     age_group: input.age_group,
     gender: input.gender,
+    height: input.height,
+    weight: input.weight,
     weekly_goal_distance: Math.max(
       0.1,
       extractNumber(input.weekly_goal_distance)
@@ -107,6 +111,8 @@ export type UserProfile = {
   residence?: string | null;
   age_group?: string | null;
   gender?: string | null;
+  height?: number | null; // 키(cm)
+  weight?: number | null; // 몸무게(kg)
   weekly_goal_distance?: number | null;
   total_distance?: number | null;
   total_running_count?: number | null;
