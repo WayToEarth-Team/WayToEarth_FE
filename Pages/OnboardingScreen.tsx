@@ -19,6 +19,7 @@ import * as FileSystem from "expo-file-system";
 import { useNavigation } from "@react-navigation/native";
 import { submitOnboarding, checkNickname } from "../utils/api/users";
 import { client } from "../utils/api/client";
+import { syncProfileToWatch } from "../src/modules/watchSync";
 
 const { width } = Dimensions.get("window");
 
@@ -283,6 +284,15 @@ export default function OnboardingScreen() {
         weekly_goal_distance: parseFloat(weeklyGoal),
         profile_Image_Url: profileImageUrl || undefined,
       });
+
+      // 워치로 프로필 동기화 (백그라운드에서 실행)
+      if (weight || height) {
+        const w = weight ? parseFloat(weight) : undefined;
+        const h = height ? parseFloat(height) : undefined;
+        syncProfileToWatch(w, h).catch(err => {
+          console.warn('[ONBOARDING] Watch profile sync failed:', err);
+        });
+      }
 
       setDialog({ open:true, kind:'positive', title:'환영합니다!', message:'Way to Earth에 오신 것을 환영합니다.' });
       navigation.reset({ index: 0, routes: [{ name: 'MainTabs', params: { screen: 'LiveRunningScreen' } }] });
