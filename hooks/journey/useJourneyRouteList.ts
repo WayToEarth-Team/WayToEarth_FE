@@ -4,7 +4,7 @@ import { listRoutes, type RouteSummary } from '../../utils/api/journeyRoutes';
 import { getMyProfile } from '../../utils/api/users';
 import { listUserProgress } from '../../utils/api/userJourneys';
 
-export default function useRouteList() {
+export default function useRouteList(category?: "DOMESTIC" | "INTERNATIONAL") {
   const [data, setData] = useState<RouteSummary[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
@@ -14,7 +14,7 @@ export default function useRouteList() {
     setLoading(true);
     (async () => {
       try {
-        const routes = await listRoutes();
+        const routes = await listRoutes(category);
         if (!mounted) return;
         // 사용자 진행률을 병합
         let enriched = routes;
@@ -57,7 +57,7 @@ export default function useRouteList() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [category]);
 
   return { data, loading, error } as const;
 }
