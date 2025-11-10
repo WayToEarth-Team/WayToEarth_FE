@@ -9,6 +9,7 @@ export type FeedItem = {
   liked: boolean;
   nickname?: string;
   distance?: number;
+  createdAt?: string; // ISO 8601 timestamp from backend
   // author avatar (backend may use different keys)
   profile_image_url?: string | null;
   profileImageUrl?: string | null;

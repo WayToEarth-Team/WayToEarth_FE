@@ -1,13 +1,13 @@
-// utils/api/users.ts
+﻿// utils/api/users.ts
 import { client } from "./client";
 import type { UserInfo } from "../../types/types";
 
-// 공통: 래퍼 응답 { success, data, ... } 언래핑 유틸
+// unwrap helper: many APIs return { success, data, ... }
 function unwrap<T = any>(resData: any): T {
   return (resData && resData.data != null ? resData.data : resData) as T;
 }
 
-/** 닉네임 중복확인: 서버 응답 포맷 차이를 흡수해 표준화 */
+// Check nickname availability
 export async function checkNickname(rawNickname: string) {
   const nickname = (rawNickname ?? "").trim();
 
@@ -15,7 +15,7 @@ export async function checkNickname(rawNickname: string) {
     return {
       available: false,
       isDuplicate: true,
-      message: "닉네임을 입력하세요.",
+      message: "Please enter a nickname.",
     };
   }
 
@@ -25,42 +25,45 @@ export async function checkNickname(rawNickname: string) {
     });
 
     const available =
-      typeof data?.available === "boolean"
-        ? data.available
-        : !Boolean(data?.isDuplicate);
+      typeof (data as any)?.available === "boolean"
+        ? !!(data as any).available
+        : !Boolean((data as any)?.isDuplicate);
 
     return {
       available,
       isDuplicate: !available,
       message:
-        data?.message ??
-        (available ? "사용 가능" : "이미 사용 중인 닉네임입니다."),
+        (typeof (data as any)?.message === "string"
+          ? (data as any).message
+          : available
+          ? "Nickname available."
+          : "Nickname already in use."),
     };
   } catch (e: any) {
     return {
       available: false,
       isDuplicate: true,
       message:
-        e?.response?.data?.message ??
-        "닉네임 확인에 실패했습니다. 잠시 후 다시 시도하세요.",
+        (e?.response?.data?.message as string) ??
+        "Failed to check nickname. Please try again.",
     };
   }
 }
 
-/** 온보딩 입력 형태(화면에서 받는 값) */
+// Onboarding input (subset used by Register flow)
 export type OnboardingInput = {
   nickname: string;
   residence: string;
-  age_group: string; // "10대" | "20대" | "30대" | "40대" | "50대" | "60대 이상"
-  gender: string; // "남성" | "여성" | "기타"
-  height?: number; // 키(cm): 100 ~ 250
-  weight?: number; // 몸무게(kg): 30 ~ 200
-  weekly_goal_distance: number; // Swagger: 최소 0.1
-  profile_Image_Url?: string;
+  age_group: string; // e.g., "TWENTIES" (backend may map from display label)
+  gender: string; // e.g., "MALE" | "FEMALE" | "OTHER"
+  height?: number; // cm
+  weight?: number; // kg
+  weekly_goal_distance: number; // km
+  profileImageUrl?: string;
   profile_image_key?: string;
 };
 
-/** 숫자 문자열에서 숫자만 추출: "주 10km" → 10 */
+// Extract number from string like "약 10km" -> 10
 function extractNumber(input: string | number) {
   if (typeof input === "number") return input;
   const s = String(input ?? "").trim();
@@ -68,20 +71,20 @@ function extractNumber(input: string | number) {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** 회원가입/온보딩 제출: Swagger 스펙에 맞춘 필드 전송 */
+// Submit onboarding
 export async function submitOnboarding(input: OnboardingInput) {
-  const payload = {
+  const payload: any = {
     nickname: (input.nickname ?? "").trim(),
     residence: (input.residence ?? "").trim(),
     age_group: input.age_group,
     gender: input.gender,
     height: input.height,
     weight: input.weight,
-    weekly_goal_distance: Math.max(
-      0.1,
-      extractNumber(input.weekly_goal_distance)
-    ),
-    profile_Image_Url: input.profile_Image_Url?.trim() || undefined,
+    weekly_goal_distance: Math.max(0.1, extractNumber(input.weekly_goal_distance)),
+    // send both variants to satisfy backend differences
+    profileImageUrl: input.profileImageUrl?.trim() || undefined,
+    profile_image_url: input.profileImageUrl?.trim() || undefined,
+    profile_image_key: input.profile_image_key?.trim() || undefined,
   };
 
   console.log('[ONBOARDING] Payload:', JSON.stringify(payload, null, 2));
@@ -94,16 +97,19 @@ export async function submitOnboarding(input: OnboardingInput) {
   return unwrap(res.data);
 }
 
-/** 화면의 UserInfo → Swagger 온보딩 입력으로 매핑 */
+// Map from screen UserInfo to onboarding
 export async function registerUser(userInfo: UserInfo) {
   return submitOnboarding({
-    nickname: userInfo.nickname,
-    residence: userInfo.location,
-    weekly_goal_distance: extractNumber(userInfo.runningDistance),
-  });
+    nickname: (userInfo as any).nickname,
+    residence: (userInfo as any).location,
+    // the minimal fields used in current flow
+    age_group: (userInfo as any).age_group ?? "TWENTIES",
+    gender: (userInfo as any).gender ?? "OTHER",
+    weekly_goal_distance: extractNumber((userInfo as any).runningDistance),
+  } as any);
 }
 
-// 내 프로필 상세
+// User profile detail
 export type UserProfile = {
   id: number;
   nickname: string;
@@ -111,8 +117,8 @@ export type UserProfile = {
   residence?: string | null;
   age_group?: string | null;
   gender?: string | null;
-  height?: number | null; // 키(cm)
-  weight?: number | null; // 몸무게(kg)
+  height?: number | null; // cm
+  weight?: number | null; // kg
   weekly_goal_distance?: number | null;
   total_distance?: number | null;
   total_running_count?: number | null;
@@ -128,7 +134,7 @@ export async function getMyProfile(): Promise<UserProfile> {
   return profile;
 }
 
-// 특정 사용자 프로필 조회
+// Fetch specific user profile
 export async function getUserProfile(userId: string | number): Promise<UserProfile> {
   const res = await client.get(`/v1/users/${userId}/profile`);
   const profile = unwrap<UserProfile>(res.data);
@@ -136,9 +142,9 @@ export async function getUserProfile(userId: string | number): Promise<UserProfi
   return profile;
 }
 
-// 내 대시보드/요약
+// User summary
 export type UserSummary = {
-  completion_rate: number; // 0~1
+  completion_rate: number; // 0..1
   emblem_count: number;
   total_distance: number;
   total_running_count: number;
@@ -149,7 +155,7 @@ export async function getMySummary(): Promise<UserSummary> {
   return unwrap<UserSummary>(res.data);
 }
 
-// 회원 탈퇴
+// Delete my account
 export async function deleteMyAccount(): Promise<void> {
   console.log('[USERS] Deleting account...');
   await client.delete("/v1/users/me");
