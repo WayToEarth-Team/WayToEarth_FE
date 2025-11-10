@@ -166,6 +166,38 @@ export default function JourneyMapRoute({
     onMapReady?.();
   };
 
+  // 📍 최적화: currentLocation 객체 전체 대신 좌표 값만 의존성으로 사용
+  const currentLat = currentLocation?.latitude;
+  const currentLng = currentLocation?.longitude;
+
+  // 🏁 랜드마크 마커 캐싱: landmarks 배열이 실제로 변경될 때만 리렌더링
+  const landmarkMarkers = useMemo(() => {
+    return landmarks.map((landmark, index) => (
+      <Marker
+        key={landmark.id}
+        coordinate={landmark.position as RNLatLng}
+        title={landmark.name}
+        description={landmark.distance}
+        onPress={() => onLandmarkPress?.(landmark)}
+      >
+        <View
+          style={[
+            styles.landmarkMarker,
+            landmark.reached
+              ? styles.landmarkMarkerReached
+              : styles.landmarkMarkerPending,
+          ]}
+        >
+          {landmark.reached ? (
+            <Text style={styles.landmarkIconReached}>✓</Text>
+          ) : (
+            <Text style={styles.landmarkIconPending}>{index + 1}</Text>
+          )}
+        </View>
+      </Marker>
+    ));
+  }, [landmarks, onLandmarkPress]);
+
   // 진행률에 따라 완료된 경로 구간 계산 (거리 기반 인덱스 사용) - useMemo로 캐싱
   const { completedRoute, remainingRoute } = useMemo(() => {
     if (journeyRoute.length === 0) {
@@ -202,7 +234,7 @@ export default function JourneyMapRoute({
     });
 
     return { completedRoute: completed, remainingRoute: remaining };
-  }, [journeyRoute, progressPercent, virtualRouteIndex, currentLocation]);
+  }, [journeyRoute, progressPercent, virtualRouteIndex, currentLat, currentLng]);
 
   return (
     <View style={styles.container}>
@@ -258,31 +290,8 @@ export default function JourneyMapRoute({
         />
       )}
 
-      {/* 랜드마크 마커 */}
-      {landmarks.map((landmark, index) => (
-        <Marker
-          key={landmark.id}
-          coordinate={landmark.position as RNLatLng}
-          title={landmark.name}
-          description={landmark.distance}
-          onPress={() => onLandmarkPress?.(landmark)}
-        >
-          <View
-            style={[
-              styles.landmarkMarker,
-              landmark.reached
-                ? styles.landmarkMarkerReached
-                : styles.landmarkMarkerPending,
-            ]}
-          >
-            {landmark.reached ? (
-              <Text style={styles.landmarkIconReached}>✓</Text>
-            ) : (
-              <Text style={styles.landmarkIconPending}>{index + 1}</Text>
-            )}
-          </View>
-        </Marker>
-      ))}
+      {/* 랜드마크 마커 (useMemo로 캐싱됨) */}
+      {landmarkMarkers}
 
       {/* 현재 위치 마커 */}
       {currentLocation && (

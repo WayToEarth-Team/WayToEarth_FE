@@ -414,7 +414,7 @@ export function useLiveRunTracker(runningType: "SINGLE" | "JOURNEY" = "SINGLE") 
           subRef.current = await Location.watchPositionAsync(
             {
               accuracy: Location.Accuracy.Highest,
-              timeInterval: 1000,
+              timeInterval: runningType === "JOURNEY" ? 3000 : 1000,
               distanceInterval: 2,
             },
             (loc) => {
