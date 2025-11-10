@@ -20,6 +20,7 @@ import { useNavigation } from "@react-navigation/native";
 import { submitOnboarding, checkNickname } from "../utils/api/users";
 import { client } from "../utils/api/client";
 import { syncProfileToWatch } from "../src/modules/watchSync";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width } = Dimensions.get("window");
 
@@ -48,6 +49,7 @@ export default function OnboardingScreen() {
   // Form state
   const [step, setStep] = useState(0);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [profileImageKey, setProfileImageKey] = useState<string | null>(null);
   const [nickname, setNickname] = useState("");
   const [residence, setResidence] = useState("");
   const [height, setHeight] = useState("");
@@ -160,6 +162,7 @@ export default function OnboardingScreen() {
         data?.upload_url ?? data?.signed_url ?? data?.signedUrl ?? data?.uploadUrl;
       const downloadUrl =
         data?.download_url ?? data?.public_url ?? data?.downloadUrl ?? data?.publicUrl;
+      const imageKey = data?.key ?? data?.file_key ?? data?.fileKey;
 
       if (!signedUrl || !downloadUrl) {
         setDialog({ open:true, kind:'negative', title:'오류', message:'업로드 URL 발급에 실패했습니다.' });
@@ -181,7 +184,36 @@ export default function OnboardingScreen() {
         throw new Error(`S3 업로드 실패: ${resUpload.status}`);
       }
 
+      // key 저장 (presign 응답에서 받거나, URL에서 추출)
+      let finalKey = imageKey;
+      if (!finalKey && downloadUrl) {
+        // URL에서 key 추출: https://cdn.waytoearth.cloud/profiles/15/profile_xxx.jpg?v=xxx -> profiles/15/profile_xxx.jpg
+        try {
+          const url = new URL(downloadUrl);
+          finalKey = url.pathname.substring(1); // 앞의 / 제거
+        } catch (e) {
+          console.warn('[ONBOARDING] Failed to extract key from URL', e);
+        }
+      }
+
+      // Persist to DB immediately like ProfileEdit does, to ensure My Info sees it
+      try {
+        if (finalKey) {
+          await client.put("/v1/users/me", { profile_image_key: finalKey });
+          console.log('[ONBOARDING] Saved profile_image_key to DB:', finalKey);
+        }
+      } catch (e) {
+        console.warn('[ONBOARDING] Failed to save profile_image_key to DB', e);
+      }
+
+      try {
+        await AsyncStorage.setItem("@pending_avatar_url", downloadUrl);
+        await AsyncStorage.setItem("@pending_avatar_key", finalKey || "");
+      } catch {}
+
       setProfileImageUrl(downloadUrl);
+      setProfileImageKey(finalKey || null);
+      console.log('[ONBOARDING] Image uploaded - URL:', downloadUrl, 'Key:', finalKey);
       setDialog({ open:true, kind:'positive', title:'완료', message:'프로필 사진이 업로드되었습니다.' });
     } catch (e: any) {
       console.warn(e);
@@ -272,6 +304,7 @@ export default function OnboardingScreen() {
         age_group: ageGroup,
         gender: gender,
         weekly_goal_distance: parseFloat(weeklyGoal),
+        profile_image_key: profileImageKey,
       });
 
       await submitOnboarding({
@@ -282,8 +315,26 @@ export default function OnboardingScreen() {
         height: height ? parseFloat(height) : undefined,
         weight: weight ? parseFloat(weight) : undefined,
         weekly_goal_distance: parseFloat(weeklyGoal),
-        profile_Image_Url: profileImageUrl || undefined,
+        profile_image_key: profileImageKey || undefined,
+        profileImageUrl: profileImageUrl || undefined,
       });
+
+      // After onboarding, persist image to profile as a fallback
+      try {
+        if (profileImageKey || profileImageUrl) {
+          await client.put("/v1/users/me", {
+            ...(profileImageKey ? { profile_image_key: profileImageKey } : {}),
+            ...(profileImageUrl ? { profile_image_url: profileImageUrl } : {}),
+          });
+          console.log('[ONBOARDING] Post-onboarding profile image persisted');
+          try {
+            await AsyncStorage.removeItem("@pending_avatar_url");
+            await AsyncStorage.removeItem("@pending_avatar_key");
+          } catch {}
+        }
+      } catch (e) {
+        console.warn('[ONBOARDING] Failed to persist profile image after onboarding', e);
+      }
 
       // 워치로 프로필 동기화 (백그라운드에서 실행)
       if (weight || height) {
