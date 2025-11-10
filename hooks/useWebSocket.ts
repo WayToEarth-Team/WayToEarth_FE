@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { normalizeTimestampToDate } from '../utils/datetime';
 import 'react-native-url-polyfill/auto';
 
 export interface ChatMessage {
@@ -6,6 +7,7 @@ export interface ChatMessage {
   message: string;
   messageType: 'TEXT' | 'ANNOUNCEMENT' | 'SYSTEM';
   senderName?: string;
+  senderId?: string | number;
   timestamp?: string;
   isOwn?: boolean;
   readByUsers?: number;
@@ -111,17 +113,31 @@ export const useWebSocket = ({
           const raw = (event as any).data ?? (event as any).message ?? '';
           const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
           if (data?.type === 'PONG' || data === 'PONG') return;
-          const ts = data.timestamp || data.sentAt || new Date().toISOString();
+          const tsDate = normalizeTimestampToDate(data.timestamp || data.sentAt || new Date());
+          const ts = tsDate.toISOString();
           const message: ChatMessage = {
             id: data.messageId?.toString() || `${data.messageType || 'TEXT'}:${data.senderName || ''}:${ts}`,
             message: data.message,
             messageType: data.messageType || 'TEXT',
             senderName: data.senderName || '알 수 없음',
+            senderId: data.senderId,
             timestamp: ts,
             isOwn: currentUserIdRef.current != null ? String(data.senderId) === String(currentUserIdRef.current) : false,
             readByUsers: data.readCount,
             isRead: data.read,
           };
+          // 서버가 SYSTEM 타입으로 보내는 클라이언트용 에러 메시지는 노출 억제
+          if (
+            (message.messageType === 'SYSTEM' || data.type === 'SYSTEM') &&
+            typeof message.message === 'string' &&
+            (
+              /메시지\s*내용이\s*비어있습니다/.test(message.message) ||
+              /전송\s*속도.*빠릅니|too\s*fast/i.test(message.message) ||
+              /rate.?limit/i.test(message.message)
+            )
+          ) {
+            return;
+          }
           onMessageRef.current?.(message);
         } catch (err) {
           onErrorRef.current?.(err);
@@ -180,12 +196,17 @@ export const useWebSocket = ({
   }, [url, token]);
 
   const sendMessage = useCallback((message: string, messageType: 'TEXT' | 'ANNOUNCEMENT' = 'TEXT') => {
+    // 빈 메시지는 전송하지 않고 조용히 무시 (에러 노출 방지)
+    const trimmed = (message ?? '').trim();
+    if (!trimmed) {
+      return false;
+    }
     if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
       setConnectionError('연결이 끊어졌습니다');
       return false;
     }
     try {
-      const payload = { message: message.trim(), messageType };
+      const payload = { message: trimmed, messageType };
       socketRef.current.send(JSON.stringify(payload));
       return true;
     } catch (error) {

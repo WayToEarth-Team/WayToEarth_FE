@@ -5,7 +5,8 @@ export type TabKey = "profile" | "crew" | "running" | "feed" | "record";
 
 const TAB_TO_ROUTE: Record<TabKey, string> = {
   profile: "Profile",
-  crew: "ChatScreen",
+  // Crew 탭을 누르면 크루 메인으로 이동하도록 수정
+  crew: "Crew",
   // 러닝 탭은 실제 러닝 화면으로 이동
   running: "LiveRunningScreen",
   feed: "Feed",
@@ -21,7 +22,8 @@ export function useBottomNav(defaultTab: TabKey = "running") {
   const navigation = useNavigation<any>();
   const route = useRoute();
   const [activeTab, setActiveTab] = useState<TabKey>(defaultTab);
-  const TAB_ROUTES = new Set(["LiveRunningScreen", "Feed", "Record", "Profile"]);
+  // MainTabs 하위 탭 스크린 목록에 'Crew' 추가
+  const TAB_ROUTES = new Set(["LiveRunningScreen", "Feed", "Record", "Profile", "Crew"]);
 
   // 현재 라우트가 바뀌면 activeTab 동기화
   useEffect(() => {
