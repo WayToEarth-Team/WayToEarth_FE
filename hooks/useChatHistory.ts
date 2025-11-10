@@ -1,11 +1,13 @@
 import { useCallback, useRef, useState } from 'react';
 import { client } from '../utils/api/client';
+import { normalizeTimestampToDate } from '../utils/datetime';
 
 export type ChatMessage = {
   id?: string;
   message: string;
   messageType: 'TEXT' | 'ANNOUNCEMENT' | 'SYSTEM';
   senderName?: string;
+  senderId?: string | number;
   timestamp?: string;
   isOwn?: boolean;
   readByUsers?: number;
@@ -26,7 +28,8 @@ export function useChatHistory({ crewId, currentUserId }: { crewId: string | num
   const idSetRef = useRef<Set<string>>(new Set());
 
   const mapDto = useCallback((d: any): ChatMessage => {
-    const ts = d.sentAt || d.timestamp || new Date().toISOString();
+    const tsDate = normalizeTimestampToDate(d.sentAt || d.timestamp || new Date());
+    const ts = tsDate.toISOString();
     const type = (d.messageType as any) || 'TEXT';
     const sender = d.senderName || '';
     const fallbackKey = `${type}:${sender}:${ts}`;
@@ -35,6 +38,7 @@ export function useChatHistory({ crewId, currentUserId }: { crewId: string | num
       message: String(d.message ?? ''),
       messageType: type,
       senderName: sender,
+      senderId: d.senderId,
       timestamp: ts,
       isOwn: currentUserId != null ? String(d.senderId ?? '') === String(currentUserId) : false,
       readByUsers: typeof d.readCount === 'number' ? d.readCount : undefined,
@@ -48,13 +52,24 @@ export function useChatHistory({ crewId, currentUserId }: { crewId: string | num
     try {
       const { data } = await client.get(`/v1/crews/${crewId}/chat/messages/recent`, { params: { limit: pageSizeRef.current } });
       const list: any[] = data ?? [];
-      const mapped = list.map(mapDto).filter((m) => {
-        const key = m.id ?? '';
-        if (!key) return true;
-        if (idSetRef.current.has(key)) return false;
-        idSetRef.current.add(key);
-        return true;
-      });
+      const mapped = list
+        .map(mapDto)
+        // Hide server-side system notices that are not user messages
+        .filter((m) => {
+          if (m.messageType === 'SYSTEM') {
+            const msg = m.message || '';
+            if (/메시지\s*내용이\s*비어있습니다/.test(msg)) return false;
+            if (/전송\s*속도.*빠릅니|too\s*fast|rate.?limit/i.test(msg)) return false;
+          }
+          return true;
+        })
+        .filter((m) => {
+          const key = m.id ?? '';
+          if (!key) return true;
+          if (idSetRef.current.has(key)) return false;
+          idSetRef.current.add(key);
+          return true;
+        });
       setMessages(mapped);
       setPage(1);
       setHasMore((list?.length ?? 0) >= pageSizeRef.current);
@@ -79,7 +94,17 @@ export function useChatHistory({ crewId, currentUserId }: { crewId: string | num
       if (list.length === 0) {
         setHasMore(false);
       } else {
-        const mapped = list.map(mapDto).filter((m) => {
+        const mapped = list
+          .map(mapDto)
+          .filter((m) => {
+            if (m.messageType === 'SYSTEM') {
+              const msg = m.message || '';
+              if (/메시지\s*내용이\s*비어있습니다/.test(msg)) return false;
+              if (/전송\s*속도.*빠릅니|too\s*fast|rate.?limit/i.test(msg)) return false;
+            }
+            return true;
+          })
+          .filter((m) => {
           const key = m.id ?? '';
           if (!key) return true;
           if (idSetRef.current.has(key)) return false;
@@ -173,4 +198,3 @@ export function useChatHistory({ crewId, currentUserId }: { crewId: string | num
     clearMessages,
   };
 }
-
