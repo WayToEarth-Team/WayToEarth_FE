@@ -336,6 +336,31 @@ export async function openWatchConnectionUI(): Promise<boolean> {
   }
 }
 
+// Sync user profile (weight, height) to watch
+export async function syncProfileToWatch(weight?: number, height?: number): Promise<boolean> {
+  try {
+    if (!isWatchAvailable()) {
+      debugLog('[WATCH] syncProfileToWatch: Watch module not available');
+      return false;
+    }
+    if (typeof WayToEarthWear.syncProfile !== 'function') {
+      debugLog('[WATCH] syncProfileToWatch: syncProfile method not available');
+      return false;
+    }
+
+    const w = weight && weight > 0 ? Math.round(weight) : 0;
+    const h = height && height > 0 ? Math.round(height) : 0;
+
+    debugLog(`[WATCH] Syncing profile to watch: weight=${w}kg, height=${h}cm`);
+    const ok = await WayToEarthWear.syncProfile(w, h);
+    debugLog(`[WATCH] Profile sync result: ${ok}`);
+    return !!ok;
+  } catch (e: any) {
+    debugLog('[WATCH] syncProfileToWatch failed:', e?.message);
+    return false;
+  }
+}
+
 // JSON.parse with guard
 ;(JSON as any).parseSafe = (s: any) => { try { return JSON.parse(String(s)); } catch { return null; } };
 
@@ -350,4 +375,5 @@ export default {
   cleanupWatchSync,
   isWatchAvailable,
   openWatchConnectionUI,
+  syncProfileToWatch,
 };

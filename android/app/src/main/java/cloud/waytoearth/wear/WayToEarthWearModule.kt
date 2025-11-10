@@ -49,6 +49,7 @@ class WayToEarthWearModule(private val reactContext: ReactApplicationContext) : 
         private const val PATH_COMMAND_RESUME = "/waytoearth/command/resume"
         private const val PATH_RESPONSE_PAUSED = "/waytoearth/response/paused"
         private const val PATH_RESPONSE_RESUMED = "/waytoearth/response/resumed"
+        private const val PATH_COMMAND_SYNC_PROFILE = "/waytoearth/command/sync_profile"
     }
 
     override fun getName(): String {
@@ -215,6 +216,24 @@ class WayToEarthWearModule(private val reactContext: ReactApplicationContext) : 
             promise.resolve(launched)
         } catch (t: Throwable) {
             promise.reject("OPEN_WEAR_FAIL", t)
+        }
+    }
+
+    @ReactMethod
+    fun syncProfile(weight: Int, height: Int, promise: Promise) {
+        scope.launch {
+            try {
+                val payload = mapOf(
+                    "weight" to weight,
+                    "height" to height
+                )
+                Log.d(TAG, "syncProfile: weight=$weight, height=$height")
+                val ok = sendMessageAll(PATH_COMMAND_SYNC_PROFILE, gson.toJson(payload).toByteArray())
+                promise.resolve(ok)
+            } catch (t: Throwable) {
+                Log.e(TAG, "syncProfile failed", t)
+                promise.reject("SYNC_PROFILE_FAIL", t)
+            }
         }
     }
 }
