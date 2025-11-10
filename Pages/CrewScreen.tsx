@@ -70,12 +70,6 @@ export default function CrewScreen() {
 
       {/* 상단 헤더 */}
       <View style={s.header}>
-        <View style={s.headerTop}>
-          <View style={s.logo}>
-            <Text>크루</Text>
-          </View>
-        </View>
-
         {/* 검색바 */}
         <View style={s.searchContainer}>
           <View style={s.searchBox}>
@@ -378,6 +372,7 @@ export default function CrewScreen() {
 const s = StyleSheet.create({
   safeContainer: { flex: 1, backgroundColor: "#FFFFFF" },
   header: {
+    marginTop: 15,
     backgroundColor: "#fff",
     paddingTop: 16,
     paddingBottom: 12,
