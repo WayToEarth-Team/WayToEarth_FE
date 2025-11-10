@@ -214,10 +214,11 @@ export default function CrewScreen() {
               (data as any)?.message ||
               e?.message ||
               "크루 생성에 실패했습니다.";
-            const friendly = /ALREADY_IN_CREW|CREW_EXISTS|USER_ALREADY_MEMBER/i.test(code) ||
+            const friendly =
+              /ALREADY_IN_CREW|CREW_EXISTS|USER_ALREADY_MEMBER/i.test(code) ||
               /이미.*크루.*(참여|가입)/.test(raw)
-              ? "이미 가입된 크루가 있어 새 크루를 생성할 수 없습니다."
-              : raw;
+                ? "이미 가입된 크루가 있어 새 크루를 생성할 수 없습니다."
+                : raw;
             setDialog({
               open: true,
               kind: "negative",
@@ -437,7 +438,7 @@ const s = StyleSheet.create({
     backgroundColor: "#F3F4F6",
     borderRadius: 24,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 3,
     gap: 8,
   },
   searchInput: {
