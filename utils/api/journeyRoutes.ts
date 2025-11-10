@@ -79,8 +79,8 @@ function mapJourneyToSummary(j: Journey): RouteSummary {
 }
 
 // 목록
-export async function listRoutes(): Promise<RouteSummary[]> {
-  const res = await client.get("/v1/journeys");
+export async function listRoutes(category?: "DOMESTIC" | "INTERNATIONAL"): Promise<RouteSummary[]> {
+  const res = await client.get("/v1/journeys", { params: { category } });
   const arr: any[] = Array.isArray(res.data) ? res.data : res.data?.content ?? [];
   console.log('[JourneyRoutes] API Response Sample:', JSON.stringify(arr[0], null, 2));
   return arr.map((x: any) => mapJourneyToSummary({
