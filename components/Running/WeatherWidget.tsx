@@ -1,14 +1,7 @@
 // components/Running/WeatherWidget.tsx
 import React, { useState, useRef } from "react";
-import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  ActivityIndicator,
-  Animated,
-  Platform,
-} from "react-native";
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, Animated } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 interface WeatherWidgetProps {
   emoji?: string;
@@ -78,10 +71,19 @@ export default function WeatherWidget({
     );
   }
 
-  if (!emoji) {
-    console.log("[WeatherWidget] emoji 없음, 숨김");
-    return null;
-  }
+  const pickIcon = (): { name: any; color: string } => {
+    const c = (condition || "").toLowerCase();
+    const e = emoji || "";
+    if (/sun|clear|맑|화창/.test(c) || /☀️|🌞/.test(e)) return { name: "weather-sunny", color: "#FDB813" };
+    if (/partly|cloud|구름/.test(c) || /⛅️|☁️/.test(e)) return { name: "weather-partly-cloudy", color: "#e5e7eb" };
+    if (/rain|비/.test(c) || /🌧️|🌦️/.test(e)) return { name: "weather-rainy", color: "#60A5FA" };
+    if (/snow|눈/.test(c) || /❄️/.test(e)) return { name: "weather-snowy", color: "#93C5FD" };
+    if (/storm|thunder|번개/.test(c) || /⛈️|⚡️/.test(e)) return { name: "weather-lightning", color: "#F59E0B" };
+    if (/fog|mist|안개/.test(c) || /🌫️/.test(e)) return { name: "weather-fog", color: "#CBD5E1" };
+    if (/night|밤/.test(c) || /🌙/.test(e)) return { name: "weather-night", color: "#64748B" };
+    return { name: "weather-cloudy", color: "#e5e7eb" };
+  };
+  const icon = pickIcon();
 
   return (
     <Pressable onPress={toggleExpand}>
@@ -95,9 +97,9 @@ export default function WeatherWidget({
           },
         ]}
       >
-        {/* 왼쪽: 날씨 이모지 (항상 표시, 항상 불투명) */}
+        {/* 왼쪽: 날씨 아이콘 (항상 표시) */}
         <View style={{ opacity: 1 }}>
-          <Text style={styles.emoji}>{emoji}</Text>
+          <MaterialCommunityIcons name={icon.name} size={30} color={icon.color} />
         </View>
 
         {/* 오른쪽: 온도 & 추천 메시지 (확장 시에만 표시) */}
@@ -146,12 +148,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  emoji: {
-    fontSize: 30,
-    textShadowColor: "rgba(0, 0, 0, 0.3)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
+  
   infoContainer: {
     marginLeft: 8,
     flex: 1,
