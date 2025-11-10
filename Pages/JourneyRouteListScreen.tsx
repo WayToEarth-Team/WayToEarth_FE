@@ -13,7 +13,13 @@ import { Ionicons } from "@expo/vector-icons";
 export default function RouteListScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState("전체");
-  const { data: routes, loading } = useRouteList();
+  const selectedCategory = useMemo(() => {
+    if (activeTab === "국내 여행") return "DOMESTIC";
+    if (activeTab === "해외 여행") return "INTERNATIONAL";
+    return undefined; // "전체" 탭일 경우
+  }, [activeTab]);
+
+  const { data: routes, loading } = useRouteList(selectedCategory);
   const [journeyImages, setJourneyImages] = useState<Record<string, string[]>>({});
 
   const tabs = ["전체", "국내 여행", "해외 여행"];
@@ -23,8 +29,10 @@ export default function RouteListScreen({ navigation }: any) {
       case "쉬움":
         return colors.green;
       case "보통":
+      case "MEDIUM": // Add MEDIUM for consistency
         return colors.yellow;
       case "어려움":
+      case "HARD": // Add HARD for consistency
         return colors.red;
       default:
         return colors.gray500;
@@ -58,12 +66,8 @@ export default function RouteListScreen({ navigation }: any) {
     })();
   }, [routes]);
 
-  const filtered = useMemo(() => {
-    const list = (routes ?? []) as RouteSummary[];
-    if (activeTab === "전체") return list;
-    const want = activeTab === "국내 여행" ? "DOMESTIC" : "INTERNATIONAL";
-    return list.filter((r: any) => r?.category === want);
-  }, [routes, activeTab]);
+  // 필터링 로직은 이제 useRouteList 훅에서 처리하므로 제거
+  const filtered = routes;
 
   return (
     <SafeAreaView edges={["top"]} style={styles.container}>
