@@ -1,6 +1,14 @@
 // screens/WayToEarthOnboarding.tsx
 import React, { useEffect, useState } from "react";
-import { View, Text, StatusBar, StyleSheet, Dimensions, ActivityIndicator, NativeModules } from "react-native";
+import {
+  View,
+  Text,
+  StatusBar,
+  StyleSheet,
+  Dimensions,
+  ActivityIndicator,
+  NativeModules,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import KakaoLoginButton from "../components/KakaoLoginButton";
 import RunningManIcon from "../components/Running/RunningManIcon";
@@ -39,7 +47,9 @@ export default function WayToEarthOnboarding() {
 
           navigation.reset({
             index: 0,
-            routes: [{ name: "MainTabs", params: { screen: "LiveRunningScreen" } }],
+            routes: [
+              { name: "MainTabs", params: { screen: "LiveRunningScreen" } },
+            ],
           });
           return;
         }
@@ -53,7 +63,9 @@ export default function WayToEarthOnboarding() {
     // 개발 편의: 키해시 로그(선택)
     (async () => {
       try {
-        const hash = await (NativeModules as any)?.RNKakaoLogins?.getKeyHash?.();
+        const hash = await (
+          NativeModules as any
+        )?.RNKakaoLogins?.getKeyHash?.();
         if (__DEV__ && hash) console.log("Kakao KeyHash:", hash);
       } catch {}
     })();
@@ -64,48 +76,53 @@ export default function WayToEarthOnboarding() {
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <View style={styles.content}>
         {checking ? (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            <Text style={{ color: "#666", marginBottom: 12 }}>자동 로그인 확인중…</Text>
+          <View
+            style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+          >
+            <Text style={{ color: "#666", marginBottom: 12 }}>
+              자동 로그인 확인중…
+            </Text>
           </View>
         ) : (
           <>
-        <View style={styles.textContainer}>
-          <Text style={styles.mainTitle}>Way to Earth로</Text>
-          <Text style={styles.subTitle}>
-            <Text style={styles.highlight}>러닝</Text>을 재미있게
-          </Text>
-        </View>
+            <View style={styles.textContainer}>
+              <Text style={styles.mainTitle}>Way to Earth로</Text>
+              <Text style={styles.subTitle}>
+                <Text style={styles.highlight}>러닝</Text>을 재미있게
+              </Text>
+            </View>
 
-        <View style={styles.illustrationContainer}>
-          <RunningManIcon />
-        </View>
+            <View style={styles.illustrationContainer}>
+              <RunningManIcon />
+            </View>
 
-        <View style={styles.buttonContainer}>
-          <KakaoLoginButton
-            onPress={async () => {
-              try {
-                if (__DEV__) console.log("🔥 [TEST] 카카오 로그인 버튼 클릭됨");
-                setLogText("카카오 로그인 중…");
-                setLoginLoading(true);
-                await handleKakaoLogin();
-                setLogText("");
-              } catch (e) {
-                setLogText("로그인 실패");
-              } finally {
-                setLoginLoading(false);
-              }
-            }}
-          />
+            <View style={styles.buttonContainer}>
+              <KakaoLoginButton
+                onPress={async () => {
+                  try {
+                    if (__DEV__)
+                      console.log("🔥 [TEST] 카카오 로그인 버튼 클릭됨");
+                    setLogText("카카오 로그인 중…");
+                    setLoginLoading(true);
+                    await handleKakaoLogin();
+                    setLogText("");
+                  } catch (e) {
+                    setLogText("로그인 실패");
+                  } finally {
+                    setLoginLoading(false);
+                  }
+                }}
+              />
 
-          {/* 상태 메시지 */}
-          <View style={{ alignItems: "center", marginTop: 20 }}>
-            {loginLoading ? (
-              <ActivityIndicator size="small" color="#4A90E2" />
-            ) : (
-              <Text style={{ color: "#666", fontSize: 12 }}>{logText}</Text>
-            )}
-          </View>
-        </View>
+              {/* 상태 메시지 */}
+              <View style={{ alignItems: "center", marginTop: 20 }}>
+                {loginLoading ? (
+                  <ActivityIndicator size="small" color="#4A90E2" />
+                ) : (
+                  <Text style={{ color: "#666", fontSize: 12 }}>{logText}</Text>
+                )}
+              </View>
+            </View>
           </>
         )}
       </View>
