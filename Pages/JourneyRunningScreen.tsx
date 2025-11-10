@@ -143,7 +143,6 @@ export default function JourneyRunningScreen(props?: RouteParams) {
   const [landmarkMenuVisible, setLandmarkMenuVisible] = useState(false);
   const [menuLandmark, setMenuLandmark] = useState<any>(null);
   const [landmarkDetail, setLandmarkDetail] = useState<LandmarkDetail | null>(null);
-  const [debugVisible, setDebugVisible] = useState(true);
 
   // 랜드마크 메뉴가 열릴 때 상세 정보 로드
   useEffect(() => {
@@ -380,46 +379,6 @@ export default function JourneyRunningScreen(props?: RouteParams) {
     return `${m}:${s}`;
   }, [t.elapsedSec]);
 
-  // 디버깅: 여정 데이터 확인
-  console.log("[JourneyRunning] 여정 경로 개수:", journeyRoute.length);
-  console.log("[JourneyRunning] 총 여정 거리:", totalDistanceKm, "km");
-  console.log("[JourneyRunning] 랜드마크 개수:", landmarks.length);
-  console.log("[JourneyRunning] 랜드마크 목록:", landmarks.map(lm => ({
-    name: lm.name,
-    distanceM: lm.distanceM,
-    distanceKm: (lm.distanceM / 1000).toFixed(2) + "km",
-  })));
-
-  // 🔍 두 번째 랜드마크(예시) 위치 확인 로그
-  if (landmarks.length > 1) {
-    const landmark = landmarks[1]; // 청와대
-    console.log("[JourneyRunning] 🎯 두번째 랜드마크 위치:", {
-      position: landmark.position,
-      distanceM: landmark.distanceM,
-    });
-    // journeyRoute에서 청와대와 가장 가까운 포인트 찾기
-    let closestIndex = 0;
-    let minDist = 999999;
-    journeyRoute.forEach((point, idx) => {
-      const dist = Math.sqrt(
-        Math.pow(point.latitude - landmark.position.latitude, 2) +
-        Math.pow(point.longitude - landmark.position.longitude, 2)
-      );
-      if (dist < minDist) {
-        minDist = dist;
-        closestIndex = idx;
-      }
-    });
-    console.log("[JourneyRunning] 🗺️ 랜드마크가 여정 경로의 몇 번째 포인트?:", {
-      closestIndex,
-      totalPoints: journeyRoute.length,
-      percentage: ((closestIndex / (journeyRoute.length - 1)) * 100).toFixed(1) + "%",
-    });
-  }
-
-  console.log("[JourneyRunning] 사용자 경로 개수:", t.route.length);
-  console.log("[JourneyRunning] 진행률:", t.progressPercent.toFixed(1), "%");
-
   // 진행률에 따른 여정 경로 상의 가상 위치 계산 (거리 기반으로 수정)
   const virtualLocation = useMemo(() => {
     if (!t.progressReady) return null; // 진행률 로드 전에는 계산 생략
@@ -502,15 +461,6 @@ export default function JourneyRunningScreen(props?: RouteParams) {
           segmentStartIdx = 0; // 첫 번째 구간의 시작은 0
         }
 
-        console.log("[JourneyRunning] 🔍 구간 찾기:", {
-          landmarkIndex: i,
-          landmarkName: landmark.name,
-          segmentStartIdx,
-          segmentEndIdx,
-          currentSegmentStart,
-          currentSegmentEnd,
-        });
-
         break;
       }
     }
@@ -546,16 +496,6 @@ export default function JourneyRunningScreen(props?: RouteParams) {
       latitude: pointA.latitude + (pointB.latitude - pointA.latitude) * ratio,
       longitude: pointA.longitude + (pointB.longitude - pointA.longitude) * ratio,
     };
-
-    console.log("[JourneyRunning] 가상 위치 계산 (거리 기반):", {
-      progressM: t.progressM,
-      segmentStart: currentSegmentStart,
-      segmentEnd: currentSegmentEnd,
-      segmentRatio: segmentRatio.toFixed(4),
-      exactIndex: exactIndex.toFixed(4),
-      beforeIndex,
-      afterIndex,
-    });
 
     return {
       location: interpolated,
@@ -607,50 +547,6 @@ export default function JourneyRunningScreen(props?: RouteParams) {
           loading={weatherLoading}
         />
       </View>
-
-      {/* 진행률 디버그 로그 오버레이 */}
-      {debugVisible && (
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            left: 12,
-            right: 12,
-            bottom: 140,
-            borderRadius: 8,
-            backgroundColor: "rgba(0,0,0,0.55)",
-            padding: 10,
-          }}
-        >
-          <Text style={{ color: "#9AE6B4", fontWeight: "800", marginBottom: 6 }}>[Progress Debug]</Text>
-          <Text style={{ color: "#E5E7EB", fontSize: 12 }}>percent: {t.progressPercent.toFixed(2)}%</Text>
-          <Text style={{ color: "#E5E7EB", fontSize: 12 }}>progressM: {Math.round(t.progressM)} m</Text>
-          <Text style={{ color: "#E5E7EB", fontSize: 12 }}>session: {(t.distance * 1000).toFixed(0)} m, elapsed: {t.elapsedSec}s, pace: {t.paceLabel}</Text>
-          {t.nextLandmark && (
-            <Text style={{ color: "#E5E7EB", fontSize: 12 }}>
-              next: {t.nextLandmark.name} ({(t.nextLandmark.distanceM / 1000).toFixed(2)} km)
-            </Text>
-          )}
-        </View>
-      )}
-
-      {/* 디버그 토글 버튼 */}
-      <Pressable
-        onPress={() => setDebugVisible((v) => !v)}
-        style={{
-          position: "absolute",
-          right: 12,
-          bottom: 100,
-          backgroundColor: debugVisible ? "#111827" : "#6B7280",
-          paddingHorizontal: 10,
-          paddingVertical: 6,
-          borderRadius: 12,
-          opacity: 0.85,
-        }}
-        accessibilityLabel="디버그 로그 토글"
-      >
-        <Text style={{ color: "#fff", fontWeight: "800" }}>{debugVisible ? "LOG ON" : "LOG OFF"}</Text>
-      </Pressable>
 
       {/* 러닝 중이 아닐 때: 여정 진행률 카드 */}
       {!t.isRunning && !t.isPaused && t.progressReady && (
@@ -711,12 +607,6 @@ export default function JourneyRunningScreen(props?: RouteParams) {
                 다음: {t.nextLandmark.name} (
                 {(() => {
                   const remaining = (t.nextLandmark.distanceM - t.progressM) / 1000;
-                  console.log("[JourneyRunning] 랜드마크 거리 계산:", {
-                    landmarkName: t.nextLandmark.name,
-                    landmarkDistanceM: t.nextLandmark.distanceM,
-                    progressM: t.progressM,
-                    remainingKm: remaining.toFixed(3),
-                  });
                   return remaining.toFixed(1);
                 })()}{" "}
                 km)
@@ -769,71 +659,6 @@ export default function JourneyRunningScreen(props?: RouteParams) {
           </Pressable>
         </View>
       )}
-
-      {/* 🧪 테스트 버튼 (거리 증가) */}
-      <View style={styles.testButtonContainer}>
-        <Pressable
-          onPress={() => t.addTestDistance(1)}
-          style={styles.testButton}
-        >
-          <Text style={styles.testButtonText}>+1m</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => t.addTestDistance(5)}
-          style={styles.testButton}
-        >
-          <Text style={styles.testButtonText}>+5m</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => t.addTestDistance(10)}
-          style={styles.testButton}
-        >
-          <Text style={styles.testButtonText}>+10m</Text>
-        </Pressable>
-      </View>
-
-      {/* 서버 진행률 동기화(가상 주입) */}
-      <View style={[styles.testButtonContainer, { top: undefined, bottom: 160 }]}>
-        <Pressable
-          onPress={async () => {
-            try {
-              const r = await (t as any).syncServerProgress?.(50);
-              Alert.alert('서버 동기화', `+50m 반영됨. 진행 ${(r?.percent ?? 0).toFixed(2)}%`);
-            } catch (e: any) {
-              Alert.alert('실패', e?.response?.data?.message || '서버 반영 실패');
-            }
-          }}
-          style={styles.testButton}
-        >
-          <Text style={styles.testButtonText}>srv +50m</Text>
-        </Pressable>
-        <Pressable
-          onPress={async () => {
-            try {
-              const r = await (t as any).syncServerProgress?.(200);
-              Alert.alert('서버 동기화', `+200m 반영됨. 진행 ${(r?.percent ?? 0).toFixed(2)}%`);
-            } catch (e: any) {
-              Alert.alert('실패', e?.response?.data?.message || '서버 반영 실패');
-            }
-          }}
-          style={styles.testButton}
-        >
-          <Text style={styles.testButtonText}>srv +200m</Text>
-        </Pressable>
-        <Pressable
-          onPress={async () => {
-            try {
-              const r = await (t as any).refreshProgress?.();
-              Alert.alert('진행 재조회', `서버 진행 ${(r?.percent ?? 0).toFixed(2)}%`);
-            } catch (e: any) {
-              Alert.alert('실패', e?.response?.data?.message || '진행 재조회 실패');
-            }
-          }}
-          style={styles.testButton}
-        >
-          <Text style={styles.testButtonText}>srv refresh</Text>
-        </Pressable>
-      </View>
 
       {/* 러닝 제어 버튼 (러닝 중) */}
       {t.isRunning && (
@@ -1084,30 +909,6 @@ const styles = StyleSheet.create({
   compactNextLandmark: {
     fontSize: 12,
     color: "#4B5563",
-  },
-  testButtonContainer: {
-    position: "absolute",
-    top: 120,
-    right: 16,
-    flexDirection: "column",
-    gap: 8,
-    zIndex: 1000,
-  },
-  testButton: {
-    backgroundColor: "#FF6B6B",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-  },
-  testButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "700",
   },
   modalOverlay: {
     flex: 1,
