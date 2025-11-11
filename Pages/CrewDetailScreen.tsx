@@ -361,11 +361,23 @@ export default function CrewDetailScreen() {
     if (!date) return "러닝기록 없음";
     const runningDate = new Date(date);
     if (isNaN(runningDate.getTime())) return "-";
+
     const now = new Date();
-    const diffMs = now.getTime() - runningDate.getTime();
+
+    // 로컬 타임존 기준으로 날짜만 추출 (시간 정보 제거)
+    const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const runningDateOnly = new Date(
+      runningDate.getFullYear(),
+      runningDate.getMonth(),
+      runningDate.getDate()
+    );
+
+    const diffMs = nowDateOnly.getTime() - runningDateOnly.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
     if (diffDays === 0) return "오늘";
     if (diffDays === 1) return "어제";
+    if (diffDays < 0) return "오늘"; // 미래 시간일 경우 (서버-클라이언트 시간 차이)
     if (diffDays <= 7) return `${diffDays}일전`;
     return runningDate.toLocaleDateString("ko-KR");
   }
