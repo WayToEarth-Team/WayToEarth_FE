@@ -39,7 +39,11 @@ export default function TopCrewItem({
     <TouchableOpacity style={s.wrap} onPress={onPress} activeOpacity={0.8}>
       {/* 등수 뱃지 */}
       <View style={[s.rankBadge, { backgroundColor: borderColor }]}>
-        <Text style={s.rankBadgeText}>{rankNum}</Text>
+        <Ionicons
+          name={rankNum === 1 ? "trophy" : "medal"}
+          size={16}
+          color="#fff"
+        />
       </View>
 
       {/* 프로필 이미지 */}
@@ -111,23 +115,15 @@ const s = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#fff",
   },
-  rankBadgeText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "800",
-    textAlign: "center",
-  },
+  rankBadgeText: { color: "#fff", fontSize: 14, fontWeight: "800", textAlign: "center" },
   name: {
-    color: "#fff",
+    color: "#0F172A",
     fontSize: 12,
     fontWeight: "700",
     maxWidth: 92,
     textAlign: "center",
     marginTop: 2,
     marginBottom: 4,
-    textShadowColor: "rgba(0, 0, 0, 0.3)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   nameLarge: {
     fontSize: 14,

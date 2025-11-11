@@ -23,6 +23,7 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import CreateCrewDrawer from "../components/Crew/CreateCrewDrawer";
 import CrewPreviewDrawer from "../components/Crew/CrewPreviewDrawer";
 import CrewDetailModal from "../components/Crew/CrewDetailModal";
+import { LinearGradient } from "expo-linear-gradient";
 
 export default function CrewScreen() {
   const [search, setSearch] = useState("");
@@ -63,27 +64,10 @@ export default function CrewScreen() {
   return (
     <SafeAreaView style={s.safeContainer}>
       <StatusBar
-        barStyle="dark-content"
-        backgroundColor="#FFFFFF"
-        translucent={false}
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent={true}
       />
-
-      {/* 상단 헤더 */}
-      <View style={s.header}>
-        {/* 검색바 */}
-        <View style={s.searchContainer}>
-          <View style={s.searchBox}>
-            <TextInput
-              style={s.searchInput}
-              value={search}
-              onChangeText={setSearch}
-              placeholder="대회, 러닝크루 검색"
-              placeholderTextColor="#9CA3AF"
-            />
-            <Ionicons name="search" size={20} color="#9CA3AF" />
-          </View>
-        </View>
-      </View>
 
       <ScrollView
         style={{ flex: 1 }}
@@ -99,6 +83,143 @@ export default function CrewScreen() {
         }}
         scrollEventThrottle={400}
       >
+        {/* 🏆 TOP 3 랭킹 섹션 - 그라데이션 배경 */}
+        {topCrews && topCrews.length > 0 && (
+          <LinearGradient
+            colors={["#F8FAFC", "#FFFFFF"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={s.rankingSection}
+          >
+            {/* 헤더 */}
+            <View style={s.rankingHeader}>
+              <View style={s.rankingTitleWrap}>
+                <Ionicons name="trophy" size={28} color="#F59E0B" />
+                <Text style={s.rankingTitle}>이달의 TOP 크루</Text>
+              </View>
+              <TouchableOpacity
+                style={s.viewAllBtn}
+                onPress={() => navigation.navigate("CrewRanking")}
+              >
+                <Text style={s.viewAllText}>전체보기</Text>
+                <Ionicons name="chevron-forward" size={16} color="#6366F1" />
+              </TouchableOpacity>
+            </View>
+
+            {/* TOP 포디움: 항목 2개일 때 동일 크기/정렬 */}
+            {topCrews.length === 2 ? (
+              <View style={s.podiumContainer}>
+                {[0, 1].map((idx) => (
+                  <View key={topCrews[idx].id} style={s.podiumItem}>
+                    <TopCrewItem
+                      rank={String(idx + 1)}
+                      name={topCrews[idx].name}
+                      distance={topCrews[idx].distance}
+                      image={
+                        topCrews[idx].imageUrl
+                          ? { uri: topCrews[idx].imageUrl as string }
+                          : undefined
+                      }
+                      size="md"
+                    />
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={s.podiumContainer}>
+                {/* 2위 */}
+                {topCrews[1] && (
+                  <View style={s.podiumItem}>
+                    <TopCrewItem
+                      rank="2"
+                      name={topCrews[1].name}
+                      distance={topCrews[1].distance}
+                      image={
+                        topCrews[1].imageUrl
+                          ? { uri: topCrews[1].imageUrl }
+                          : undefined
+                      }
+                      size="md"
+                    />
+                  </View>
+                )}
+
+                {/* 1위 - 중앙, 더 크게 */}
+                {topCrews[0] && (
+                  <View style={[s.podiumItem, s.podiumFirst]}>
+                    <TopCrewItem
+                      rank="1"
+                      name={topCrews[0].name}
+                      distance={topCrews[0].distance}
+                      image={
+                        topCrews[0].imageUrl
+                          ? { uri: topCrews[0].imageUrl }
+                          : undefined
+                      }
+                      size="lg"
+                    />
+                  </View>
+                )}
+
+                {/* 3위 */}
+                {topCrews[2] && (
+                  <View style={s.podiumItem}>
+                    <TopCrewItem
+                      rank="3"
+                      name={topCrews[2].name}
+                      distance={topCrews[2].distance}
+                      image={
+                        topCrews[2].imageUrl
+                          ? { uri: topCrews[2].imageUrl }
+                          : undefined
+                      }
+                      size="sm"
+                    />
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* 4~10위 리스트 */}
+            {topCrews.length > 3 && (
+              <View style={s.rankingList}>
+                {topCrews.slice(3, 10).map((crew, idx) => (
+                  <View key={crew.id} style={s.rankingListItem}>
+                    <View style={s.rankingLeft}>
+                      <View style={s.rankNumberBadge}>
+                        <Text style={s.rankNumberText}>{idx + 4}</Text>
+                      </View>
+                      <Text style={s.rankingCrewName} numberOfLines={1}>
+                        {crew.name}
+                      </Text>
+                    </View>
+                    <View style={s.rankingRight}>
+                      <Text style={s.rankingDistance}>
+                        {String(crew.distance || "0km").replace(/[^\d.]/g, "")}
+                      </Text>
+                      <Text style={s.rankingUnit}>km</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </LinearGradient>
+        )}
+
+        {/* 검색바 */}
+        <View style={s.searchContainer}>
+          <View style={s.searchBox}>
+            <Ionicons name="search" size={20} color="#9CA3AF" />
+            <TextInput
+              style={s.searchInput}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="대회, 러닝크루 검색"
+              placeholderTextColor="#9CA3AF"
+            />
+          </View>
+        </View>
+
         {/* 크루 둘러보기 섹션 */}
         <View style={s.content}>
           <View style={s.sectionHeader}>
@@ -130,9 +251,7 @@ export default function CrewScreen() {
             </TouchableOpacity>
           )}
 
-          {/* 내 크루 별도 카드 제거: 그리드 첫 번째로 통합 */}
-
-          {/* 크루 목록: 2열 그리드 (이름 + 인원 + 프사) */}
+          {/* 크루 목록: 2열 그리드 */}
           <View style={s.gridWrap}>
             {(myCrew ? [myCrew, ...crews] : crews).map((c, idx) => {
               const isMine = Boolean(myCrew) && idx === 0;
@@ -187,7 +306,6 @@ export default function CrewScreen() {
         onSubmit={async (name, description) => {
           try {
             if (!name?.trim()) return;
-            // 이미 내 크루가 있는 경우: 생성 불가 커스텀 메시지
             if (myCrew) {
               setDialog({
                 open: true,
@@ -370,62 +488,117 @@ export default function CrewScreen() {
 }
 
 const s = StyleSheet.create({
-  safeContainer: { flex: 1, backgroundColor: "#FFFFFF" },
-  header: {
-    marginTop: 15,
-    backgroundColor: "#fff",
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-  },
-  rankingWrap: {
+  safeContainer: { flex: 1, backgroundColor: "#F9FAFB" },
+
+  // 🏆 랭킹 섹션
+  rankingSection: {
+    paddingTop: 60, // StatusBar 공간
+    paddingBottom: 32,
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 16,
   },
   rankingHeader: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
+    marginBottom: 24,
+  },
+  rankingTitleWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   rankingTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#1F2937",
-    letterSpacing: -0.3,
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#0F172A",
+    letterSpacing: -0.5,
   },
-  topItemsContainer: {
+  viewAllBtn: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  topItemWrap: { width: "32%", alignItems: "center" },
-  headerTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    gap: 4,
   },
-  logo: {
-    width: 40,
-    height: 40,
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#6366F1",
   },
-  headerRight: {
+
+  // 포디움
+  podiumContainer: {
     flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "flex-end",
     gap: 12,
+    marginBottom: 24,
   },
-  iconBtn: {
-    width: 40,
-    height: 40,
+  podiumItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  podiumFirst: {
+    marginBottom: 20, // 1위를 살짝 위로
+  },
+
+  // 4~10위 리스트
+  rankingList: {
+    gap: 8,
+  },
+  rankingListItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  rankingLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  rankNumberBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#E2E8F0",
     alignItems: "center",
     justifyContent: "center",
   },
+  rankNumberText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  rankingCrewName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1F2937",
+    flex: 1,
+  },
+  rankingRight: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 2,
+  },
+  rankingDistance: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  rankingUnit: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+
+  // 검색바
   searchContainer: {
     paddingHorizontal: 20,
-    marginBottom: 16,
+    paddingVertical: 16,
+    backgroundColor: "#FFFFFF",
   },
   searchBox: {
     flexDirection: "row",
@@ -433,7 +606,7 @@ const s = StyleSheet.create({
     backgroundColor: "#F3F4F6",
     borderRadius: 24,
     paddingHorizontal: 16,
-    paddingVertical: 3,
+    paddingVertical: 12,
     gap: 8,
   },
   searchInput: {
@@ -441,47 +614,11 @@ const s = StyleSheet.create({
     fontSize: 15,
     color: "#1F2937",
   },
-  regionScroll: {
-    paddingLeft: 20,
-  },
-  regionContainer: {
-    paddingRight: 20,
-    gap: 8,
-  },
-  regionChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#fff",
-  },
-  regionChipActive: {
-    borderColor: "#6366F1",
-    backgroundColor: "#EEF2FF",
-  },
-  regionIcon: {
-    width: 20,
-    height: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  regionEmoji: {
-    fontSize: 16,
-  },
-  regionText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#6B7280",
-  },
-  regionTextActive: {
-    color: "#6366F1",
-  },
+
+  // 크루 둘러보기
   content: {
     padding: 20,
+    backgroundColor: "#FFFFFF",
   },
   sectionHeader: {
     flexDirection: "row",
@@ -509,10 +646,6 @@ const s = StyleSheet.create({
   emptyContent: {
     alignItems: "center",
   },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
   emptyTitle: {
     fontSize: 16,
     fontWeight: "700",
@@ -538,82 +671,6 @@ const s = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-  },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    justifyContent: "space-between",
-  },
-  crewCard: {
-    width: "48%",
-    aspectRatio: 1,
-    borderRadius: 16,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  cardContent: {
-    padding: 16,
-    flex: 1,
-    justifyContent: "space-between",
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  regionBadge: {
-    backgroundColor: "#6366F1",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  regionBadgeDark: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-  },
-  regionBadgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  regionBadgeTextDark: {
-    color: "#fff",
-  },
-  bookmarkBtn: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  crewName: {
-    fontSize: 28,
-    fontWeight: "900",
-    color: "#1F2937",
-    marginBottom: 4,
-    letterSpacing: -1,
-  },
-  crewNameDark: {
-    color: "#fff",
-  },
-  crewInfo: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginBottom: 4,
-  },
-  crewInfoDark: {
-    color: "rgba(255, 255, 255, 0.7)",
-  },
-  crewTime: {
-    fontSize: 11,
-    color: "#9CA3AF",
-  },
-  crewTimeDark: {
-    color: "rgba(255, 255, 255, 0.6)",
   },
   loadingMore: {
     paddingVertical: 20,
