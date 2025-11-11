@@ -619,21 +619,6 @@ export default function CrewDetailScreen() {
               </View>
             )}
             {/* 크루 통계 */}
-            <View style={s.statsSection}>
-              {/* <View style={s.statsSectionHeader}>
-                <Text style={s.statsSectionTitle}>크루 통계</Text>
-                <View style={s.filterButtons}>
-                  <TouchableOpacity style={s.filterBtn}>
-                    <Text style={s.filterBtnText}>주간</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.filterBtnInactive}>
-                    <Text style={s.filterBtnInactiveText}>월간</Text>
-                  </TouchableOpacity>
-                </View>
-              </View> */}
-
-              {/* 월간 요약을 추가 카드로 확장하려면 여기서 확장 */}
-            </View>
 
             {/* MVP 섹션 */}
             {mvpMember && (
@@ -727,7 +712,11 @@ export default function CrewDetailScreen() {
                       )}
                     </View>
                     <View style={s.memberTextInfo}>
-                      <Text style={s.memberName}>
+                      <Text
+                        style={s.memberName}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
                         {m.nickname}
                         {m.role === "ADMIN" && (
                           <Text style={s.adminBadge}> 관리자</Text>
@@ -739,7 +728,53 @@ export default function CrewDetailScreen() {
                     </View>
                   </View>
                   {isAdmin && !isSelf && (
-                    <View style={{ flexDirection: "row", gap: 8 }}>
+                    <View style={s.actionGroup}>
+                      {/* 내보내기 버튼을 왼쪽에 */}
+                      {m.role !== "ADMIN" && (
+                        <TouchableOpacity
+                          style={s.roundIconBtn}
+                          onPress={() => {
+                            setConfirm({
+                              open: true,
+                              title: "확인",
+                              message: `${m.nickname} 님을 내보낼까요?`,
+                              destructive: true,
+                              onConfirm: async () => {
+                                try {
+                                  await removeMember(crewId, m.id);
+                                  setAlert({
+                                    open: true,
+                                    kind: "positive",
+                                    title: "완료",
+                                    message: `${m.nickname} 님을 내보냈습니다.`,
+                                  });
+                                  await refresh({ silent: true });
+                                } catch (e: any) {
+                                  const msg =
+                                    e?.response?.data?.message ||
+                                    e?.message ||
+                                    "내보내기에 실패했습니다.";
+                                  setAlert({
+                                    open: true,
+                                    kind: "negative",
+                                    title: "오류",
+                                    message: msg,
+                                  });
+                                }
+                              },
+                            });
+                          }}
+                          accessibilityLabel="내보내기"
+                        >
+                          <Ionicons
+                            name="person-remove-outline"
+                            size={18}
+                            color="#EF4444"
+                          />
+                        </TouchableOpacity>
+                      )}
+
+                      {/* 매니저 임명/해제 아이콘을 그 오른쪽에 */}
                       {m.role !== "ADMIN" ? (
                         <TouchableOpacity
                           style={s.roundIconBtn}
@@ -783,6 +818,8 @@ export default function CrewDetailScreen() {
                           <Ionicons name="star" size={18} color="#6B7280" />
                         </TouchableOpacity>
                       )}
+
+                      {/* 권한 이임(ADMIN일 때만) */}
                       {m.role === "ADMIN" && (
                         <TouchableOpacity
                           style={s.roundIconBtn}
@@ -804,30 +841,6 @@ export default function CrewDetailScreen() {
                             name="swap-horizontal"
                             size={18}
                             color="#3B82F6"
-                          />
-                        </TouchableOpacity>
-                      )}
-                      {m.role !== "ADMIN" && (
-                        <TouchableOpacity
-                          style={s.roundIconBtn}
-                          onPress={() => {
-                            setConfirm({
-                              open: true,
-                              title: "확인",
-                              message: `${m.nickname} 님을 내보낼까요?`,
-                              destructive: true,
-                              onConfirm: async () => {
-                                await removeMember(crewId, m.id);
-                                await refresh({ silent: true });
-                              },
-                            });
-                          }}
-                          accessibilityLabel="내보내기"
-                        >
-                          <Ionicons
-                            name="person-remove"
-                            size={18}
-                            color="#EF4444"
                           />
                         </TouchableOpacity>
                       )}
@@ -1317,7 +1330,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F3F4F6",
   },
-  memberInfo: { flexDirection: "row", alignItems: "center" },
+  memberInfo: { flexDirection: "row", alignItems: "center", flex: 1 },
   memberAvatarContainer: {
     width: 40,
     height: 40,
@@ -1338,9 +1351,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  memberTextInfo: {
-    flex: 1,
-  },
+  memberTextInfo: { flex: 1, flexShrink: 1 },
   memberName: { fontSize: 15, color: "#111827", fontWeight: "500" },
   memberSub: { fontSize: 12, color: "#6B7280", marginTop: 2 },
   adminBadge: {
@@ -1356,6 +1367,12 @@ const s = StyleSheet.create({
   },
   kickBtnText: { color: "#111827", fontSize: 13, fontWeight: "600" },
   roundIconBtn: { backgroundColor: "#F3F4F6", padding: 8, borderRadius: 999 },
+  actionGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexShrink: 0,
+  },
 
   // 설정 섹션
   settingsSection: {
