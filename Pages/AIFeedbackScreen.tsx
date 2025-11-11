@@ -1,29 +1,37 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, StatusBar, ActivityIndicator, TouchableOpacity, Alert, ScrollView } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  View,
+  Text,
+  StyleSheet,
+  StatusBar,
+  ActivityIndicator,
+  TouchableOpacity,
+  ScrollView,
+} from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   getOrCreateOverallFeedback,
   getFriendlyErrorMessage,
   AIFeedback,
 } from "../utils/api/aiFeedback";
 import { client } from "../utils/api/client";
+import Markdown from "../components/Common/Markdown";
 
 type AIFeedbackScreenProps = {
   route: {
     params: {
-      completedCount?: number; // 완료된 러닝 기록 수 (에러 메시지용)
-      latestRecordId?: number; // 최근 레코드 ID (RecordScreen에서 전달)
+      completedCount?: number;
+      latestRecordId?: number;
     };
   };
   navigation: any;
 };
 
-/**
- * AI 피드백 화면
- * - 최근 10개 러닝 기록에 대한 전체 AI 분석 결과를 표시
- * - GET으로 조회 시도 후 없으면 POST로 새로 생성
- * - 로딩 상태 표시 (POST는 2-5초 소요)
- */
 const AIFeedbackScreen: React.FC<AIFeedbackScreenProps> = ({
   route,
   navigation,
@@ -45,17 +53,20 @@ const AIFeedbackScreen: React.FC<AIFeedbackScreenProps> = ({
       setLoading(true);
       setError(null);
 
-      // latestRecordId가 있으면 직접 사용, 없으면 getOrCreateOverallFeedback 사용
       let result;
       if (latestRecordId) {
         console.log("[AI Feedback] 전달받은 레코드 ID 사용:", latestRecordId);
         try {
-          const feedback = await client.get(`/v1/running/analysis/${latestRecordId}`).then(res => res.data);
+          const feedback = await client
+            .get(`/v1/running/analysis/${latestRecordId}`)
+            .then((res) => res.data);
           result = { feedback, wasCreated: false };
         } catch (err: any) {
           if (err?.response?.status === 404 || err?.response?.status === 400) {
             setLoading(true);
-            const feedback = await client.post(`/v1/running/analysis/${latestRecordId}`).then(res => res.data);
+            const feedback = await client
+              .post(`/v1/running/analysis/${latestRecordId}`)
+              .then((res) => res.data);
             result = { feedback, wasCreated: true };
           } else {
             throw err;
@@ -84,14 +95,31 @@ const AIFeedbackScreen: React.FC<AIFeedbackScreenProps> = ({
 
   if (loading) {
     return (
-      <SafeAreaView edges={["top"]} style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#000" />
-          <Text style={styles.loadingText}>
-            AI가 러닝 기록을 분석하고 있어요...
+      <SafeAreaView edges={["top"]} style={s.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <View style={s.centerContainer}>
+          <LinearGradient
+            colors={["#6366F1", "#8B5CF6"]}
+            style={s.loadingGradient}
+          >
+            <View style={s.loadingIconBox}>
+              <Ionicons name="analytics" size={48} color="#FFFFFF" />
+            </View>
+          </LinearGradient>
+          <ActivityIndicator
+            size="large"
+            color="#6366F1"
+            style={s.loadingSpinner}
+          />
+          <Text style={s.loadingTitle}>AI가 분석 중이에요</Text>
+          <Text style={s.loadingSubtitle}>
+            러닝 기록을 꼼꼼히 분석하고 있어요
           </Text>
-          <Text style={styles.loadingSubText}>2-5초 정도 소요돼요</Text>
+          <View style={s.loadingDots}>
+            <View style={s.dot} />
+            <View style={[s.dot, s.dotDelay1]} />
+            <View style={[s.dot, s.dotDelay2]} />
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -99,19 +127,23 @@ const AIFeedbackScreen: React.FC<AIFeedbackScreenProps> = ({
 
   if (error) {
     return (
-      <SafeAreaView edges={["top"]} style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-        <View style={styles.centerContainer}>
-          <Text style={styles.errorIcon}>😅</Text>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={retry}>
-            <Text style={styles.retryButtonText}>다시 시도</Text>
+      <SafeAreaView edges={["top"]} style={s.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <View style={s.centerContainer}>
+          <View style={s.errorIconBox}>
+            <Ionicons name="alert-circle-outline" size={64} color="#EF4444" />
+          </View>
+          <Text style={s.errorTitle}>분석을 완료하지 못했어요</Text>
+          <Text style={s.errorMessage}>{error}</Text>
+          <TouchableOpacity style={s.retryButton} onPress={retry}>
+            <Ionicons name="refresh" size={20} color="#FFFFFF" />
+            <Text style={s.retryButtonText}>다시 시도</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.cancelButton}
+            style={s.cancelButton}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.cancelButtonText}>돌아가기</Text>
+            <Text style={s.cancelButtonText}>돌아가기</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -119,279 +151,504 @@ const AIFeedbackScreen: React.FC<AIFeedbackScreenProps> = ({
   }
 
   return (
-    <SafeAreaView edges={["top"]} style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <SafeAreaView edges={["top"]} style={s.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>←</Text>
+      <View style={s.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={s.backButton}
+        >
+          <Ionicons name="arrow-back" size={24} color="#0F172A" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>AI 코치의 피드백</Text>
-        <View style={{ width: 40 }} />
+        <View style={s.headerTitleBox}>
+          <Ionicons name="sparkles" size={20} color="#6366F1" />
+          <Text style={s.headerTitle}>AI 코치</Text>
+        </View>
+        <View style={s.headerRight} />
       </View>
 
       <ScrollView
-        style={styles.scrollView}
+        style={s.scrollView}
         contentContainerStyle={[
-          styles.scrollContent,
+          s.scrollContent,
           { paddingBottom: Math.max(120, insets.bottom + 140) },
         ]}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Feedback Card */}
-        <View style={styles.feedbackCard}>
-          <View style={styles.iconContainer}>
-            <Text style={styles.robotIcon}>🤖</Text>
+        {/* New Badge */}
+        {wasCreated && (
+          <View style={s.newBadgeContainer}>
+            <LinearGradient
+              colors={["#6366F1", "#8B5CF6"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={s.newBadge}
+            >
+              <Ionicons name="sparkles" size={14} color="#FFFFFF" />
+              <Text style={s.newBadgeText}>새로운 분석</Text>
+            </LinearGradient>
           </View>
+        )}
 
-          <Text style={styles.feedbackContent}>{feedback?.feedbackContent}</Text>
-
-          <View style={styles.metaContainer}>
-            <Text style={styles.metaText}>
-              {new Date(feedback?.createdAt ?? "").toLocaleDateString("ko-KR", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            </Text>
-            <Text style={styles.metaText}>•</Text>
-            <Text style={styles.metaText}>{feedback?.modelName}</Text>
-          </View>
-
-          {wasCreated && (
-            <View style={styles.newBadge}>
-              <Text style={styles.newBadgeText}>새로 생성됨</Text>
+        {/* Main Feedback Card */}
+        <View style={s.feedbackCard}>
+          <View style={s.aiHeader}>
+            <LinearGradient colors={["#6366F1", "#8B5CF6"]} style={s.aiIconBox}>
+              <Ionicons name="flash" size={24} color="#FFFFFF" />
+            </LinearGradient>
+            <View style={s.aiHeaderText}>
+              <Text style={s.aiTitle}>AI 코치의 분석</Text>
+              <Text style={s.aiSubtitle}>당신의 러닝 패턴 분석 결과</Text>
             </View>
-          )}
+          </View>
+
+          <View style={s.feedbackContent}>
+            {!!feedback?.feedbackContent && (
+              <Markdown content={feedback.feedbackContent} />
+            )}
+          </View>
+
+          <View style={s.metaRow}>
+            <View style={s.metaItem}>
+              <Ionicons name="calendar-outline" size={14} color="#94A3B8" />
+              <Text style={s.metaText}>
+                {new Date(feedback?.createdAt ?? "").toLocaleDateString(
+                  "ko-KR",
+                  {
+                    month: "long",
+                    day: "numeric",
+                  }
+                )}
+              </Text>
+            </View>
+            <View style={s.metaDivider} />
+            <View style={s.metaItem}>
+              <Ionicons name="cube-outline" size={14} color="#94A3B8" />
+              <Text style={s.metaText}>{feedback?.modelName}</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Goal Card */}
-        <View style={styles.goalCard}>
-          <Text style={styles.goalTitle}>🎯 다음 목표</Text>
-          <Text style={styles.goalText}>
+        {/* Goal Section */}
+        <View style={s.sectionHeader}>
+          <Ionicons name="flag" size={20} color="#0F172A" />
+          <Text style={s.sectionTitle}>다음 목표</Text>
+        </View>
+        <View style={s.goalCard}>
+          <LinearGradient
+            colors={["#FEF3C7", "#FDE68A"]}
+            style={s.goalGradient}
+          >
+            <Ionicons name="trophy" size={32} color="#F59E0B" />
+          </LinearGradient>
+          <Text style={s.goalText}>
             꾸준히 성장하고 있으니 이 페이스를 유지하세요!
           </Text>
         </View>
 
-        {/* Info */}
-        <View style={styles.infoCard}>
-          <Text style={styles.infoText}>
-            💡 AI 분석은 과거 최대 10개의 러닝 기록과 비교하여 성장 패턴을
-            분석해요.
-          </Text>
-          <Text style={styles.infoText}>
-            📊 하루에 최대 10번까지 분석할 수 있어요.
-          </Text>
+        {/* Tips Section */}
+        <View style={s.sectionHeader}>
+          <Ionicons name="bulb" size={20} color="#0F172A" />
+          <Text style={s.sectionTitle}>알아두세요</Text>
+        </View>
+        <View style={s.tipsContainer}>
+          <View style={s.tipCard}>
+            <View style={s.tipIconBox}>
+              <Ionicons name="bar-chart" size={20} color="#6366F1" />
+            </View>
+            <Text style={s.tipText}>
+              최근 10개의 러닝 기록을 분석하여 성장 패턴을 파악해요
+            </Text>
+          </View>
+          <View style={s.tipCard}>
+            <View style={s.tipIconBox}>
+              <Ionicons name="time" size={20} color="#6366F1" />
+            </View>
+            <Text style={s.tipText}>
+              하루 최대 10번까지 AI 분석을 받을 수 있어요
+            </Text>
+          </View>
+          <View style={s.tipCard}>
+            <View style={s.tipIconBox}>
+              <Ionicons name="trending-up" size={20} color="#6366F1" />
+            </View>
+            <Text style={s.tipText}>
+              꾸준히 기록하면 더 정확한 분석을 받을 수 있어요
+            </Text>
+          </View>
         </View>
       </ScrollView>
 
       {/* Bottom Button */}
-      <View style={[styles.bottomContainer, { paddingBottom: Math.max(20, insets.bottom + 12) }]}>
+      <View
+        style={[
+          s.bottomContainer,
+          { paddingBottom: Math.max(20, insets.bottom + 12) },
+        ]}
+      >
         <TouchableOpacity
-          style={styles.closeButton}
+          style={s.closeButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.closeButtonText}>닫기</Text>
+          <Text style={s.closeButtonText}>확인</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#F8FAFC",
   },
+
+  // Header
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 16,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitleBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F172A",
+    letterSpacing: -0.5,
+  },
+  headerRight: {
+    width: 40,
+  },
+
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+  },
+
+  // Loading
   centerContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 32,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  loadingGradient: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
+    justifyContent: "center",
+    marginBottom: 24,
   },
-  backButton: {
-    fontSize: 28,
-    color: "#000",
-    width: 40,
+  loadingIconBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#000",
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 100,
-  },
-  loadingText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#000",
-    marginTop: 24,
-    textAlign: "center",
-  },
-  loadingSubText: {
-    fontSize: 14,
-    color: "#6c757d",
-    marginTop: 8,
-    textAlign: "center",
-  },
-  errorIcon: {
-    fontSize: 64,
+  loadingSpinner: {
     marginBottom: 16,
   },
-  errorText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#000",
+  loadingTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 8,
+    letterSpacing: -0.5,
+  },
+  loadingSubtitle: {
+    fontSize: 15,
+    color: "#64748B",
     textAlign: "center",
     marginBottom: 24,
-    lineHeight: 24,
+  },
+  loadingDots: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#6366F1",
+  },
+  dotDelay1: {
+    opacity: 0.6,
+  },
+  dotDelay2: {
+    opacity: 0.3,
+  },
+
+  // Error
+  errorIconBox: {
+    marginBottom: 24,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  errorMessage: {
+    fontSize: 15,
+    color: "#64748B",
+    textAlign: "center",
+    marginBottom: 32,
+    lineHeight: 22,
+    paddingHorizontal: 20,
   },
   retryButton: {
-    backgroundColor: "#000",
-    borderRadius: 25,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#6366F1",
+    borderRadius: 16,
     paddingHorizontal: 32,
-    paddingVertical: 14,
+    paddingVertical: 16,
+    gap: 8,
     marginBottom: 12,
     minWidth: 200,
+    shadowColor: "#6366F1",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   retryButtonText: {
-    color: "#fff",
+    color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
-    textAlign: "center",
   },
   cancelButton: {
     backgroundColor: "transparent",
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: "#000",
+    borderRadius: 16,
     paddingHorizontal: 32,
-    paddingVertical: 14,
+    paddingVertical: 16,
     minWidth: 200,
   },
   cancelButtonText: {
-    color: "#000",
+    color: "#64748B",
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "600",
     textAlign: "center",
   },
-  feedbackCard: {
-    backgroundColor: "#fff",
-    borderRadius: 24,
-    padding: 24,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-    position: "relative",
-  },
-  iconContainer: {
+
+  // New Badge
+  newBadgeContainer: {
     alignItems: "center",
     marginBottom: 16,
-  },
-  robotIcon: {
-    fontSize: 48,
-  },
-  feedbackContent: {
-    fontSize: 16,
-    fontWeight: "400",
-    color: "#212529",
-    lineHeight: 26,
-    marginBottom: 20,
-  },
-  metaContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-  },
-  metaText: {
-    fontSize: 12,
-    color: "#6c757d",
-    fontWeight: "500",
   },
   newBadge: {
-    position: "absolute",
-    top: 16,
-    right: 16,
-    backgroundColor: "#000",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   newBadgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  goalCard: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: "#000",
-  },
-  goalTitle: {
-    fontSize: 16,
+    color: "#FFFFFF",
+    fontSize: 13,
     fontWeight: "700",
-    color: "#000",
+  },
+
+  // Feedback Card
+  feedbackCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  aiHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  aiIconBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  aiHeaderText: {
+    flex: 1,
+  },
+  aiTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+    letterSpacing: -0.5,
+  },
+  aiSubtitle: {
+    fontSize: 13,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+  feedbackContent: {
+    marginBottom: 20,
+  },
+  feedbackText: {
+    fontSize: 16,
+    fontWeight: "400",
+    color: "#334155",
+    lineHeight: 26,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  metaDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: "#E2E8F0",
+  },
+  metaText: {
+    fontSize: 13,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+
+  // Section Header
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     marginBottom: 12,
   },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F172A",
+    letterSpacing: -0.5,
+  },
+
+  // Goal Card
+  goalCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 20,
+    gap: 16,
+    marginBottom: 32,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  goalGradient: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   goalText: {
-    fontSize: 14,
-    fontWeight: "400",
-    color: "#495057",
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#334155",
     lineHeight: 22,
   },
-  infoCard: {
-    backgroundColor: "#e9ecef",
+
+  // Tips
+  tipsContainer: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  tipCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 16,
-    gap: 8,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
   },
-  infoText: {
-    fontSize: 13,
-    color: "#495057",
+  tipIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#EEF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#475569",
     lineHeight: 20,
+    fontWeight: "500",
   },
+
+  // Bottom
   bottomContainer: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     padding: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
-    borderTopColor: "#e9ecef",
+    borderTopColor: "#F1F5F9",
   },
   closeButton: {
-    backgroundColor: "#000",
-    borderRadius: 25,
+    backgroundColor: "#0F172A",
+    borderRadius: 16,
     height: 56,
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   closeButtonText: {
-    color: "#fff",
-    fontSize: 18,
+    color: "#FFFFFF",
+    fontSize: 17,
     fontWeight: "700",
   },
 });
