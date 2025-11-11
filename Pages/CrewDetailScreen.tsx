@@ -363,22 +363,20 @@ export default function CrewDetailScreen() {
     if (isNaN(runningDate.getTime())) return "-";
 
     const now = new Date();
+    const diffMs = now.getTime() - runningDate.getTime();
 
-    // 로컬 타임존 기준으로 날짜만 추출 (시간 정보 제거)
-    const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const runningDateOnly = new Date(
-      runningDate.getFullYear(),
-      runningDate.getMonth(),
-      runningDate.getDate()
-    );
+    // 음수인 경우 (미래 시간) - 서버/클라이언트 시간 차이
+    if (diffMs < 0) return "방금 전";
 
-    const diffMs = nowDateOnly.getTime() - runningDateOnly.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) return "오늘";
+    if (diffMinutes < 1) return "방금 전";
+    if (diffMinutes < 60) return `${diffMinutes}분 전`;
+    if (diffHours < 24) return `${diffHours}시간 전`;
     if (diffDays === 1) return "어제";
-    if (diffDays < 0) return "오늘"; // 미래 시간일 경우 (서버-클라이언트 시간 차이)
-    if (diffDays <= 7) return `${diffDays}일전`;
+    if (diffDays <= 7) return `${diffDays}일 전`;
     return runningDate.toLocaleDateString("ko-KR");
   }
 
