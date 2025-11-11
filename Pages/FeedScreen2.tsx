@@ -12,18 +12,26 @@ import {
   FlatList,
   Pressable,
   StyleSheet,
+  Animated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { avgPaceLabel } from "../utils/run";
-import { listFeeds, toggleFeedLike, deleteFeed, FeedItem } from "../utils/api/feeds";
+import {
+  listFeeds,
+  toggleFeedLike,
+  deleteFeed,
+  FeedItem,
+} from "../utils/api/feeds";
 import { getMyProfile } from "../utils/api/users";
 import { useFocusEffect } from "@react-navigation/native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { PositiveAlert, NegativeAlert, MessageAlert, DestructiveConfirm } from "../components/ui/AlertDialog";
 
 const { width, height } = Dimensions.get("window");
 
-// 상대 시간 포맷 함수 (예: "5분 전", "2시간 전")
 const formatRelativeTime = (timestamp: string): string => {
   const date = new Date(timestamp);
   const now = new Date();
@@ -39,6 +47,56 @@ const formatRelativeTime = (timestamp: string): string => {
   return date.toLocaleDateString("ko-KR");
 };
 
+// Animated Like Button Component
+const AnimatedLikeButton = ({
+  liked,
+  likeCount,
+  onPress,
+}: {
+  liked: boolean;
+  likeCount: number;
+  onPress: () => void;
+}) => {
+  const scaleAnim = React.useRef(new Animated.Value(1)).current;
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 1.3,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    onPress();
+  };
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      style={styles.likeButton}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    >
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <Ionicons
+          name={liked ? "heart" : "heart-outline"}
+          size={24}
+          color={liked ? "#FF3B5C" : "#1F2937"}
+        />
+      </Animated.View>
+      {likeCount > 0 && (
+        <Text style={[styles.likeCount, liked && styles.likeCountActive]}>
+          {likeCount}
+        </Text>
+      )}
+    </Pressable>
+  );
+};
+
 export default function FeedScreen({ navigation, route }: any) {
   const tabBarHeight = useBottomTabBarHeight?.() ?? 70;
   const insets = useSafeAreaInsets();
@@ -48,6 +106,8 @@ export default function FeedScreen({ navigation, route }: any) {
   const [error, setError] = useState<string | null>(null);
   const [myNickname, setMyNickname] = useState<string | null>(null);
   const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; id?: number }>({ open: false });
+  const [dialog, setDialog] = useState<{ open: boolean; kind: 'positive'|'negative'|'message'; title?: string; message?: string }>({ open: false, kind: 'message' });
 
   const fetchFeeds = useCallback(async () => {
     try {
@@ -110,18 +170,18 @@ export default function FeedScreen({ navigation, route }: any) {
     }
   };
 
-  const getProfileColor = (index: number) => {
-    const colors = [
-      "#FF6B6B",
-      "#4ECDC4",
-      "#45B7D1",
-      "#FFA07A",
-      "#98D8C8",
-      "#F7DC6F",
-      "#BB8FCE",
-      "#85C1E2",
+  const getProfileGradient = (index: number) => {
+    const gradients = [
+      ["#FF6B9D", "#C44569"],
+      ["#4FACFE", "#00F2FE"],
+      ["#43E97B", "#38F9D7"],
+      ["#FA709A", "#FEE140"],
+      ["#A8EDEA", "#FED6E3"],
+      ["#FF9A56", "#FF6A88"],
+      ["#667EEA", "#764BA2"],
+      ["#F093FB", "#F5576C"],
     ];
-    return colors[index % colors.length];
+    return gradients[index % gradients.length];
   };
 
   const renderFeedItem = ({
@@ -180,17 +240,16 @@ export default function FeedScreen({ navigation, route }: any) {
           {finalUrl ? (
             <Image source={{ uri: finalUrl }} style={styles.avatar} />
           ) : (
-            <View
-              style={[
-                styles.avatar,
-                styles.avatarFallback,
-                { backgroundColor: getProfileColor(index) },
-              ]}
+            <LinearGradient
+              colors={getProfileGradient(index)}
+              style={[styles.avatar, styles.avatarFallback]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
             >
               <Text style={styles.avatarFallbackText}>
                 {displayName.charAt(0).toUpperCase()}
               </Text>
-            </View>
+            </LinearGradient>
           )}
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{displayName}</Text>
@@ -198,109 +257,76 @@ export default function FeedScreen({ navigation, route }: any) {
               {item.createdAt ? formatRelativeTime(item.createdAt) : ""}
             </Text>
           </View>
+          {myNickname && displayName === myNickname && (
+            <Pressable
+              onPress={() => {
+                setConfirmDelete({ open: true, id: item.id });
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={({ pressed }) => [
+                styles.deleteBtn,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Ionicons name="ellipsis-horizontal" size={20} color="#9CA3AF" />
+            </Pressable>
+          )}
         </View>
 
-        {/* Image - Full Width */}
+        {/* Image */}
         {item.imageUrl && (
-          <View style={[styles.imageWrap, { width, height: height * 0.7 }]}>
+          <View style={styles.imageContainer}>
             <Image source={{ uri: item.imageUrl }} style={styles.feedImage} />
 
-            {/* Minimal Metrics Overlay */}
+            {/* Glassmorphism Metrics Overlay */}
             {!!distanceKm && (
-              <View style={styles.metricsBar}>
-                <View style={styles.metricsRowBetween}>
-                  <View>
-                    <Text style={styles.metricDistance}>
-                      {Number(distanceKm).toFixed(2)} km
+              <BlurView intensity={80} tint="light" style={styles.metricsBlur}>
+                <View style={styles.metricsContent}>
+                  <View style={styles.distanceRow}>
+                    <Text style={styles.distanceNumber}>
+                      {Number(distanceKm).toFixed(2)}
                     </Text>
-                    <View style={styles.metricInlineRow}>
-                      {fmtHMS(durationSec) && (
-                        <View style={styles.metricItem}>
-                          <Ionicons
-                            name="time-outline"
-                            size={14}
-                            color="#6B7280"
-                          />
-                          <Text style={styles.metricLabel}>
-                            {fmtHMS(durationSec)}
-                          </Text>
-                        </View>
-                      )}
-                      {paceLabel && (
-                        <View style={[styles.metricItem, { marginLeft: 12 }]}>
-                          <Ionicons
-                            name="speedometer-outline"
-                            size={14}
-                            color="#6B7280"
-                          />
-                          <Text style={styles.metricLabel}>{paceLabel}/km</Text>
-                        </View>
-                      )}
-                    </View>
+                    <Text style={styles.distanceUnit}>km</Text>
+                  </View>
+                  <View style={styles.statsRow}>
+                    {fmtHMS(durationSec) && (
+                      <View style={styles.statItem}>
+                        <Ionicons name="time" size={16} color="#6B7280" />
+                        <Text style={styles.statText}>
+                          {fmtHMS(durationSec)}
+                        </Text>
+                      </View>
+                    )}
+                    {paceLabel && (
+                      <View style={styles.statItem}>
+                        <Ionicons
+                          name="speedometer"
+                          size={16}
+                          color="#6B7280"
+                        />
+                        <Text style={styles.statText}>{paceLabel}</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
-              </View>
+              </BlurView>
             )}
           </View>
         )}
 
-        {/* Bottom Section */}
+        {/* Actions & Caption */}
         <View style={styles.bottomSection}>
-          {/* Like Button */}
-          <View style={styles.rowBetween}>
-            <Pressable
-              onPress={() => like(item.id, item.liked)}
-              style={({ pressed }) => [
-                styles.likeButton,
-                pressed && styles.pressed,
-              ]}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons
-                name={item.liked ? "heart" : "heart-outline"}
-                size={22}
-                color={item.liked ? "#FF6B6B" : "#9CA3AF"}
-              />
-              <Text style={styles.likeCount}>{item.likeCount || 0}</Text>
-            </Pressable>
+          <AnimatedLikeButton
+            liked={item.liked}
+            likeCount={item.likeCount || 0}
+            onPress={() => like(item.id, item.liked)}
+          />
 
-            {myNickname && displayName === myNickname ? (
-              <Pressable
-                onPress={() => {
-                  Alert.alert(
-                    "삭제",
-                    "이 피드를 삭제하시겠습니까?",
-                    [
-                      { text: "취소", style: "cancel" },
-                      {
-                        text: "삭제",
-                        style: "destructive",
-                        onPress: async () => {
-                          try {
-                            await deleteFeed(item.id);
-                            setFeeds((prev) => prev.filter((f) => f.id !== item.id));
-                          } catch (e) {
-                            Alert.alert("오류", "삭제에 실패했습니다.");
-                          }
-                        },
-                      },
-                    ]
-                  );
-                }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={({ pressed }) => [pressed && styles.pressed]}
-                accessibilityLabel="피드 삭제"
-              >
-                <Ionicons name="trash-outline" size={20} color="#EF4444" />
-              </Pressable>
-            ) : (
-              <View style={{ width: 20 }} />
-            )}
-          </View>
-
-          {/* Caption */}
           {!!(item.content && item.content.trim().length > 0) && (
-            <Text style={styles.caption}>{item.content}</Text>
+            <Text style={styles.caption}>
+              <Text style={styles.captionName}>{displayName}</Text>{" "}
+              {item.content}
+            </Text>
           )}
         </View>
       </View>
@@ -310,10 +336,9 @@ export default function FeedScreen({ navigation, route }: any) {
   if (loading && !refreshing) {
     return (
       <View style={styles.screen}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <StatusBar barStyle="dark-content" backgroundColor="#FAFAFA" />
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#000000" />
-          <Text style={styles.loadingText}>피드를 불러오는 중...</Text>
+          <ActivityIndicator size="large" color="#10B981" />
         </View>
       </View>
     );
@@ -322,11 +347,17 @@ export default function FeedScreen({ navigation, route }: any) {
   if (error && !refreshing) {
     return (
       <View style={styles.screen}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <StatusBar barStyle="dark-content" backgroundColor="#FAFAFA" />
         <View style={[styles.centered, { paddingHorizontal: 24 }]}>
-          <Ionicons name="cloud-offline-outline" size={48} color="#D1D5DB" />
+          <Ionicons name="cloud-offline-outline" size={64} color="#E5E7EB" />
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retryBtn} onPress={fetchFeeds}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.retryBtn,
+              pressed && styles.pressed,
+            ]}
+            onPress={fetchFeeds}
+          >
             <Text style={styles.retryBtnText}>다시 시도</Text>
           </Pressable>
         </View>
@@ -336,10 +367,14 @@ export default function FeedScreen({ navigation, route }: any) {
 
   return (
     <View style={styles.screen}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FAFAFA" />
 
-      {/* Minimal Top Bar (safe-area aware) */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
+      {/* Minimal Top Bar */}
+      <BlurView
+        intensity={100}
+        tint="light"
+        style={[styles.topBar, { paddingTop: insets.top + 8 }]}
+      >
         <View style={styles.topBarRow}>
           <Pressable
             onPress={() => navigation.goBack()}
@@ -349,11 +384,11 @@ export default function FeedScreen({ navigation, route }: any) {
             ]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="chevron-back" size={24} color="#10B981" />
+            <Ionicons name="chevron-back" size={28} color="#10B981" />
           </Pressable>
           <Text style={styles.topBarTitle}>피드</Text>
         </View>
-      </View>
+      </BlurView>
 
       {/* Feed List */}
       <FlatList
@@ -365,12 +400,45 @@ export default function FeedScreen({ navigation, route }: any) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={["#000000"]}
-            tintColor="#000000"
+            colors={["#10B981"]}
+            tintColor="#10B981"
           />
         }
         showsVerticalScrollIndicator={false}
       />
+      {/* Alerts */}
+      {dialog.open && dialog.kind === 'positive' && (
+        <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open: false, kind: 'message' })} />
+      )}
+      {dialog.open && dialog.kind === 'negative' && (
+        <NegativeAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open: false, kind: 'message' })} />
+      )}
+      {dialog.open && dialog.kind === 'message' && (
+        <MessageAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open: false, kind: 'message' })} />
+      )}
+
+      {/* Delete Confirm */}
+      {confirmDelete.open && (
+        <DestructiveConfirm
+          visible
+          title="피드 삭제"
+          message="이 피드를 삭제하시겠습니까? 삭제 후에는 되돌릴 수 없습니다."
+          confirmText="삭제"
+          cancelText="취소"
+          onClose={() => setConfirmDelete({ open: false })}
+          onConfirm={async () => {
+            const id = confirmDelete.id!;
+            try {
+              await deleteFeed(id);
+              setFeeds((prev) => prev.filter((f) => f.id !== id));
+              setDialog({ open: true, kind: 'positive', title: '삭제 완료', message: '피드가 삭제되었습니다.' });
+            } catch (e: any) {
+              const msg = e?.response?.data?.message || e?.message || '삭제에 실패했습니다.';
+              setDialog({ open: true, kind: 'negative', title: '오류', message: msg });
+            }
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -378,59 +446,60 @@ export default function FeedScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#FAFAFA",
   },
   centered: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 14,
-    color: "#4B5563",
-  },
   errorText: {
-    marginTop: 16,
-    marginBottom: 24,
-    fontSize: 16,
-    color: "#374151",
+    marginTop: 24,
+    marginBottom: 32,
+    fontSize: 15,
+    color: "#6B7280",
     textAlign: "center",
+    lineHeight: 22,
   },
   retryBtn: {
-    backgroundColor: "#000000",
+    backgroundColor: "#10B981",
     paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 9999,
+    paddingVertical: 14,
+    borderRadius: 12,
+    shadowColor: "#10B981",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   retryBtnText: {
     color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "700",
   },
   topBar: {
-    backgroundColor: "#FFFFFF",
     paddingHorizontal: 16,
-    paddingTop: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: "rgba(0,0,0,0.05)",
   },
   topBarRow: {
     flexDirection: "row",
     alignItems: "center",
   },
   navBackBtn: {
-    marginRight: 12,
+    marginRight: 8,
     padding: 4,
   },
   topBarTitle: {
-    fontSize: 20,
-    fontWeight: "600",
+    fontSize: 24,
+    fontWeight: "800",
     color: "#111827",
+    letterSpacing: -0.5,
   },
   cardContainer: {
     backgroundColor: "#FFFFFF",
+    marginBottom: 2,
   },
   cardHeader: {
     paddingHorizontal: 16,
@@ -439,9 +508,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
   },
   avatarFallback: {
     justifyContent: "center",
@@ -449,96 +520,107 @@ const styles = StyleSheet.create({
   },
   avatarFallbackText: {
     color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "700",
   },
   userInfo: {
     marginLeft: 12,
     flex: 1,
   },
   userName: {
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "700",
     color: "#111827",
   },
   timeAgo: {
-    fontSize: 12,
-    color: "#6B7280",
+    fontSize: 13,
+    color: "#9CA3AF",
     marginTop: 2,
   },
-  imageWrap: {
+  deleteBtn: {
+    padding: 4,
+  },
+  imageContainer: {
+    width: width,
+    height: height * 0.65,
+    backgroundColor: "#F9FAFB",
     position: "relative",
-    backgroundColor: "#F3F4F6",
   },
   feedImage: {
     width: "100%",
     height: "100%",
     resizeMode: "cover",
   },
-  metricsBar: {
+  metricsBlur: {
     position: "absolute",
+    bottom: 0,
     left: 0,
     right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(255,255,255,0.95)",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: "hidden",
   },
-  metricsRowBetween: {
+  metricsContent: {
+    padding: 20,
+  },
+  distanceRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    alignItems: "baseline",
+    marginBottom: 12,
   },
-  metricDistance: {
-    fontSize: 20,
-    fontWeight: "700",
+  distanceNumber: {
+    fontSize: 32,
+    fontWeight: "900",
     color: "#111827",
+    letterSpacing: -1,
   },
-  metricInlineRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  metricItem: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  metricLabel: {
-    fontSize: 12,
-    color: "#4B5563",
-    fontWeight: "500",
+  distanceUnit: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#6B7280",
     marginLeft: 4,
   },
-  bottomSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+  statsRow: {
+    flexDirection: "row",
+    gap: 16,
   },
-  rowBetween: {
+  statItem: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 6,
+  },
+  statText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#4B5563",
+  },
+  bottomSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   likeButton: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
   },
   likeCount: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#374151",
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#6B7280",
   },
-  // removed viewsCount style
+  likeCountActive: {
+    color: "#FF3B5C",
+  },
   caption: {
     fontSize: 14,
     color: "#374151",
-    marginTop: 12,
     lineHeight: 20,
+    marginTop: 4,
+  },
+  captionName: {
+    fontWeight: "700",
+    color: "#111827",
   },
   pressed: {
     opacity: 0.6,
