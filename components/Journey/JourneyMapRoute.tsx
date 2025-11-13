@@ -68,7 +68,10 @@ const LandmarkMarkerItem = React.memo(function LandmarkMarkerItem({
           tension: 140,
           useNativeDriver: true,
         }),
-      ]).start(() => setTracks(false));
+      ]).start(() => {
+        // 약간의 지연 후 뷰 스냅샷 고정(안드로이드 지도 갱신 안정화)
+        setTimeout(() => setTracks(false), 200);
+      });
     }
     prevReachedRef.current = landmark.reached;
   }, [landmark.reached, scale]);
@@ -84,7 +87,13 @@ const LandmarkMarkerItem = React.memo(function LandmarkMarkerItem({
       tracksViewChanges={tracks}
     >
       {/* 모던한 핀 스타일 마커 */}
-      <View style={styles.markerContainer}>
+      <View
+        style={[
+          styles.markerContainer,
+          // 확대 애니메이션 시 잘림 방지를 위해 여유 공간 확보
+          { padding: 10, marginBottom: -10 },
+        ]}
+      >
         {/* 하단 그림자 */}
         <View style={styles.markerShadow} />
 
