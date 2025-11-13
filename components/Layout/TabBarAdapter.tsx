@@ -3,6 +3,7 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import BottomNavigation from "./BottomNav";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState } from "react-native";
+import { addRunningSessionListener } from "../../utils/navEvents";
 import { useBottomBarHeight } from "./BottomBarHeightContext";
 
 const ROUTE_TO_KEY: Record<string, string> = {
@@ -30,6 +31,7 @@ export default function TabBarAdapter({
   const activeTab = ROUTE_TO_KEY[route.name] || "running";
 
   const [hidden, setHidden] = useState(false);
+  const [locked, setLocked] = useState(false);
 
   // Hide when a running session is active
   const refreshHidden = async () => {
@@ -39,21 +41,30 @@ export default function TabBarAdapter({
         const s = JSON.parse(raw);
         // 탭바 숨김은 러닝 화면에서만 적용
         const isRunning = !!s?.isRunning;
-        setHidden(isRunning && route.name === 'LiveRunningScreen');
+        // 러닝 중엔 어떤 화면에서도 탭바 숨김
+        setHidden(isRunning);
+        setLocked(isRunning);
       } else {
         setHidden(false);
+        setLocked(false);
       }
     } catch {
       setHidden(false);
+      setLocked(false);
     }
   };
 
   useEffect(() => {
     refreshHidden();
     const sub = AppState.addEventListener("change", () => refreshHidden());
+    const evt = addRunningSessionListener((isRunning) => {
+      setHidden(isRunning);
+      setLocked(isRunning);
+    });
 
     return () => {
       sub.remove();
+      try { evt.remove(); } catch {}
     };
   }, [route?.name, navigation]);
 
@@ -63,6 +74,8 @@ export default function TabBarAdapter({
   }, [hidden, setHeight]);
 
   const onTabPress = (key: string) => {
+    // 러닝 중에는 러닝 탭 외 이동 차단
+    if (locked && key !== 'running') return;
     const target = KEY_TO_ROUTE[key];
     if (!target) return;
     navigation.navigate(target as never);
