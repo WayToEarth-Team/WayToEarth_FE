@@ -18,6 +18,7 @@ import {
 import JourneyMapRoute from "../components/Journey/JourneyMapRoute";
 import JourneyProgressCard from "../components/Journey/JourneyProgressCard";
 import RunStatsCard from "../components/Running/RunStatsCard";
+import RunStatsSidePanel from "../components/Running/RunStatsSidePanel";
 import RunPlayControls from "../components/Running/RunPlayControls";
 import CountdownOverlay from "../components/Running/CountdownOverlay";
 import WeatherWidget from "../components/Running/WeatherWidget";
@@ -25,6 +26,7 @@ import GuestbookCreateModal from "../components/Guestbook/GuestbookCreateModal";
 import LandmarkStatistics from "../components/Guestbook/LandmarkStatistics";
 import ImageCarousel from "../components/Common/ImageCarousel";
 import StampBottomSheet from "../components/Landmark/StampBottomSheet";
+import { LinearGradient } from "expo-linear-gradient";
 import { useJourneyRunning } from "../hooks/journey/useJourneyRunning";
 import { useBackgroundRunning } from "../hooks/journey/useBackgroundRunning";
 import { useWeather } from "../contexts/WeatherContext";
@@ -687,14 +689,14 @@ export default function JourneyRunningScreen(
         />
       )}
 
-      {/* 러닝 중일 때: 러닝 통계 + 간소화된 진행률 */}
+      {/* 러닝 중일 때: 사이드 패널(통계) + 간소화된 진행률 */}
       {(t.isRunning || t.isPaused) && (
         <>
-          <RunStatsCard
+          {/* 오른쪽 사이드 패널 (여정 러닝 전용) */}
+          <RunStatsSidePanel
             distanceKm={t.distance}
             paceLabel={t.paceLabel}
             kcal={t.kcal}
-            speedKmh={t.speedKmh}
             elapsedSec={t.elapsedSec}
           />
 
@@ -750,39 +752,46 @@ export default function JourneyRunningScreen(
         <View
           style={[
             styles.startButtonContainer,
-            { bottom: Math.max(insets.bottom, 12) + 100 },
+            { bottom: Math.max(insets.bottom, 12) + 100 }, // 스탬프 바텀시트(90px) 위
           ]}
         >
           <Pressable
             onPress={handleStartPress}
             disabled={!t.isReady || t.isInitializing}
-            style={[
-              styles.startButton,
-              (!t.isReady || t.isInitializing) && styles.startButtonDisabled,
-            ]}
+            style={styles.startButtonWrapper}
           >
-            <Text style={styles.startButtonText}>
-              {!t.isReady
-                ? "준비중..."
-                : t.isInitializing
-                ? "시작중..."
-                : "여정 러닝 시작"}
-            </Text>
+            <View
+              style={[
+                styles.startButton,
+                (!t.isReady || t.isInitializing) && styles.startButtonDisabled,
+              ]}
+            >
+              <Text style={styles.startButtonIcon}>🏃</Text>
+              <Text style={styles.startButtonText}>
+                {!t.isReady
+                  ? "준비중..."
+                  : t.isInitializing
+                  ? "시작중..."
+                  : "여정 시작"}
+              </Text>
+            </View>
           </Pressable>
         </View>
       )}
 
-      {/* 러닝 제어 버튼 (러닝 중) */}
+      {/* 러닝 제어 버튼 (러닝 중) - 위치 조정 */}
       {t.isRunning && (
-        <RunPlayControls
-          isRunning={t.isRunning}
-          isPaused={t.isPaused}
-          onPlay={() => t.start()}
-          onPause={() => t.pause()}
-          onResume={() => t.resume()}
-          onStopTap={() => Alert.alert("종료하려면 길게 누르세요")}
-          onStopLong={handleComplete}
-        />
+        <View style={styles.playControlsContainer}>
+          <RunPlayControls
+            isRunning={t.isRunning}
+            isPaused={t.isPaused}
+            onPlay={() => t.start()}
+            onPause={() => t.pause()}
+            onResume={() => t.resume()}
+            onStopTap={() => Alert.alert("종료하려면 길게 누르세요")}
+            onStopLong={handleComplete}
+          />
+        </View>
       )}
 
       {/* 카운트다운 오버레이 */}
@@ -966,6 +975,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 14,
   },
+  playControlsContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 110, // 스탬프 바텀시트(90px) 바로 위
+    alignItems: "center",
+    justifyContent: "center",
+  },
   startButtonContainer: {
     position: "absolute",
     left: 0,
@@ -973,64 +990,74 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  startButtonWrapper: {
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
   startButton: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "#6366F1",
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 20,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.16,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 10,
+    gap: 6,
+    backgroundColor: "#fff",
   },
   startButtonDisabled: {
-    backgroundColor: "rgba(0,0,0,0.1)",
+    shadowOpacity: 0,
+    backgroundColor: "#F3F4F6",
+  },
+  startButtonIcon: {
+    fontSize: 20,
   },
   startButtonText: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111827",
     textAlign: "center",
+    letterSpacing: 0.3,
   },
   compactProgressCard: {
     position: "absolute",
-    top: 120,
+    top: 70,
     left: 16,
     right: 16,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    borderRadius: 16,
+    padding: 10,
     shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
   compactHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   compactTitle: {
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 11,
+    fontWeight: "600",
     color: "#6B7280",
   },
   compactPercent: {
-    fontSize: 16,
-    fontWeight: "900",
+    fontSize: 14,
+    fontWeight: "800",
     color: "#6366F1",
   },
   compactProgressBar: {
-    height: 6,
+    height: 5,
     backgroundColor: "#E5E7EB",
     borderRadius: 3,
     overflow: "hidden",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   compactProgressFill: {
     height: "100%",
@@ -1038,8 +1065,9 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   compactNextLandmark: {
-    fontSize: 12,
-    color: "#4B5563",
+    fontSize: 10,
+    color: "#6B7280",
+    fontWeight: "500",
   },
   modalOverlay: {
     flex: 1,
