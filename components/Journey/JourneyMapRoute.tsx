@@ -37,6 +37,96 @@ type Props = {
   onLandmarkPress?: (landmark: JourneyLandmark) => void;
 };
 
+// 커스텀 지도 스타일 (미니멀 & 깔끔)
+const customMapStyle = [
+  {
+    elementType: "geometry",
+    stylers: [{ color: "#f5f5f5" }],
+  },
+  {
+    elementType: "labels.icon",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#616161" }],
+  },
+  {
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#f5f5f5" }],
+  },
+  {
+    featureType: "administrative.land_parcel",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#bdbdbd" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "geometry",
+    stylers: [{ color: "#eeeeee" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#757575" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#e5f5e0" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#7cb342" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#ffffff" }],
+  },
+  {
+    featureType: "road.arterial",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#757575" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#dadada" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#616161" }],
+  },
+  {
+    featureType: "road.local",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9e9e9e" }],
+  },
+  {
+    featureType: "transit.line",
+    elementType: "geometry",
+    stylers: [{ color: "#e5e5e5" }],
+  },
+  {
+    featureType: "transit.station",
+    elementType: "geometry",
+    stylers: [{ color: "#eeeeee" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#c9e7f8" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9e9e9e" }],
+  },
+];
+
 export default function JourneyMapRoute({
   journeyRoute,
   landmarks,
@@ -195,20 +285,38 @@ export default function JourneyMapRoute({
         title={landmark.name}
         description={landmark.distance}
         onPress={() => onLandmarkPress?.(landmark)}
+        anchor={{ x: 0.5, y: 1 }}
       >
-        <View
-          style={[
-            styles.landmarkMarker,
-            landmark.reached
-              ? styles.landmarkMarkerReached
-              : styles.landmarkMarkerPending,
-          ]}
-        >
-          {landmark.reached ? (
-            <Text style={styles.landmarkIconReached}>✓</Text>
-          ) : (
-            <Text style={styles.landmarkIconPending}>{index + 1}</Text>
-          )}
+        {/* 모던한 핀 스타일 마커 */}
+        <View style={styles.markerContainer}>
+          {/* 하단 그림자 */}
+          <View style={styles.markerShadow} />
+
+          {/* 메인 핀 */}
+          <View
+            style={[
+              styles.pinBody,
+              landmark.reached
+                ? styles.pinBodyReached
+                : styles.pinBodyPending,
+            ]}
+          >
+            {landmark.reached ? (
+              <Text style={styles.pinIcon}>✓</Text>
+            ) : (
+              <Text style={styles.pinNumber}>{index + 1}</Text>
+            )}
+          </View>
+
+          {/* 핀 끝 (삼각형 느낌) */}
+          <View
+            style={[
+              styles.pinTip,
+              landmark.reached
+                ? styles.pinTipReached
+                : styles.pinTipPending,
+            ]}
+          />
         </View>
       </Marker>
     ));
@@ -258,6 +366,7 @@ export default function JourneyMapRoute({
         ref={mapRef}
         style={styles.map}
         initialRegion={initialRegion}
+        customMapStyle={customMapStyle}
         showsUserLocation={false}
         showsMyLocationButton={false}
         onMapReady={handleMapReady}
@@ -272,24 +381,34 @@ export default function JourneyMapRoute({
         maxZoomLevel={20}
         minZoomLevel={10}
       >
-      {/* 완료된 여정 경로 (초록색) */}
+      {/* 완료된 여정 경로 (그라데이션 느낌의 밝은 초록색) */}
       {completedRoute.length > 1 && (
-        <Polyline
-          coordinates={completedRoute as RNLatLng[]}
-          strokeWidth={6}
-          strokeColor="#10B981"
-          lineCap="round"
-          lineJoin="round"
-        />
+        <>
+          {/* 외곽 글로우 레이어 */}
+          <Polyline
+            coordinates={completedRoute as RNLatLng[]}
+            strokeWidth={12}
+            strokeColor="rgba(16, 185, 129, 0.3)"
+            lineCap="round"
+            lineJoin="round"
+          />
+          {/* 메인 경로 */}
+          <Polyline
+            coordinates={completedRoute as RNLatLng[]}
+            strokeWidth={7}
+            strokeColor="#10B981"
+            lineCap="round"
+            lineJoin="round"
+          />
+        </>
       )}
 
-      {/* 남은 여정 경로 (회색 점선) */}
+      {/* 남은 여정 경로 (보라색 실선) */}
       {remainingRoute.length > 1 && (
         <Polyline
           coordinates={remainingRoute as RNLatLng[]}
-          strokeWidth={5}
-          strokeColor="#94A3B8"
-          lineDashPattern={[10, 5]}
+          strokeWidth={6}
+          strokeColor="#A78BFA"
           lineCap="round"
           lineJoin="round"
         />
@@ -309,15 +428,19 @@ export default function JourneyMapRoute({
       {/* 랜드마크 마커 (useMemo로 캐싱됨) */}
       {landmarkMarkers}
 
-      {/* 현재 위치 마커 */}
+      {/* 현재 위치 마커 - 모던한 펄싱 디자인 */}
       {currentLocation && (
         <Marker
           coordinate={currentLocation as RNLatLng}
           title="현재 위치"
           anchor={{ x: 0.5, y: 0.5 }}
         >
-          <View style={styles.currentLocationMarker}>
-            <View style={styles.currentLocationDot} />
+          <View style={styles.currentPosContainer}>
+            {/* 외곽 펄스 링 */}
+            <View style={styles.pulseRingOuter} />
+            <View style={styles.pulseRingInner} />
+            {/* 중심 점 */}
+            <View style={styles.currentPosDot} />
           </View>
         </Marker>
       )}
@@ -353,50 +476,107 @@ const styles = StyleSheet.create({
   gpsIcon: {
     fontSize: 24,
   },
-  landmarkMarker: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  // 🎯 모던한 핀 스타일 마커
+  markerContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  markerShadow: {
+    position: "absolute",
+    bottom: 0,
+    width: 16,
+    height: 4,
+    borderRadius: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
+  },
+  pinBody: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 3,
     borderColor: "#fff",
     shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 5,
+    elevation: 8,
   },
-  landmarkMarkerReached: {
+  pinBodyReached: {
     backgroundColor: "#10B981",
+    shadowColor: "#10B981",
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
   },
-  landmarkMarkerPending: {
+  pinBodyPending: {
     backgroundColor: "#6366F1",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
   },
-  landmarkIconReached: {
+  pinTip: {
+    width: 0,
+    height: 0,
+    backgroundColor: "transparent",
+    borderStyle: "solid",
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    marginTop: -2,
+  },
+  pinTipReached: {
+    borderTopColor: "#10B981",
+  },
+  pinTipPending: {
+    borderTopColor: "#6366F1",
+  },
+  pinIcon: {
     color: "#fff",
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: "700",
   },
-  landmarkIconPending: {
+  pinNumber: {
     color: "#fff",
     fontSize: 14,
-    fontWeight: "bold",
+    fontWeight: "700",
   },
-  currentLocationMarker: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "rgba(59, 130, 246, 0.2)",
+  // 📍 현재 위치 마커 (펄싱 디자인)
+  currentPosContainer: {
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
   },
-  currentLocationDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: "#3B82F6",
+  pulseRingOuter: {
+    position: "absolute",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(59, 130, 246, 0.2)",
     borderWidth: 2,
+    borderColor: "rgba(59, 130, 246, 0.3)",
+  },
+  pulseRingInner: {
+    position: "absolute",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(59, 130, 246, 0.3)",
+  },
+  currentPosDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#3B82F6",
+    borderWidth: 3,
     borderColor: "#fff",
+    shadowColor: "#3B82F6",
+    shadowOpacity: 0.8,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 15,
   },
 });
