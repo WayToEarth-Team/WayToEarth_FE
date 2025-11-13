@@ -1,4 +1,10 @@
-import React, { useMemo, useRef, useState, useCallback, useEffect } from "react";
+import React, {
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  useEffect,
+} from "react";
 import { StackActions, useFocusEffect } from "@react-navigation/native";
 import { navigationRef } from "../navigation/RootNavigation";
 import * as Location from "expo-location";
@@ -13,8 +19,14 @@ import {
   AppState,
   TouchableOpacity,
 } from "react-native";
-import { PositiveAlert, NegativeAlert, MessageAlert, ConfirmAlert } from "../components/ui/AlertDialog";
-import { LinearGradient } from 'expo-linear-gradient';
+import {
+  PositiveAlert,
+  NegativeAlert,
+  MessageAlert,
+  ConfirmAlert,
+} from "../components/ui/AlertDialog";
+import { LinearGradient } from "expo-linear-gradient";
+import EmblemCelebration from "../components/Effects/EmblemCelebration";
 import MapRoute from "../components/Running/MapRoute";
 import RunStatsCard from "../components/Running/RunStatsCard";
 import RunPlayControls from "../components/Running/RunPlayControls";
@@ -22,20 +34,29 @@ import CountdownOverlay from "../components/Running/CountdownOverlay";
 import WeatherWidget from "../components/Running/WeatherWidget";
 import { useLiveRunTracker } from "../hooks/useLiveRunTracker";
 import { useBackgroundRunning } from "../hooks/journey/useBackgroundRunning";
+import { emitRunningSession } from "../utils/navEvents";
 import { useWeather } from "../contexts/WeatherContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiComplete } from "../utils/api/running"; // ✅ 추가
+import { awardEmblemByCode } from "../utils/api/emblems";
 import {
   initWatchSync,
   subscribeRealtimeUpdates,
   startRunOrchestrated,
   isWatchAvailable,
-  type RealtimeRunningData
+  type RealtimeRunningData,
 } from "../src/modules/watchSync";
 import { useWatchConnection } from "../src/hooks/useWatchConnection";
 
-export default function LiveRunningScreen({ navigation, route }: { navigation: any; route?: any }) {
-  const targetDistanceKm = (route?.params?.targetDistanceKm as number | undefined) ?? undefined;
+export default function LiveRunningScreen({
+  navigation,
+  route,
+}: {
+  navigation: any;
+  route?: any;
+}) {
+  const targetDistanceKm =
+    (route?.params?.targetDistanceKm as number | undefined) ?? undefined;
   const t = useLiveRunTracker();
 
   // 백그라운드 러닝 훅
@@ -51,12 +72,24 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
     undefined
   );
   const isStoppingRef = useRef(false);
-  const [alert, setAlert] = useState<{ open: boolean; title?: string; message?: string; kind?: 'positive'|'negative'|'message' }>({ open:false, kind:'message' });
+  const [alert, setAlert] = useState<{
+    open: boolean;
+    title?: string;
+    message?: string;
+    kind?: "positive" | "negative" | "message";
+  }>({ open: false, kind: "message" });
   const [confirmExit, setConfirmExit] = useState(false);
   const [confirmSave, setConfirmSave] = useState(false);
+  const [celebrate, setCelebrate] = useState<{
+    visible: boolean;
+    count?: number;
+  }>({ visible: false });
+  const celebratedKmRef = useRef<Set<number>>(new Set());
+  const celebratingRef = useRef(false);
+  const shown10mRef = useRef(false);
 
   // 탭 상태: 'running' | 'journey'
-  const [activeTab, setActiveTab] = useState<'running' | 'journey'>('running');
+  const [activeTab, setActiveTab] = useState<"running" | "journey">("running");
   const [mapReady, setMapReady] = useState(false);
   const [countdownVisible, setCountdownVisible] = useState(false);
   const [mapKey, setMapKey] = useState(0);
@@ -67,27 +100,42 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
   const [watchRunning, setWatchRunning] = useState(false);
   const [watchData, setWatchData] = useState<RealtimeRunningData | null>(null);
   const [watchCompleteData, setWatchCompleteData] = useState<any>(null);
-  const [watchRoutePoints, setWatchRoutePoints] = useState<Array<{latitude: number; longitude: number}>>([]);
+  const [watchRoutePoints, setWatchRoutePoints] = useState<
+    Array<{ latitude: number; longitude: number }>
+  >([]);
 
   // 날씨 정보 (이 화면에서만 위치/날씨 활성화)
-  const { weather, loading: weatherLoading, enable: enableWeather, disable: disableWeather } = useWeather();
+  const {
+    weather,
+    loading: weatherLoading,
+    enable: enableWeather,
+    disable: disableWeather,
+  } = useWeather();
   useEffect(() => {
-    try { enableWeather(); } catch {}
-    return () => { try { disableWeather(); } catch {} };
+    try {
+      enableWeather();
+    } catch {}
+    return () => {
+      try {
+        disableWeather();
+      } catch {}
+    };
   }, []);
 
   // 다른 탭에서 돌아올 때만 지도 리프레시 (배터리 절약)
   useFocusEffect(
     React.useCallback(() => {
-      console.log('[LiveRunning] Tab focused, wasFocused:', wasFocused.current);
+      console.log("[LiveRunning] Tab focused, wasFocused:", wasFocused.current);
       if (!wasFocused.current) {
-        console.log('[LiveRunning] ✅ Returned from another tab, refreshing map');
-        setMapKey(prev => prev + 1);
+        console.log(
+          "[LiveRunning] ✅ Returned from another tab, refreshing map"
+        );
+        setMapKey((prev) => prev + 1);
       }
       wasFocused.current = true;
 
       return () => {
-        console.log('[LiveRunning] 👋 Leaving tab');
+        console.log("[LiveRunning] 👋 Leaving tab");
         wasFocused.current = false;
       };
     }, [])
@@ -99,9 +147,9 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
     if (isStoppingRef.current) return; // 종료 진행 중이면 저장/업데이트 중단
 
     const session = {
-      type: 'general' as const,
+      type: "general" as const,
       sessionId: t.sessionId,
-      startTime: Date.now() - (t.elapsedSec * 1000),
+      startTime: Date.now() - t.elapsedSec * 1000,
       distanceKm: t.distance,
       durationSeconds: t.elapsedSec,
       isRunning: t.isRunning,
@@ -115,13 +163,51 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
     backgroundRunning.saveSession(session);
   }, [t.isRunning, t.distance, t.elapsedSec, t.isPaused]);
 
+  // 거리 도달 엠블럼 수여/축하 (세션 중)
+  useEffect(() => {
+    if (!t.isRunning) return;
+    // 10m 도달
+    if (!shown10mRef.current && t.distance >= 0.01) {
+      shown10mRef.current = true;
+      (async () => {
+        try {
+          const res = await awardEmblemByCode('DIST_10M');
+          if (res?.awarded && !celebratingRef.current) {
+            celebratingRef.current = true;
+            setCelebrate({ visible: true, count: 1 });
+            await new Promise((r) => setTimeout(r, 2500));
+            setCelebrate({ visible: false });
+            celebratingRef.current = false;
+          }
+        } catch {}
+      })();
+    }
+    // 정수 km 도달
+    const km = Math.floor(t.distance);
+    if (!Number.isFinite(km) || km < 1) return;
+    if (celebratedKmRef.current.has(km)) return;
+    celebratedKmRef.current.add(km);
+    (async () => {
+      try {
+        const res = await awardEmblemByCode(`DIST_${km}KM`);
+        if (res?.awarded && !celebratingRef.current) {
+          celebratingRef.current = true;
+          setCelebrate({ visible: true, count: 1 });
+          await new Promise((r) => setTimeout(r, 2500));
+          setCelebrate({ visible: false });
+          celebratingRef.current = false;
+        }
+      } catch {}
+    })();
+  }, [t.distance, t.isRunning]);
+
   // 러닝 시작 시 Foreground Service 시작
   useEffect(() => {
     if (t.isRunning) {
       const session = {
-        type: 'general' as const,
+        type: "general" as const,
         sessionId: t.sessionId,
-        startTime: Date.now() - (t.elapsedSec * 1000),
+        startTime: Date.now() - t.elapsedSec * 1000,
         distanceKm: t.distance,
         durationSeconds: t.elapsedSec,
         isRunning: true,
@@ -144,7 +230,7 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
   // 워치 동기화 초기화
   useEffect(() => {
     if (isWatchAvailable()) {
-      console.log('[LiveRunning] Initializing watch sync');
+      console.log("[LiveRunning] Initializing watch sync");
       initWatchSync();
     }
   }, []);
@@ -153,11 +239,11 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
   useEffect(() => {
     if (!watchMode) return;
 
-    console.log('[LiveRunning] Subscribing to watch updates');
+    console.log("[LiveRunning] Subscribing to watch updates");
 
     // 실시간 데이터 구독
     const unsubscribeUpdates = subscribeRealtimeUpdates((data) => {
-      console.log('[LiveRunning] Watch data received:', data);
+      console.log("[LiveRunning] Watch data received:", data);
       setWatchData(data);
 
       // 첫 데이터 수신 시 러닝 시작으로 간주
@@ -165,29 +251,45 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
         setWatchRunning(true);
 
         // AsyncStorage에 러닝 세션 저장 (탭 바 숨김용)
-        import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
-          AsyncStorage.setItem('@running_session', JSON.stringify({
-            isRunning: true,
-            sessionId: data.sessionId,
-            startTime: Date.now(),
-          }));
-        });
+        import("@react-native-async-storage/async-storage").then(
+          ({ default: AsyncStorage }) => {
+            AsyncStorage.setItem(
+              "@running_session",
+              JSON.stringify({
+                isRunning: true,
+                sessionId: data.sessionId,
+                startTime: Date.now(),
+              })
+            );
+          }
+        );
+
+        // 즉시 탭바 숨김 반영
+        try {
+          emitRunningSession(true);
+        } catch {}
       }
 
       // 워치 위치로 지도 이동 및 경로 누적
-      if (data.currentPoint && data.currentPoint.latitude && data.currentPoint.longitude) {
+      if (
+        data.currentPoint &&
+        data.currentPoint.latitude &&
+        data.currentPoint.longitude
+      ) {
         const newPoint = {
           latitude: data.currentPoint.latitude,
           longitude: data.currentPoint.longitude,
         };
 
         // 경로에 새 포인트 추가 (중복 방지)
-        setWatchRoutePoints(prev => {
+        setWatchRoutePoints((prev) => {
           const lastPoint = prev[prev.length - 1];
           // 마지막 포인트와 동일한지 확인 (좌표가 정확히 같으면 추가하지 않음)
-          if (lastPoint &&
-              Math.abs(lastPoint.latitude - newPoint.latitude) < 0.00001 &&
-              Math.abs(lastPoint.longitude - newPoint.longitude) < 0.00001) {
+          if (
+            lastPoint &&
+            Math.abs(lastPoint.latitude - newPoint.latitude) < 0.00001 &&
+            Math.abs(lastPoint.longitude - newPoint.longitude) < 0.00001
+          ) {
             return prev;
           }
           return [...prev, newPoint];
@@ -201,76 +303,98 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
     });
 
     // wearStarted 이벤트 리스너 추가
-    const { NativeModules, NativeEventEmitter } = require('react-native');
+    const { NativeModules, NativeEventEmitter } = require("react-native");
     const { WayToEarthWear } = NativeModules;
     const emitter = new NativeEventEmitter(WayToEarthWear);
 
-    const startedSub = emitter.addListener('wearStarted', (payload: string) => {
-      console.log('[LiveRunning] Watch session started:', payload);
+    const startedSub = emitter.addListener("wearStarted", (payload: string) => {
+      console.log("[LiveRunning] Watch session started:", payload);
       setWatchRunning(true);
     });
 
     // wearRunningComplete 이벤트 리스너 추가 (워치에서 종료 버튼 누름)
-    const completeSub = emitter.addListener('wearRunningComplete', async (payload: string) => {
-      console.log('[LiveRunning] Watch session completed:', payload);
+    const completeSub = emitter.addListener(
+      "wearRunningComplete",
+      async (payload: string) => {
+        console.log("[LiveRunning] Watch session completed:", payload);
 
-      try {
-        // payload 파싱
-        const completeData = JSON.parse(payload);
-        console.log('[LiveRunning] Parsed complete data:', completeData);
-
-        // 완료 데이터 저장
-        setWatchCompleteData(completeData);
-
-        // 워치 러닝 종료
-        setWatchRunning(false);
-
-        // 혹시 실행 중인 핸드폰 러닝이 있다면 종료 (정리)
-        if (t.isRunning) {
-          console.log('[LiveRunning] Stopping phone running session after watch complete');
-          t.stop().catch(err => console.error('[LiveRunning] Failed to stop:', err));
-        }
-
-        // AsyncStorage 세션 정보 제거
-        import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
-          AsyncStorage.removeItem('@running_session');
-        });
-
-        // 위치를 강제로 다시 가져오기 (메인 페이지 지도를 위해)
-        console.log('[LiveRunning] Attempting to refresh location after watch complete...');
         try {
-            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-            console.log('[LiveRunning] Successfully refreshed location after watch complete:', loc.coords);
-        } catch (err) {
-            console.warn('[LiveRunning] Failed to refresh location after watch complete:', err);
-        }
+          // payload 파싱
+          const completeData = JSON.parse(payload);
+          console.log("[LiveRunning] Parsed complete data:", completeData);
 
-        // 저장 확인 다이얼로그 표시
-        setConfirmSave(true);
-      } catch (e) {
-        console.error('[LiveRunning] Failed to parse complete data:', e);
+          // 완료 데이터 저장
+          setWatchCompleteData(completeData);
+
+          // 워치 러닝 종료
+          setWatchRunning(false);
+
+          // 혹시 실행 중인 핸드폰 러닝이 있다면 종료 (정리)
+          if (t.isRunning) {
+            console.log(
+              "[LiveRunning] Stopping phone running session after watch complete"
+            );
+            t.stop().catch((err) =>
+              console.error("[LiveRunning] Failed to stop:", err)
+            );
+          }
+
+          // AsyncStorage 세션 정보 제거
+          import("@react-native-async-storage/async-storage").then(
+            ({ default: AsyncStorage }) => {
+              AsyncStorage.removeItem("@running_session");
+            }
+          );
+
+          // 위치를 강제로 다시 가져오기 (메인 페이지 지도를 위해)
+          console.log(
+            "[LiveRunning] Attempting to refresh location after watch complete..."
+          );
+          try {
+            const loc = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.High,
+            });
+            console.log(
+              "[LiveRunning] Successfully refreshed location after watch complete:",
+              loc.coords
+            );
+          } catch (err) {
+            console.warn(
+              "[LiveRunning] Failed to refresh location after watch complete:",
+              err
+            );
+          }
+
+          // 저장 확인 다이얼로그 표시
+          setConfirmSave(true);
+        } catch (e) {
+          console.error("[LiveRunning] Failed to parse complete data:", e);
+        }
       }
-    });
+    );
 
     // wearRunIdReceived 이벤트 리스너 추가 (서버에서 runId 수신)
-    const runIdSub = emitter.addListener('wearRunIdReceived', (payload: string) => {
-      console.log('[LiveRunning] Watch runId received:', payload);
+    const runIdSub = emitter.addListener(
+      "wearRunIdReceived",
+      (payload: string) => {
+        console.log("[LiveRunning] Watch runId received:", payload);
 
-      try {
-        const data = JSON.parse(payload);
-        console.log('[LiveRunning] Parsed runId data:', data);
+        try {
+          const data = JSON.parse(payload);
+          console.log("[LiveRunning] Parsed runId data:", data);
 
-        // watchCompleteData 업데이트
-        setWatchCompleteData(prev => {
-          if (prev && prev.sessionId === data.sessionId) {
-            return { ...prev, runId: data.runId };
-          }
-          return prev;
-        });
-      } catch (e) {
-        console.error('[LiveRunning] Failed to parse runId data:', e);
+          // watchCompleteData 업데이트
+          setWatchCompleteData((prev) => {
+            if (prev && prev.sessionId === data.sessionId) {
+              return { ...prev, runId: data.runId };
+            }
+            return prev;
+          });
+        } catch (e) {
+          console.error("[LiveRunning] Failed to parse runId data:", e);
+        }
       }
-    });
+    );
 
     return () => {
       unsubscribeUpdates();
@@ -291,7 +415,9 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
       console.log("[LiveRunning] Watch not connected, using phone-only mode");
       setWatchMode(false);
       // 폰 모드에서만 GPS 가열
-      try { (t as any).prime?.(); } catch {}
+      try {
+        (t as any).prime?.();
+      } catch {}
     }
 
     setCountdownVisible(true);
@@ -306,16 +432,36 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
       // 워치 모드: 워치 세션 시작
       try {
         console.log("[LiveRunning] Starting watch session");
-        const sessionId = await startRunOrchestrated('SINGLE');
+        const sessionId = await startRunOrchestrated("SINGLE");
         console.log("[LiveRunning] Watch session started:", sessionId);
+        // 워치 모드 시작과 동시에 탭바 숨김 즉시 반영
+        try {
+          const { default: AsyncStorage } = await import(
+            "@react-native-async-storage/async-storage"
+          );
+          await AsyncStorage.setItem(
+            "@running_session",
+            JSON.stringify({
+              isRunning: true,
+              sessionId,
+              startTime: Date.now(),
+            })
+          );
+        } catch {}
+        try {
+          emitRunningSession(true);
+        } catch {}
         setAlert({
           open: true,
-          kind: 'positive',
-          title: '워치 연동',
-          message: '워치와 연동되어 러닝을 시작합니다'
+          kind: "positive",
+          title: "워치 연동",
+          message: "워치와 연동되어 러닝을 시작합니다",
         });
       } catch (error) {
-        console.error("[LiveRunning] Watch start failed, fallback to phone mode:", error);
+        console.error(
+          "[LiveRunning] Watch start failed, fallback to phone mode:",
+          error
+        );
         // 워치 시작 실패 시 폰 모드로 전환
         setWatchMode(false);
         requestAnimationFrame(() => {
@@ -323,9 +469,9 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
         });
         setAlert({
           open: true,
-          kind: 'negative',
-          title: '워치 연동 실패',
-          message: '폰 모드로 시작합니다'
+          kind: "negative",
+          title: "워치 연동 실패",
+          message: "폰 모드로 시작합니다",
         });
       }
     } else {
@@ -334,11 +480,37 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
         console.log("[LiveRunning] calling t.start() (phone mode)");
         t.start();
       });
+      // 러닝 세션 시작 표시 -> 탭 네비 잠금에 사용
+      try {
+        const { default: AsyncStorage } = await import(
+          "@react-native-async-storage/async-storage"
+        );
+        await AsyncStorage.setItem(
+          "@running_session",
+          JSON.stringify({
+            isRunning: true,
+            sessionId: t.sessionId,
+            startTime: Date.now(),
+          })
+        );
+      } catch {}
+      // 즉시 탭바 숨김 반영
+      try {
+        emitRunningSession(true);
+      } catch {}
     }
 
     // 권한 요청은 비동기로 병렬 처리 (UI 차단 방지)
     backgroundRunning.requestNotificationPermission().catch(() => {});
   }, [watchMode, t, backgroundRunning]);
+
+  // 러닝 상태 변경 시 제스처 차단 외 탭바 표시 상태도 동기화(이중 안전장치)
+  useEffect(() => {
+    const running = t.isRunning || watchRunning;
+    try {
+      emitRunningSession(!!running);
+    } catch {}
+  }, [t.isRunning, watchRunning]);
 
   const elapsedLabel = useMemo(() => {
     const m = Math.floor(t.elapsedSec / 60);
@@ -365,28 +537,45 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
     try {
       // 혹시 실행 중인 러닝 세션이 있다면 종료
       if (t.isRunning) {
-        console.log('[LiveRunning] Stopping running session in doExitWithoutSave');
+        console.log(
+          "[LiveRunning] Stopping running session in doExitWithoutSave"
+        );
         await t.stop();
       }
 
       await backgroundRunning.clearSession();
 
       // AsyncStorage 세션 정보도 제거
-      import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
-        AsyncStorage.removeItem('@running_session');
-      });
+      import("@react-native-async-storage/async-storage").then(
+        ({ default: AsyncStorage }) => {
+          AsyncStorage.removeItem("@running_session");
+        }
+      );
+      // 즉시 탭바 복귀
+      try {
+        emitRunningSession(false);
+      } catch {}
 
       // 위치를 강제로 다시 가져오기 (메인 페이지로 돌아갈 때를 위해)
-      console.log('[LiveRunning] Attempting to refresh location before exiting...');
+      console.log(
+        "[LiveRunning] Attempting to refresh location before exiting..."
+      );
       try {
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        console.log('[LiveRunning] Successfully refreshed location in doExitWithoutSave:', loc.coords);
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+        console.log(
+          "[LiveRunning] Successfully refreshed location in doExitWithoutSave:",
+          loc.coords
+        );
       } catch (err) {
-        console.warn('[LiveRunning] Failed to refresh location before exiting:', err);
+        console.warn(
+          "[LiveRunning] Failed to refresh location before exiting:",
+          err
+        );
       }
-
     } catch (e) {
-      console.error('[LiveRunning] Error during pre-exit cleanup:', e);
+      console.error("[LiveRunning] Error during pre-exit cleanup:", e);
     }
 
     // 워치 모드 리셋
@@ -400,7 +589,7 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
       navigationRef.dispatch(StackActions.replace("MainTabs"));
     } else {
       const rootParent = navigation.getParent?.()?.getParent?.();
-      if (rootParent && typeof rootParent.dispatch === 'function') {
+      if (rootParent && typeof rootParent.dispatch === "function") {
         rootParent.dispatch(StackActions.replace("MainTabs"));
       } else {
         navigation.navigate("MainTabs", { screen: "LiveRunningScreen" });
@@ -427,7 +616,10 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
       // 워치 모드인지 폰 모드인지 확인
       if (watchMode && watchCompleteData) {
         // 워치 모드: watchCompleteData 사용 (watchSync.ts에서 이미 서버에 complete 전송됨)
-        const distanceMeters = watchCompleteData.totalDistanceMeters || watchCompleteData.distanceMeters || 0;
+        const distanceMeters =
+          watchCompleteData.totalDistanceMeters ||
+          watchCompleteData.distanceMeters ||
+          0;
         const distanceKm = distanceMeters / 1000;
         const avgPaceSec = watchCompleteData.averagePaceSeconds || null;
         const calories = watchCompleteData.calories || 0;
@@ -435,17 +627,29 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
 
         // routePoints 처리: watchCompleteData에서 가져오거나 실시간 누적된 watchRoutePoints 사용
         let routePointsForSummary = [];
-        if (watchCompleteData.routePoints && Array.isArray(watchCompleteData.routePoints) && watchCompleteData.routePoints.length > 0) {
-          routePointsForSummary = watchCompleteData.routePoints.map((p: any) => ({
-            latitude: p.latitude,
-            longitude: p.longitude,
-          }));
-          console.log('[LiveRunning] Using routePoints from watchCompleteData:', routePointsForSummary.length);
+        if (
+          watchCompleteData.routePoints &&
+          Array.isArray(watchCompleteData.routePoints) &&
+          watchCompleteData.routePoints.length > 0
+        ) {
+          routePointsForSummary = watchCompleteData.routePoints.map(
+            (p: any) => ({
+              latitude: p.latitude,
+              longitude: p.longitude,
+            })
+          );
+          console.log(
+            "[LiveRunning] Using routePoints from watchCompleteData:",
+            routePointsForSummary.length
+          );
         } else if (watchRoutePoints.length > 0) {
           routePointsForSummary = watchRoutePoints;
-          console.log('[LiveRunning] Using accumulated watchRoutePoints:', routePointsForSummary.length);
+          console.log(
+            "[LiveRunning] Using accumulated watchRoutePoints:",
+            routePointsForSummary.length
+          );
         } else {
-          console.warn('[LiveRunning] No route points available');
+          console.warn("[LiveRunning] No route points available");
         }
 
         await backgroundRunning.stopForegroundService();
@@ -456,14 +660,26 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
         setWatchCompleteData(null);
         setWatchRoutePoints([]);
 
+        // 테스트/개발 강제 표시 제거: 실제 수여 시에만 별도 처리
+
+        // 러닝 종료 → 탭바 재표시
+        try {
+          emitRunningSession(false);
+        } catch {}
         navigation.navigate("RunSummary", {
           runId: watchCompleteData.runId || null, // watchSync.ts에서 apiComplete 결과로 받은 runId
           defaultTitle: "오늘의 러닝",
           distanceKm,
-          paceLabel: avgPaceSec ? `${Math.floor(avgPaceSec / 60)}:${String(avgPaceSec % 60).padStart(2, "0")}` : "--:--",
+          paceLabel: avgPaceSec
+            ? `${Math.floor(avgPaceSec / 60)}:${String(
+                avgPaceSec % 60
+              ).padStart(2, "0")}`
+            : "--:--",
           kcal: calories,
           elapsedSec: durationSec,
-          elapsedLabel: `${Math.floor(durationSec / 60)}:${String(durationSec % 60).padStart(2, "0")}`,
+          elapsedLabel: `${Math.floor(durationSec / 60)}:${String(
+            durationSec % 60
+          ).padStart(2, "0")}`,
           routePath: routePointsForSummary,
           sessionId: watchCompleteData.sessionId || "",
         });
@@ -473,15 +689,22 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
           t.distance > 0 && Number.isFinite(t.elapsedSec / t.distance)
             ? Math.floor(t.elapsedSec / Math.max(t.distance, 0.000001))
             : null;
-        const routePoints = t.route.map((p, i) => ({ latitude: p.latitude, longitude: p.longitude, sequence: i + 1 }));
+        const routePoints = t.route.map((p, i) => ({
+          latitude: p.latitude,
+          longitude: p.longitude,
+          sequence: i + 1,
+        }));
 
         // sessionId가 null인 경우 기본값 생성 (세션 생성이 완료되지 않은 경우)
         const sessionId = t.sessionId || `phone-${Date.now()}`;
         if (!t.sessionId) {
-          console.warn('[LiveRunning] sessionId is null, using fallback:', sessionId);
+          console.warn(
+            "[LiveRunning] sessionId is null, using fallback:",
+            sessionId
+          );
         }
 
-        const { runId } = await apiComplete({
+        const completeRes = await apiComplete({
           sessionId: sessionId,
           distanceMeters: Math.round(t.distance * 1000),
           durationSeconds: t.elapsedSec,
@@ -492,9 +715,30 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
           title: "오늘의 러닝",
         });
 
+        const runId = completeRes.runId;
+        const awards = (completeRes as any)?.data?.emblemAwardResult;
+        // Extra client-side 10m emblem award (if backend didn't automatically)
+        let extraAwarded = false;
+        try {
+          if (t.distance >= 0.01) {
+            const res = await awardEmblemByCode("DIST_10M");
+            extraAwarded = Boolean(res.awarded);
+          }
+        } catch {}
+        if ((awards && Number(awards.awarded_count) > 0) || extraAwarded) {
+          const baseCount = Number(awards?.awarded_count || 0);
+          setCelebrate({ visible: true, count: Math.max(1, baseCount + (extraAwarded ? 1 : 0)) });
+          await new Promise((r) => setTimeout(r, 2500));
+          setCelebrate({ visible: false });
+        }
+
         await backgroundRunning.stopForegroundService();
         await backgroundRunning.clearSession();
         await t.stop();
+        // 러닝 종료 → 탭바 재표시
+        try {
+          emitRunningSession(false);
+        } catch {}
         navigation.navigate("RunSummary", {
           runId,
           defaultTitle: "오늘의 러닝",
@@ -502,14 +746,21 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
           paceLabel: t.paceLabel,
           kcal: Math.round(t.kcal),
           elapsedSec: t.elapsedSec,
-          elapsedLabel: `${Math.floor(t.elapsedSec / 60)}:${String(t.elapsedSec % 60).padStart(2, "0")}`,
+          elapsedLabel: `${Math.floor(t.elapsedSec / 60)}:${String(
+            t.elapsedSec % 60
+          ).padStart(2, "0")}`,
           routePath: t.route,
           sessionId: (t.sessionId as string) ?? "",
         });
       }
     } catch (e) {
       console.error("러닝 완료/저장 실패:", e);
-      setAlert({ open:true, kind:'negative', title:'저장 실패', message:'네트워크 또는 서버 오류가 발생했어요.' });
+      setAlert({
+        open: true,
+        kind: "negative",
+        title: "저장 실패",
+        message: "네트워크 또는 서버 오류가 발생했어요.",
+      });
     } finally {
       isStoppingRef.current = false;
     }
@@ -536,16 +787,51 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
     }
   }, [t.distance, t.isRunning, targetDistanceKm, completeRun]);
 
+  // 러닝 시작 시 네비게이션 비활성화 (뒤로가기/제스처 차단)
+  useEffect(() => {
+    try {
+      navigation?.setOptions?.({
+        gestureEnabled: !(t.isRunning || watchRunning),
+      });
+    } catch {}
+    const onBeforeRemove = (e: any) => {
+      if (t.isRunning || watchRunning) {
+        e.preventDefault();
+      }
+    };
+    const unsub = navigation?.addListener?.("beforeRemove", onBeforeRemove);
+    return () => {
+      try {
+        unsub && unsub();
+      } catch {}
+    };
+  }, [navigation, t.isRunning, watchRunning]);
+
   return (
     <SafeLayout withBottomInset>
-      {alert.open && alert.kind === 'positive' && (
-        <PositiveAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+      {alert.open && alert.kind === "positive" && (
+        <PositiveAlert
+          visible
+          title={alert.title}
+          message={alert.message}
+          onClose={() => setAlert({ open: false, kind: "message" })}
+        />
       )}
-      {alert.open && alert.kind === 'negative' && (
-        <NegativeAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+      {alert.open && alert.kind === "negative" && (
+        <NegativeAlert
+          visible
+          title={alert.title}
+          message={alert.message}
+          onClose={() => setAlert({ open: false, kind: "message" })}
+        />
       )}
-      {alert.open && alert.kind === 'message' && (
-        <MessageAlert visible title={alert.title} message={alert.message} onClose={() => setAlert({ open:false, kind:'message' })} />
+      {alert.open && alert.kind === "message" && (
+        <MessageAlert
+          visible
+          title={alert.title}
+          message={alert.message}
+          onClose={() => setAlert({ open: false, kind: "message" })}
+        />
       )}
       <ConfirmAlert
         visible={confirmExit}
@@ -582,7 +868,11 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
       <MapRoute
         key={mapKey}
         route={watchMode && watchRunning ? watchRoutePoints : t.route}
-        last={watchMode && watchRunning && watchRoutePoints.length > 0 ? watchRoutePoints[watchRoutePoints.length - 1] : t.last}
+        last={
+          watchMode && watchRunning && watchRoutePoints.length > 0
+            ? watchRoutePoints[watchRoutePoints.length - 1]
+            : t.last
+        }
         liveMode
         onBindCenter={t.bindMapCenter}
         onBindSnapshot={(fn) => {
@@ -594,42 +884,54 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
 
       {/* 상단 비네팅 효과 */}
       <LinearGradient
-        colors={['rgba(255, 255, 255, 1)', 'rgba(255, 255, 255, 0.7)', 'transparent']}
+        colors={[
+          "rgba(255, 255, 255, 1)",
+          "rgba(255, 255, 255, 0.7)",
+          "transparent",
+        ]}
         style={{
-          position: 'absolute',
+          position: "absolute",
           top: 0,
           left: 0,
           right: 0,
           height: 180,
-          pointerEvents: 'none',
+          pointerEvents: "none",
         }}
       />
 
       {/* 좌우 비네팅 효과 */}
       <LinearGradient
-        colors={['rgba(255, 255, 255, 0.9)', 'transparent', 'rgba(255, 255, 255, 0.9)']}
+        colors={[
+          "rgba(255, 255, 255, 0.9)",
+          "transparent",
+          "rgba(255, 255, 255, 0.9)",
+        ]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={{
-          position: 'absolute',
+          position: "absolute",
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          pointerEvents: 'none',
+          pointerEvents: "none",
         }}
       />
 
       {/* 하단 비네팅 효과 */}
       <LinearGradient
-        colors={['transparent', 'rgba(255, 255, 255, 0.6)', 'rgba(255, 255, 255, 1)']}
+        colors={[
+          "transparent",
+          "rgba(255, 255, 255, 0.6)",
+          "rgba(255, 255, 255, 1)",
+        ]}
         style={{
-          position: 'absolute',
+          position: "absolute",
           left: 0,
           right: 0,
           bottom: 0,
           height: 200,
-          pointerEvents: 'none',
+          pointerEvents: "none",
         }}
       />
 
@@ -642,23 +944,23 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
             left: 20,
             right: 20,
             zIndex: 10,
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
           }}
         >
           <View style={styles.segmentControl}>
             <TouchableOpacity
               style={[
                 styles.segmentButton,
-                activeTab === 'running' && styles.segmentButtonActive,
+                activeTab === "running" && styles.segmentButtonActive,
               ]}
-              onPress={() => setActiveTab('running')}
+              onPress={() => setActiveTab("running")}
             >
               <Text
                 style={[
                   styles.segmentText,
-                  activeTab === 'running' && styles.segmentTextActive,
+                  activeTab === "running" && styles.segmentTextActive,
                 ]}
               >
                 러닝
@@ -667,14 +969,14 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
             <TouchableOpacity
               style={[
                 styles.segmentButton,
-                activeTab === 'journey' && styles.segmentButtonActive,
+                activeTab === "journey" && styles.segmentButtonActive,
               ]}
-              onPress={() => setActiveTab('journey')}
+              onPress={() => setActiveTab("journey")}
             >
               <Text
                 style={[
                   styles.segmentText,
-                  activeTab === 'journey' && styles.segmentTextActive,
+                  activeTab === "journey" && styles.segmentTextActive,
                 ]}
               >
                 여정 러닝
@@ -694,15 +996,23 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
 
       {(t.isRunning || t.isPaused || watchRunning) && (
         <RunStatsCard
-          distanceKm={watchMode && watchData ? watchData.distanceMeters / 1000 : t.distance}
+          distanceKm={
+            watchMode && watchData
+              ? watchData.distanceMeters / 1000
+              : t.distance
+          }
           paceLabel={
             watchMode && watchData && watchData.averagePaceSeconds
-              ? `${Math.floor(watchData.averagePaceSeconds / 60)}:${String(watchData.averagePaceSeconds % 60).padStart(2, "0")}`
+              ? `${Math.floor(watchData.averagePaceSeconds / 60)}:${String(
+                  watchData.averagePaceSeconds % 60
+                ).padStart(2, "0")}`
               : t.paceLabel
           }
           kcal={watchMode && watchData ? watchData.calories : t.kcal}
           speedKmh={t.speedKmh}
-          elapsedSec={watchMode && watchData ? watchData.durationSeconds : t.elapsedSec}
+          elapsedSec={
+            watchMode && watchData ? watchData.durationSeconds : t.elapsedSec
+          }
         />
       )}
 
@@ -744,30 +1054,32 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
         >
           <TouchableOpacity
             onPress={() => {
-              if (activeTab === 'running') {
+              if (activeTab === "running") {
                 handleRunningStart();
               } else {
                 // Tab Navigator에서 Root Stack으로 이동
                 if (navigationRef.isReady()) {
-                  navigationRef.navigate('JourneyRouteList' as never);
+                  navigationRef.navigate("JourneyRouteList" as never);
                 } else {
                   // fallback: parent navigation 사용
                   const parentNav = navigation.getParent?.();
                   if (parentNav) {
-                    parentNav.navigate('JourneyRouteList');
+                    parentNav.navigate("JourneyRouteList");
                   } else {
-                    navigation.navigate('JourneyRouteList');
+                    navigation.navigate("JourneyRouteList");
                   }
                 }
               }
             }}
-            disabled={activeTab === 'running' && (!t.isReady || t.isInitializing)}
+            disabled={
+              activeTab === "running" && (!t.isReady || t.isInitializing)
+            }
             style={{
               width: 80,
               height: 80,
               borderRadius: 40,
               backgroundColor:
-                activeTab === 'running' && (!t.isReady || t.isInitializing)
+                activeTab === "running" && (!t.isReady || t.isInitializing)
                   ? "rgba(0, 0, 0, 0.3)"
                   : "rgba(0, 0, 0, 0.85)",
               alignItems: "center",
@@ -785,18 +1097,19 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
               style={{
                 fontSize: 15,
                 fontWeight: "800",
-                color: activeTab === 'running' && (!t.isReady || t.isInitializing)
-                  ? "rgba(255, 255, 255, 0.5)"
-                  : "#FFFFFF",
+                color:
+                  activeTab === "running" && (!t.isReady || t.isInitializing)
+                    ? "rgba(255, 255, 255, 0.5)"
+                    : "#FFFFFF",
                 textAlign: "center",
               }}
             >
-              {activeTab === 'running'
-                ? (!t.isReady
+              {activeTab === "running"
+                ? !t.isReady
                   ? "준비중"
                   : t.isInitializing
                   ? "시작중"
-                  : "시작")
+                  : "시작"
                 : "여정"}
             </Text>
           </TouchableOpacity>
@@ -810,7 +1123,14 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
           onPlay={() => t.start()}
           onPause={() => t.pause()}
           onResume={() => t.resume()}
-          onStopTap={() => setAlert({ open:true, kind:'message', title:'안내', message:'종료하려면 길게 누르세요' })}
+          onStopTap={() =>
+            setAlert({
+              open: true,
+              kind: "message",
+              title: "안내",
+              message: "종료하려면 길게 누르세요",
+            })
+          }
           onStopLong={completeRun}
         />
       )}
@@ -825,14 +1145,16 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
             alignItems: "center",
           }}
         >
-          <Text style={{
-            fontSize: 14,
-            color: "rgba(0,0,0,0.6)",
-            backgroundColor: "rgba(255,255,255,0.9)",
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            borderRadius: 20,
-          }}>
+          <Text
+            style={{
+              fontSize: 14,
+              color: "rgba(0,0,0,0.6)",
+              backgroundColor: "rgba(255,255,255,0.9)",
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              borderRadius: 20,
+            }}
+          >
             ⌚ 워치에서 제어 중
           </Text>
         </View>
@@ -845,23 +1167,26 @@ export default function LiveRunningScreen({ navigation, route }: { navigation: a
         seconds={3}
         onDone={handleCountdownDone}
       />
+
+      {/* Celebration overlay should render last to ensure topmost stacking */}
+      {celebrate.visible && <EmblemCelebration count={celebrate.count} />}
     </SafeLayout>
   );
 }
 
 const styles = StyleSheet.create({
   segmentControl: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    flexDirection: "row",
+    backgroundColor: "rgba(0, 0, 0, 0.85)",
     borderRadius: 24,
     padding: 4,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 12,
     elevation: 6,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: "rgba(255, 255, 255, 0.2)",
   },
   segmentButton: {
     paddingHorizontal: 20,
@@ -869,14 +1194,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   segmentButtonActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
   },
   segmentText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.6)',
+    fontWeight: "600",
+    color: "rgba(255, 255, 255, 0.6)",
   },
   segmentTextActive: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
 });
