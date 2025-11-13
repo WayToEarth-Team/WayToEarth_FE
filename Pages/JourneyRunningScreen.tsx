@@ -1,7 +1,7 @@
 // Pages/JourneyRunningScreen.tsx
 // 여정 러닝 메인 화면 (실시간 추적 + 진행률)
 
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import * as Location from "expo-location";
 import SafeLayout from "../components/Layout/SafeLayout";
 import {
@@ -24,6 +24,7 @@ import WeatherWidget from "../components/Running/WeatherWidget";
 import GuestbookCreateModal from "../components/Guestbook/GuestbookCreateModal";
 import LandmarkStatistics from "../components/Guestbook/LandmarkStatistics";
 import ImageCarousel from "../components/Common/ImageCarousel";
+import StampBottomSheet from "../components/Landmark/StampBottomSheet";
 import { useJourneyRunning } from "../hooks/journey/useJourneyRunning";
 import { useBackgroundRunning } from "../hooks/journey/useBackgroundRunning";
 import { useWeather } from "../contexts/WeatherContext";
@@ -35,6 +36,14 @@ import type { LandmarkSummary } from "../types/guestbook";
 import type { LandmarkDetail } from "../types/landmark";
 import { getMyProfile } from "../utils/api/users";
 import { getLandmarkDetail } from "../utils/api/landmarks";
+import { distanceKm } from "../utils/geo";
+import {
+  getOrFetchProgressId,
+  getProgressStamps,
+  checkCollection,
+  collectStampForProgress,
+  type StampResponse,
+} from "../utils/api/stamps";
 
 type RouteParams = {
   route: {
@@ -55,7 +64,9 @@ type RouteParams = {
   navigation?: any;
 };
 
-export default function JourneyRunningScreen(props?: RouteParams) {
+export default function JourneyRunningScreen(
+  props: RouteParams = { route: { params: {} } }
+) {
   const route = props?.route as any;
   const navigation = props?.navigation as any;
   const params = route?.params || {};
@@ -84,14 +95,24 @@ export default function JourneyRunningScreen(props?: RouteParams) {
   const handleLandmarkReached = useCallback(async (landmark: any) => {
     console.log("[JourneyRunning] 랜드마크 도달:", landmark.name);
 
-    // 스탬프 수집 (자동)
+    // 스탬프 수집 (자동, 서버 규칙 준수: progressId/좌표 필요)
     try {
-      const { collectStamp } = await import("../utils/api/stamps");
-      await collectStamp(userId, parseInt(landmark.id));
-      console.log("[JourneyRunning] ✅ 스탬프 수집 완료:", landmark.name);
+      const pid = progressId || (await getOrFetchProgressId(userId, journeyId));
+      const lastPoint = (t.route?.length ? t.route[t.route.length - 1] : null) as LatLng | null;
+      const lmid = parseInt(landmark.id);
+      if (pid && lastPoint && !collectedSet.has(lmid)) {
+        const can = await checkCollection(pid, lmid, { latitude: lastPoint.latitude, longitude: lastPoint.longitude });
+        if (can) {
+          await collectStampForProgress(pid, lmid, { latitude: lastPoint.latitude, longitude: lastPoint.longitude });
+          setCollectedSet((prev) => new Set(prev).add(lmid));
+          console.log("[JourneyRunning] ✅ 스탬프 수집 완료:", landmark.name);
+        } else {
+          console.log("[JourneyRunning] ℹ️ 조건 미충족으로 자동 수집 생략");
+        }
+      }
     } catch (error) {
       console.error("[JourneyRunning] ❌ 스탬프 수집 실패:", error);
-      // 스탬프 수집 실패해도 계속 진행 (방명록은 작성 가능)
+      // 수집 실패해도 계속 진행 (방명록은 작성 가능)
     }
 
     // 랜드마크를 LandmarkSummary 형식으로 변환
@@ -122,7 +143,7 @@ export default function JourneyRunningScreen(props?: RouteParams) {
         { text: "방명록 작성", onPress: () => {} },
       ]
     );
-  }, [userId]);
+  }, [userId, journeyId, progressId, collectedSet]);
 
   const t = useJourneyRunning({
     journeyId,
@@ -143,6 +164,9 @@ export default function JourneyRunningScreen(props?: RouteParams) {
   const [landmarkMenuVisible, setLandmarkMenuVisible] = useState(false);
   const [menuLandmark, setMenuLandmark] = useState<any>(null);
   const [landmarkDetail, setLandmarkDetail] = useState<LandmarkDetail | null>(null);
+  const [progressId, setProgressId] = useState<string | null>(null);
+  const [collectedSet, setCollectedSet] = useState<Set<number>>(new Set());
+  const collectingRef = useRef<Set<number>>(new Set());
 
   // 랜드마크 메뉴가 열릴 때 상세 정보 로드
   useEffect(() => {
@@ -161,6 +185,25 @@ export default function JourneyRunningScreen(props?: RouteParams) {
       setLandmarkDetail(null);
     }
   }, [landmarkMenuVisible, menuLandmark, userId]);
+
+  // 진행ID 및 수집된 스탬프 목록 로드
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const pid = await getOrFetchProgressId(userId, journeyId);
+        if (!alive) return;
+        setProgressId(pid);
+        if (pid) {
+          const list = await getProgressStamps(pid);
+          if (!alive) return;
+          const ids = new Set<number>(list.map((s) => s.landmark?.id).filter((v): v is number => v != null));
+          setCollectedSet(ids);
+        }
+      } catch {}
+    })();
+    return () => { alive = false; };
+  }, [userId, journeyId]);
 
   // 날씨 정보 (이 화면에서만 위치/날씨 활성화)
   const { weather, loading: weatherLoading, enable: enableWeather, disable: disableWeather } = useWeather();
@@ -233,6 +276,40 @@ export default function JourneyRunningScreen(props?: RouteParams) {
       }
     };
   }, []);
+
+  // 위치 업데이트마다 50m 반경 자동 수집 시도
+  useEffect(() => {
+    if (!t.isRunning || t.isPaused) return;
+    if (!progressId) return;
+    const last = t.route?.length ? t.route[t.route.length - 1] : null;
+    if (!last) return;
+
+    const target = landmarks.find((lm) => {
+      const id = parseInt(lm.id);
+      if (collectedSet.has(id) || collectingRef.current.has(id)) return false;
+      const pos = lm.position as LatLng | undefined;
+      if (!pos) return false;
+      const d = distanceKm(last, pos) * 1000;
+      return d <= 50;
+    });
+    if (!target) return;
+
+    const idNum = parseInt(target.id);
+    collectingRef.current.add(idNum);
+    (async () => {
+      try {
+        const can = await checkCollection(progressId, idNum, { latitude: last.latitude, longitude: last.longitude });
+        if (!can) return;
+        await collectStampForProgress(progressId, idNum, { latitude: last.latitude, longitude: last.longitude });
+        setCollectedSet((prev) => new Set(prev).add(idNum));
+        Alert.alert(`🎉 ${target.name} 도착!`, "스탬프를 획득했습니다! 랜드마크에 방명록을 남겨보세요.");
+      } catch (e) {
+        // 무시: 다음 업데이트에서 재시도
+      } finally {
+        setTimeout(() => collectingRef.current.delete(idNum), 4000);
+      }
+    })();
+  }, [t.route?.length, t.isRunning, t.isPaused, progressId, landmarks, collectedSet]);
 
   const handleStartPress = useCallback(() => {
     console.log("[JourneyRunning] start pressed -> show countdown");
@@ -308,7 +385,7 @@ export default function JourneyRunningScreen(props?: RouteParams) {
                 sessionId: t.sessionId,
                 distance: t.distance,
                 elapsedSec: t.elapsedSec,
-                routeLength: t.route.length,
+                routeLength: (t.route?.length ?? 0),
               });
 
               const avgPaceSec =
@@ -317,7 +394,7 @@ export default function JourneyRunningScreen(props?: RouteParams) {
                   : null;
 
               const now = Math.floor(Date.now() / 1000);
-              const routePoints = t.route.map((p, i) => ({
+              const routePoints = (t.route ?? []).map((p, i) => ({
                 latitude: p.latitude,
                 longitude: p.longitude,
                 sequence: i + 1,
@@ -520,6 +597,19 @@ export default function JourneyRunningScreen(props?: RouteParams) {
 
   return (
     <SafeLayout withBottomInset>
+      {/* 스탬프 바텀시트(스와이프 업) - 먼저 렌더해서 다른 UI가 위에 오도록 */}
+      <StampBottomSheet
+        userId={userId}
+        journeyId={journeyId}
+        progressPercent={t.progressPercent}
+        landmarks={landmarks.map(l => ({ id: parseInt(l.id), name: l.name, distanceM: l.distanceM }))}
+        currentLocation={t.route?.length ? t.route[t.route.length - 1] : null}
+        onCollected={(res: StampResponse) => {
+          const id = res?.landmark?.id;
+          if (typeof id === 'number') setCollectedSet((prev) => new Set(prev).add(id));
+        }}
+      />
+
       <JourneyMapRoute
         journeyRoute={journeyRoute}
         landmarks={t.landmarksWithReached}
@@ -802,6 +892,8 @@ export default function JourneyRunningScreen(props?: RouteParams) {
           </View>
         </Pressable>
       </Modal>
+
+      {/* 스탬프 바텀시트(스와이프 업) - 컨트롤 위에 겹치지 않도록 먼저 렌더 */}
     </SafeLayout>
   );
 }
