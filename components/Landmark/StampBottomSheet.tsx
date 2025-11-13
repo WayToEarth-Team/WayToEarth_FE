@@ -10,6 +10,7 @@ import {
   Animated,
   PanResponder,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   ScrollView,
   ActivityIndicator,
   Modal,
@@ -40,7 +41,7 @@ type Props = {
 };
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-const COLLAPSED_PEEK = 140; // HTML과 동일: 헤더 포함 140px
+const COLLAPSED_PEEK = 90; // 접혔을 때 더 많이 보임: 90px (사이드 패널처럼)
 const MAX_HEIGHT = Math.min(SCREEN_HEIGHT * 0.85, SCREEN_HEIGHT - 80);
 
 export default function StampBottomSheet({
@@ -61,6 +62,7 @@ export default function StampBottomSheet({
   const [landmarkDetails, setLandmarkDetails] = useState<Map<number, any>>(new Map());
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successStamp, setSuccessStamp] = useState<StampResponse | null>(null);
+  const lastTap = useRef<number | null>(null);
 
   // 모달 애니메이션
   const modalScale = useRef(new Animated.Value(0)).current;
@@ -158,17 +160,81 @@ export default function StampBottomSheet({
     [translateY]
   );
 
+  // 더블 탭 핸들러
+  const handleDoubleTap = useCallback(() => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+
+    if (lastTap.current && now - lastTap.current < DOUBLE_TAP_DELAY) {
+      // 더블 탭 감지
+      onToggle(!expanded);
+      lastTap.current = null;
+    } else {
+      lastTap.current = now;
+    }
+  }, [expanded, onToggle]);
+
+  const startY = useRef(0);
+  const isDoubleTap = useRef(false);
+
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 6,
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => false,
+      onPanResponderGrant: (_, g) => {
+        // 애니메이션 즉시 중단
+        translateY.stopAnimation((value) => {
+          startY.current = value;
+        });
+        isDoubleTap.current = false;
+
+        // 더블 탭 감지
+        const now = Date.now();
+        const DOUBLE_TAP_DELAY = 300;
+
+        if (lastTap.current && now - lastTap.current < DOUBLE_TAP_DELAY) {
+          // 더블 탭!
+          isDoubleTap.current = true;
+          onToggle(!expanded);
+          lastTap.current = null;
+        } else {
+          lastTap.current = now;
+        }
+      },
       onPanResponderMove: (_, g) => {
+        // 더블 탭이면 움직임 무시
+        if (isDoubleTap.current) return;
+
+        // 손가락 움직임을 정확히 따라가도록 (부드럽게)
         const next = Math.min(
           MAX_HEIGHT - COLLAPSED_PEEK,
-          Math.max(0, (expanded ? 0 : MAX_HEIGHT - COLLAPSED_PEEK) + g.dy)
+          Math.max(0, startY.current + g.dy)
         );
         translateY.setValue(next);
       },
       onPanResponderRelease: (_, g) => {
+        // 더블 탭이면 release 무시
+        if (isDoubleTap.current) {
+          return;
+        }
+
+        // 스와이프가 거의 없었다면 (단일 탭) 현재 상태 유지
+        if (Math.abs(g.dy) < 30 && Math.abs(g.vy) < 0.3) {
+          // 현재 expanded 상태에 맞춰 원래 위치로
+          const targetY = expanded ? 0 : MAX_HEIGHT - COLLAPSED_PEEK;
+          Animated.spring(translateY, {
+            toValue: targetY,
+            useNativeDriver: true,
+            stiffness: 300,
+            damping: 30,
+          }).start();
+          return;
+        }
+
         const threshold = (MAX_HEIGHT - COLLAPSED_PEEK) / 2;
         const current = (translateY as any)._value as number;
         const shouldExpand = g.vy < 0 || current < threshold;
@@ -258,27 +324,30 @@ export default function StampBottomSheet({
           },
         ]}
       >
-        {/* 드래그 핸들 */}
-        <View style={styles.dragHandleArea} {...panResponder.panHandlers}>
-          <View style={styles.dragHandle} />
-        </View>
+        {/* 드래그 핸들 + 헤더 전체 - 더블 탭 & 스와이프 가능 */}
+        <View {...panResponder.panHandlers} style={styles.interactiveArea}>
+          {/* 드래그 핸들 */}
+          <View style={styles.dragHandleArea}>
+            <View style={styles.dragHandle} />
+          </View>
 
-        {/* 헤더 */}
-        <View style={styles.header}>
-          <Text style={styles.title}>랜드마크 스탬프</Text>
-          <View style={styles.subtitleRow}>
-            <Text style={styles.subtitle}>🎯 각 위치에 도착해서 스탬프를 수집하세요</Text>
-            <LinearGradient
-              colors={["#667eea", "#764ba2"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.badge}
-            >
-              <Text style={styles.badgeText}>✨</Text>
-              <Text style={styles.badgeText}>
-                {Math.max(0, Math.min(100, progressPercent)).toFixed(0)}%
-              </Text>
-            </LinearGradient>
+          {/* 헤더 */}
+          <View style={styles.header}>
+            <Text style={styles.title}>랜드마크 스탬프</Text>
+            <View style={styles.subtitleRow}>
+              <Text style={styles.subtitle}>🎯 각 위치에 도착해서 스탬프를 수집하세요</Text>
+              <LinearGradient
+                colors={["#667eea", "#764ba2"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.badge}
+              >
+                <Text style={styles.badgeText}>✨</Text>
+                <Text style={styles.badgeText}>
+                  {Math.max(0, Math.min(100, progressPercent)).toFixed(0)}%
+                </Text>
+              </LinearGradient>
+            </View>
           </View>
         </View>
 
@@ -456,26 +525,30 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: -4 },
-    elevation: 20,
-    zIndex: 1000, // 기본 zIndex 추가
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: -6 },
+    elevation: 24,
+    zIndex: 1000,
+  },
+  interactiveArea: {
+    // 터치 가능한 넓은 영역
   },
   dragHandleArea: {
-    padding: 12,
-    paddingBottom: 8,
-    paddingTop: 16, // 터치 영역 확대
+    padding: 8,
+    paddingBottom: 4,
+    paddingTop: 6,
   },
   dragHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#d0d0d0",
+    width: 50,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#6366F1", // 보라색으로 변경
     alignSelf: "center",
+    opacity: 0.6,
   },
   header: {
     paddingHorizontal: 20,
