@@ -4,7 +4,7 @@ import MapView, {
   Polyline,
   LatLng as RNLatLng,
 } from "react-native-maps";
-import { StyleSheet, View, Text, Pressable } from "react-native";
+import { StyleSheet, View, Text, Pressable, Animated } from "react-native";
 import type { LatLng } from "../../types/types";
 import * as Location from "expo-location";
 
@@ -36,6 +36,94 @@ type Props = {
   // 랜드마크 마커 클릭 콜백
   onLandmarkPress?: (landmark: JourneyLandmark) => void;
 };
+
+// 개별 랜드마크 마커 컴포넌트(메모이제이션으로 깜빡임/불필요 렌더 방지)
+const LandmarkMarkerItem = React.memo(function LandmarkMarkerItem({
+  landmark,
+  index,
+  onPress,
+}: {
+  landmark: JourneyLandmark;
+  index: number;
+  onPress?: (lm: JourneyLandmark) => void;
+}) {
+  const prevReachedRef = React.useRef<boolean>(landmark.reached);
+  const scale = React.useRef(new Animated.Value(1)).current;
+  const [tracks, setTracks] = React.useState(false);
+
+  React.useEffect(() => {
+    // 최초로 reached가 true로 전환될 때만 축하 애니메이션 (해당 마커만)
+    if (!prevReachedRef.current && landmark.reached) {
+      setTracks(true); // 애니메이션 동안만 뷰 갱신 허용
+      Animated.sequence([
+        Animated.spring(scale, {
+          toValue: 1.25,
+          friction: 4,
+          tension: 160,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scale, {
+          toValue: 1,
+          friction: 6,
+          tension: 140,
+          useNativeDriver: true,
+        }),
+      ]).start(() => setTracks(false));
+    }
+    prevReachedRef.current = landmark.reached;
+  }, [landmark.reached, scale]);
+
+  return (
+    <Marker
+      key={`lmk-${landmark.id}`}
+      coordinate={landmark.position as RNLatLng}
+      title={landmark.name}
+      description={landmark.distance}
+      onPress={() => onPress?.(landmark)}
+      anchor={{ x: 0.5, y: 1 }}
+      tracksViewChanges={tracks}
+    >
+      {/* 모던한 핀 스타일 마커 */}
+      <View style={styles.markerContainer}>
+        {/* 하단 그림자 */}
+        <View style={styles.markerShadow} />
+
+        {/* 메인 핀 (도달 전환 시 스케일 애니메이션) */}
+        <Animated.View
+          style={[
+            styles.pinBody,
+            landmark.reached ? styles.pinBodyReached : styles.pinBodyPending,
+            { transform: [{ scale }] },
+          ]}
+        >
+          {landmark.reached ? (
+            <Text style={styles.pinIcon}>✓</Text>
+          ) : (
+            <Text style={styles.pinNumber}>{index + 1}</Text>
+          )}
+        </Animated.View>
+
+        {/* 핀 끝 (삼각형 느낌) */}
+        <View
+          style={[
+            styles.pinTip,
+            landmark.reached ? styles.pinTipReached : styles.pinTipPending,
+          ]}
+        />
+      </View>
+    </Marker>
+  );
+}, (prev, next) => {
+  const a = prev.landmark, b = next.landmark;
+  return (
+    a.id === b.id &&
+    a.reached === b.reached &&
+    a.position.latitude === b.position.latitude &&
+    a.position.longitude === b.position.longitude &&
+    prev.index === next.index &&
+    prev.onPress === next.onPress
+  );
+});
 
 // 커스텀 지도 스타일 (미니멀 & 깔끔)
 const customMapStyle = [
@@ -276,51 +364,27 @@ export default function JourneyMapRoute({
     } catch {}
   }, [mapReady, currentLat, currentLng]);
 
-  // 🏁 랜드마크 마커 캐싱: landmarks 배열이 실제로 변경될 때만 리렌더링
+  // 🏁 랜드마크 마커 캐싱: landmarks 내용 서명만 의존해 불필요 재생성 방지
+  const landmarksSig = useMemo(
+    () =>
+      landmarks
+        .map(
+          (l) => `${l.id}:${l.reached ? 1 : 0}:${l.position.latitude.toFixed(6)},${l.position.longitude.toFixed(6)}`
+        )
+        .join("|"),
+    [landmarks]
+  );
+
   const landmarkMarkers = useMemo(() => {
     return landmarks.map((landmark, index) => (
-      <Marker
-        key={landmark.id}
-        coordinate={landmark.position as RNLatLng}
-        title={landmark.name}
-        description={landmark.distance}
-        onPress={() => onLandmarkPress?.(landmark)}
-        anchor={{ x: 0.5, y: 1 }}
-      >
-        {/* 모던한 핀 스타일 마커 */}
-        <View style={styles.markerContainer}>
-          {/* 하단 그림자 */}
-          <View style={styles.markerShadow} />
-
-          {/* 메인 핀 */}
-          <View
-            style={[
-              styles.pinBody,
-              landmark.reached
-                ? styles.pinBodyReached
-                : styles.pinBodyPending,
-            ]}
-          >
-            {landmark.reached ? (
-              <Text style={styles.pinIcon}>✓</Text>
-            ) : (
-              <Text style={styles.pinNumber}>{index + 1}</Text>
-            )}
-          </View>
-
-          {/* 핀 끝 (삼각형 느낌) */}
-          <View
-            style={[
-              styles.pinTip,
-              landmark.reached
-                ? styles.pinTipReached
-                : styles.pinTipPending,
-            ]}
-          />
-        </View>
-      </Marker>
+      <LandmarkMarkerItem
+        key={`lmk-${landmark.id}`}
+        landmark={landmark}
+        index={index}
+        onPress={onLandmarkPress}
+      />
     ));
-  }, [landmarks, onLandmarkPress]);
+  }, [landmarksSig, onLandmarkPress]);
 
   // 진행률에 따라 완료된 경로 구간 계산 (거리 기반 인덱스 사용) - useMemo로 캐싱
   const { completedRoute, remainingRoute } = useMemo(() => {

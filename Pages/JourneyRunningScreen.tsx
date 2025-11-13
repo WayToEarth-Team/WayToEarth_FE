@@ -636,7 +636,7 @@ export default function JourneyRunningScreen(
     <SafeLayout withBottomInset>
       <JourneyMapRoute
         journeyRoute={journeyRoute}
-        landmarks={t.landmarksWithReached}
+        landmarks={useMemo(() => t.landmarksWithReached, [t.landmarksWithReached.map(l => `${l.id}:${l.reached?1:0}:${l.position.latitude.toFixed(6)},${l.position.longitude.toFixed(6)}`).join('|')])}
         userRoute={[]} // 여정 러닝에서는 실제 GPS 경로 표시 안 함
         currentLocation={virtualLocationPoint}
         progressPercent={t.progressPercent}
