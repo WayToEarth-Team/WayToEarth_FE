@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>랜드마크 스토리 - 프리미엄 디자인</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+            color: #1a1a1a;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* 헤더 섹션 - 더 드라마틱하게 */
+        .hero-header {
+            position: relative;
+            height: 420px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
+        }
+
+        .hero-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.9;
+        }
+
+        .hero-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.7) 100%);
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            padding: 60px 24px 40px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+
+        .stamp-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(16, 185, 129, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 8px 16px;
+            border-radius: 20px;
+            margin-bottom: 16px;
+            align-self: flex-start;
+            font-size: 13px;
+            font-weight: 700;
+            color: white;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+            animation: slideInLeft 0.6s ease;
+        }
+
+        .hero-title {
+            font-size: 42px;
+            font-weight: 900;
+            color: white;
+            margin-bottom: 12px;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            letter-spacing: -0.5px;
+            animation: slideInUp 0.6s ease;
+        }
+
+        .hero-description {
+            font-size: 16px;
+            color: rgba(255,255,255,0.95);
+            margin-bottom: 8px;
+            line-height: 1.6;
+            animation: slideInUp 0.7s ease;
+        }
+
+        .hero-distance {
+            font-size: 14px;
+            color: rgba(255,255,255,0.85);
+            font-weight: 600;
+            animation: slideInUp 0.8s ease;
+        }
+
+        /* 탭 메뉴 - 글래스모피즘 */
+        .tabs-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 16px 20px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.08);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .tab {
+            flex-shrink: 0;
+            padding: 10px 20px;
+            background: transparent;
+            border: 2px solid #e5e7eb;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #6b7280;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 14px;
+        }
+
+        .tab:hover {
+            border-color: #6366f1;
+            background: rgba(99, 102, 241, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        /* 컨텐츠 영역 */
+        .content-section {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 32px 20px;
+        }
+
+        /* 스토리 카드 - 카드 스타일 개선 */
+        .story-card {
+            background: white;
+            border-radius: 24px;
+            padding: 32px;
+            margin-bottom: 32px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(0,0,0,0.04);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: fadeInUp 0.6s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .story-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .story-card:hover {
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12);
+            transform: translateY(-4px);
+        }
+
+        .story-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .story-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .type-badge {
+            flex-shrink: 0;
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .type-badge.history {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .type-badge.culture {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .type-badge.nature {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .story-title {
+            font-size: 28px;
+            font-weight: 800;
+            color: #111827;
+            line-height: 1.3;
+            letter-spacing: -0.5px;
+            margin-bottom: 4px;
+        }
+
+        /* 인트로 섹션 */
+        .intro-section {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 24px;
+            border-radius: 16px;
+            margin-bottom: 32px;
+            border-left: 4px solid #6366f1;
+            font-size: 16px;
+            line-height: 1.8;
+            color: #4b5563;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .intro-section::before {
+            content: '"';
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            font-size: 80px;
+            color: rgba(99, 102, 241, 0.1);
+            font-family: Georgia, serif;
+        }
+
+        /* 텍스트 섹션 */
+        .text-section {
+            margin-bottom: 28px;
+            font-size: 16px;
+            line-height: 1.9;
+            color: #374151;
+        }
+
+        .text-section p {
+            margin-bottom: 16px;
+        }
+
+        /* 타임라인 - 더 세련되게 */
+        .timeline-section {
+            margin: 40px 0;
+            padding-left: 20px;
+        }
+
+        .section-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: #111827;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            border-radius: 2px;
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-left: 40px;
+            padding-bottom: 32px;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 8px;
+            width: 16px;
+            height: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.2);
+        }
+
+        .timeline-item::after {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 24px;
+            width: 2px;
+            height: calc(100% - 16px);
+            background: linear-gradient(180deg, rgba(102, 126, 234, 0.3) 0%, transparent 100%);
+        }
+
+        .timeline-item:last-child::after {
+            display: none;
+        }
+
+        .timeline-year {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .timeline-event {
+            font-size: 15px;
+            line-height: 1.7;
+            color: #4b5563;
+        }
+
+        /* Tips 섹션 - 더 임팩트있게 */
+        .tips-section {
+            background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%);
+            border-radius: 20px;
+            padding: 28px;
+            margin: 32px 0;
+            border: 2px solid #fdba74;
+            box-shadow: 0 8px 24px rgba(251, 146, 60, 0.15);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tips-section::before {
+            content: '💡';
+            position: absolute;
+            top: -20px;
+            right: -20px;
+            font-size: 120px;
+            opacity: 0.1;
+            transform: rotate(15deg);
+        }
+
+        .tips-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .tips-icon {
+            font-size: 28px;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+        }
+
+        .tips-title {
+            font-size: 18px;
+            font-weight: 800;
+            color: #9a3412;
+        }
+
+        .tip-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px 0;
+            font-size: 15px;
+            line-height: 1.7;
+            color: #7c2d12;
+            border-bottom: 1px dashed rgba(154, 52, 18, 0.2);
+        }
+
+        .tip-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .tip-bullet {
+            flex-shrink: 0;
+            width: 6px;
+            height: 6px;
+            background: #f97316;
+            border-radius: 50%;
+            margin-top: 8px;
+        }
+
+        /* 이미지 갤러리 - 더 세련된 캐러셀 */
+        .image-carousel {
+            margin: 32px 0;
+            position: relative;
+        }
+
+        .carousel-container {
+            overflow: hidden;
+            border-radius: 20px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+
+        .carousel-track {
+            display: flex;
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .carousel-slide {
+            min-width: 100%;
+            position: relative;
+            aspect-ratio: 16/9;
+        }
+
+        .carousel-slide img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .carousel-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .indicator {
+            width: 8px;
+            height: 8px;
+            background: #cbd5e1;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .indicator.active {
+            width: 28px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        }
+
+        /* 그리드 갤러리 */
+        .image-grid {
+            display: grid;
+            gap: 12px;
+            margin: 32px 0;
+        }
+
+        .grid-1 { grid-template-columns: 1fr; }
+        .grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .grid-3 { 
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+        }
+        .grid-3 .grid-item:first-child {
+            grid-column: 1 / 3;
+            grid-row: 1 / 3;
+        }
+
+        .grid-item {
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .grid-item:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+        }
+
+        .grid-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            aspect-ratio: 1;
+        }
+
+        .grid-1 .grid-item img {
+            aspect-ratio: 16/9;
+        }
+
+        .grid-item .more-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 32px;
+            font-weight: 900;
+        }
+
+        /* 방명록 버튼 - 플로팅 */
+        .floating-actions {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            z-index: 100;
+        }
+
+        .guestbook-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px 32px;
+            border-radius: 30px;
+            font-weight: 800;
+            font-size: 16px;
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.4);
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .guestbook-btn:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(102, 126, 234, 0.5);
+        }
+
+        .view-all-btn {
+            background: white;
+            color: #6366f1;
+            border: 2px solid #6366f1;
+            box-shadow: 0 4px 16px rgba(99, 102, 241, 0.2);
+        }
+
+        /* 애니메이션 */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 반응형 */
+        @media (max-width: 768px) {
+            .hero-title { font-size: 32px; }
+            .story-title { font-size: 22px; }
+            .section-title { font-size: 18px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 히어로 헤더 -->
+    <div class="hero-header">
+        <img src="https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800" alt="랜드마크 이미지" class="hero-bg">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <div class="stamp-badge">✓ 스탬프 획득</div>
+            <h1 class="hero-title">덕수궁</h1>
+            <p class="hero-description">대한제국의 아픈 역사를 간직한 왕궁</p>
+            <div class="hero-distance">3.2km 지점</div>
+        </div>
+    </div>
+
+    <!-- 탭 메뉴 -->
+    <div class="tabs-container">
+        <div class="tabs">
+            <div class="tab active">전체</div>
+            <div class="tab">📘 역사</div>
+            <div class="tab">🎭 문화</div>
+            <div class="tab">🌿 자연</div>
+        </div>
+    </div>
+
+    <!-- 컨텐츠 섹션 -->
+    <div class="content-section">
+        <!-- 스토리 카드 1 -->
+        <div class="story-card">
+            <div class="story-header">
+                <div class="type-badge history">History</div>
+            </div>
+            <h2 class="story-title">역사의 흔적을 따라서</h2>
+            
+            <div class="intro-section">
+                덕수궁은 조선시대 왕궁 중 하나로, 대한제국의 아픈 역사를 간직하고 있는 곳입니다. 
+                특히 고종황제가 머물렀던 장소로, 근대사의 중요한 무대가 되었습니다.
+            </div>
+
+            <div class="text-section">
+                <p>
+                    덕수궁은 원래 월산대군의 저택이었으나, 임진왜란 때 선조가 피난에서 돌아온 후 임시 거처로 사용하면서
+                    궁궐로 사용되기 시작했습니다.
+                </p>
+                <p>
+                    1897년 고종황제가 러시아 공사관에서 환궁한 후, 경운궁(현 덕수궁)을 정식 궁궐로 삼고 
+                    대한제국을 선포하였습니다.
+                </p>
+            </div>
+
+            <!-- 타임라인 -->
+            <div class="timeline-section">
+                <div class="section-title">주요 역사</div>
+                <div class="timeline-item">
+                    <div class="timeline-year">1593년</div>
+                    <div class="timeline-event">
+                        임진왜란 이후 선조가 의주에서 환도하여 월산대군의 집을 임시 거처로 사용하며 궁궐의 시작
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-year">1897년</div>
+                    <div class="timeline-event">
+                        고종이 러시아 공사관에서 경운궁으로 환궁하고, 대한제국을 선포하며 국호를 바꿈
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-year">1904년</div>
+                    <div class="timeline-event">
+                        대규모 화재로 주요 전각들이 소실되어 재건축 시작
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-year">1907년</div>
+                    <div class="timeline-event">
+                        고종이 강제 퇴위당하고 순종이 즉위하면서 궁의 이름이 덕수궁으로 변경
+                    </div>
+                </div>
+            </div>
+
+            <!-- 이미지 캐러셀 -->
+            <div class="image-carousel">
+                <div class="carousel-container">
+                    <div class="carousel-track">
+                        <div class="carousel-slide">
+                            <img src="https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800" alt="덕수궁 중화전">
+                        </div>
+                        <div class="carousel-slide">
+                            <img src="https://images.unsplash.com/photo-1583992332308-95e7b1b04b16?w=800" alt="덕수궁 석조전">
+                        </div>
+                        <div class="carousel-slide">
+                            <img src="https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800" alt="덕수궁 정문">
+                        </div>
+                    </div>
+                </div>
+                <div class="carousel-indicators">
+                    <div class="indicator active"></div>
+                    <div class="indicator"></div>
+                    <div class="indicator"></div>
+                </div>
+            </div>
+
+            <!-- Tips 섹션 -->
+            <div class="tips-section">
+                <div class="tips-header">
+                    <span class="tips-icon">💡</span>
+                    <h3 class="tips-title">알고 계셨나요?</h3>
+                </div>
+                <div class="tip-item">
+                    <div class="tip-bullet"></div>
+                    <div>덕수궁 돌담길은 연인들이 걸으면 헤어진다는 속설이 있지만, 실제로는 과거 가정법원이 근처에 있어서 생긴 이야기입니다.</div>
+                </div>
+                <div class="tip-item">
+                    <div class="tip-bullet"></div>
+                    <div>석조전은 우리나라 최초의 서양식 궁중건물로, 영국인 건축가가 설계했습니다.</div>
+                </div>
+                <div class="tip-item">
+                    <div class="tip-bullet"></div>
+                    <div>매일 11시, 14시, 15시 30분에 수문장 교대의식이 진행되며 무료로 관람할 수 있습니다.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 스토리 카드 2 -->
+        <div class="story-card">
+            <div class="story-header">
+                <div class="type-badge culture">Culture</div>
+            </div>
+            <h2 class="story-title">전통과 근대의 조화</h2>
+            
+            <div class="text-section">
+                <p>
+                    덕수궁은 한국의 전통 건축과 서양의 근대 건축이 공존하는 독특한 공간입니다.
+                    조선시대 목조 건물과 서양식 석조건물이 한 공간에 어우러져 있어, 우리나라 근대화의 
+                    역사를 한눈에 볼 수 있습니다.
+                </p>
+            </div>
+
+            <!-- 이미지 그리드 (3장) -->
+            <div class="image-grid grid-3">
+                <div class="grid-item">
+                    <img src="https://images.unsplash.com/photo-1583992332308-95e7b1b04b16?w=600" alt="덕수궁 전경">
+                </div>
+                <div class="grid-item">
+                    <img src="https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400" alt="전통 건축">
+                </div>
+                <div class="grid-item">
+                    <img src="https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400" alt="석조전">
+                </div>
+            </div>
+        </div>
+
+        <!-- 스토리 카드 3 -->
+        <div class="story-card">
+            <div class="story-header">
+                <div class="type-badge nature">Nature</div>
+            </div>
+            <h2 class="story-title">도심 속 휴식 공간</h2>
+            
+            <div class="text-section">
+                <p>
+                    덕수궁은 서울 도심 한복판에 위치하면서도 아름다운 자연 경관을 간직하고 있습니다.
+                    봄의 벚꽃, 여름의 녹음, 가을의 단풍, 겨울의 설경까지 사계절의 아름다움을 모두 느낄 수 있는 곳입니다.
+                </p>
+            </div>
+
+            <!-- 이미지 그리드 (5장 이상) -->
+            <div class="image-grid grid-2">
+                <div class="grid-item">
+                    <img src="https://images.unsplash.com/photo-1583992332308-95e7b1b04b16?w=400" alt="봄">
+                </div>
+                <div class="grid-item">
+                    <img src="https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400" alt="여름">
+                </div>
+                <div class="grid-item">
+                    <img src="https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400" alt="가을">
+                </div>
+                <div class="grid-item">
+                    <img src="https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400" alt="겨울">
+                    <div class="more-overlay">+3</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 플로팅 액션 버튼 -->
+    <div class="floating-actions">
+        <button class="guestbook-btn">
+            <span>📝</span>
+            <span>방명록 작성하기</span>
+        </button>
+        <button class="guestbook-btn view-all-btn">
+            <span>📖</span>
+            <span>전체 보기</span>
+        </button>
+    </div>
+
+    <script>
+        // 캐러셀 기능
+        let currentSlide = 0;
+        const track = document.querySelector('.carousel-track');
+        const slides = document.querySelectorAll('.carousel-slide');
+        const indicators = document.querySelectorAll('.indicator');
+
+        function updateCarousel() {
+            track.style.transform = `translateX(-${currentSlide * 100}%)`;
+            indicators.forEach((ind, idx) => {
+                ind.classList.toggle('active', idx === currentSlide);
+            });
+        }
+
+        indicators.forEach((indicator, idx) => {
+            indicator.addEventListener('click', () => {
+                currentSlide = idx;
+                updateCarousel();
+            });
+        });
+
+        // 자동 슬라이드 (3초마다)
+        setInterval(() => {
+            currentSlide = (currentSlide + 1) % slides.length;
+            updateCarousel();
+        }, 3000);
+
+        // 탭 전환
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // 스크롤 애니메이션
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.story-card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(30px)';
+            card.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+            observer.observe(card);
+        });
+    </script>
+</body>
+</html>
