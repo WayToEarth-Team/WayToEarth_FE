@@ -8,7 +8,10 @@ import {
   TouchableOpacity,
   TextInput,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   PositiveAlert,
@@ -26,6 +29,7 @@ import { client } from "../utils/api/client";
 import MapView, { Polyline } from "react-native-maps";
 
 export default function RecordScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [weekly, setWeekly] = useState<any | null>(null);
   const [weeklyGoal, setWeeklyGoal] = useState<string>("");
@@ -84,10 +88,7 @@ export default function RecordScreen({ navigation }: any) {
   useEffect(() => {
     (async () => {
       try {
-        const ids = records
-          .slice(0, 5)
-          .map((r: any) => r.id)
-          .filter(Boolean);
+        const ids = records.map((r: any) => r.id).filter(Boolean);
         await Promise.all(
           ids.map(async (id) => {
             if (previews[id]) return;
@@ -141,7 +142,7 @@ export default function RecordScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <SafeAreaView edges={["top"]} style={s.root}>
+      <SafeAreaView edges={["top", "bottom"]} style={s.root}>
         <View style={s.center}>
           <ActivityIndicator size="large" color="#667eea" />
           <Text style={{ marginTop: 12, color: "#64748b", fontSize: 15 }}>
@@ -358,7 +359,7 @@ export default function RecordScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView edges={["top"]} style={s.root}>
+    <SafeAreaView edges={["top", "bottom"]} style={s.root}>
       {dialog.open && dialog.kind === "positive" && (
         <PositiveAlert
           visible
@@ -384,7 +385,10 @@ export default function RecordScreen({ navigation }: any) {
         />
       )}
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        contentContainerStyle={{
+          padding: 16,
+          paddingBottom: 32 + Math.max(insets.bottom, 0),
+        }}
         onScroll={({ nativeEvent }) => {
           if (!loadingMore && hasMore && isCloseToBottom(nativeEvent)) {
             loadMoreRecords();
@@ -1074,6 +1078,7 @@ const s = StyleSheet.create({
   // 기록 섹션
   recordsSection: {
     marginTop: 8,
+    marginBottom: 8,
   },
   recordsHeader: {
     flexDirection: "row",
