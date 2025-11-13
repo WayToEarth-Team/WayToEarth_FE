@@ -103,14 +103,15 @@ export function useBackgroundRunning() {
       const title = session.type === 'journey' && session.journeyTitle
         ? `🏃 ${session.journeyTitle} 러닝 중`
         : `🏃 일반 러닝 중`;
-      let dur = session.durationSeconds;
+      let dur = session.durationSeconds || 0;
       if (!session.isPaused) {
         dur = Math.max(0, Math.floor((Date.now() - session.startTime) / 1000));
       }
       if (typeof effectiveDurationSec === 'number') dur = effectiveDurationSec;
+      const distanceKm = session.distanceKm ?? 0;
       const body = session.type === 'journey'
-        ? `진행 거리: ${session.distanceKm.toFixed(2)}km | 시간: ${formatDuration(dur)}`
-        : `거리: ${session.distanceKm.toFixed(2)}km | 시간: ${formatDuration(dur)}`;
+        ? `진행 거리: ${distanceKm.toFixed(2)}km | 시간: ${formatDuration(dur)}`
+        : `거리: ${distanceKm.toFixed(2)}km | 시간: ${formatDuration(dur)}`;
       await createNotificationChannels();
       const notificationIdResult = await notifee.displayNotification({
         id: 'running_session',
@@ -143,17 +144,25 @@ export function useBackgroundRunning() {
     // renderOngoing(session).catch(() => {});
     // 동시에 헤드업 1회 알림(짧게 표시 후 자동 취소)
     try {
+      if (!notifee || !AndroidImportance) {
+        console.warn('[BG-NOTI] notifee 모듈이 로드되지 않았습니다');
+        return;
+      }
+
+      console.log('[BG-NOTI] 팝업 알림 표시 시도');
       const title = session.type === 'journey' && session.journeyTitle
         ? `🏃 ${session.journeyTitle} 러닝 시작`
         : `🏃 일반 러닝 시작`;
       const dur = session.isPaused
-        ? session.durationSeconds
+        ? (session.durationSeconds || 0)
         : Math.max(0, Math.floor((Date.now() - session.startTime) / 1000));
+      const distanceKm = session.distanceKm ?? 0;
       const body = session.type === 'journey'
-        ? `진행 거리: ${session.distanceKm.toFixed(2)}km | 시간: ${formatDuration(dur)}`
-        : `거리: ${session.distanceKm.toFixed(2)}km | 시간: ${formatDuration(dur)}`;
+        ? `진행 거리: ${distanceKm.toFixed(2)}km | 시간: ${formatDuration(dur)}`
+        : `거리: ${distanceKm.toFixed(2)}km | 시간: ${formatDuration(dur)}`;
 
-      await notifee.displayNotification({
+      await createNotificationChannels();
+      const notificationId = await notifee.displayNotification({
         id: 'running_popup',
         title,
         body,
@@ -162,7 +171,7 @@ export function useBackgroundRunning() {
           importance: AndroidImportance.HIGH,
           category: AndroidCategory.WORKOUT,
           autoCancel: true,
-          onlyAlertOnce: true,
+          onlyAlertOnce: false, // 매번 표시되도록 수정
           showTimestamp: true,
           lightUpScreen: true,
           // 짧게 표시 후 자동 종료(일부 기기에서만 동작). 보조로 setTimeout 취소 처리.
@@ -170,10 +179,13 @@ export function useBackgroundRunning() {
           smallIcon: 'ic_launcher',
         },
       });
+      console.log('[BG-NOTI] 팝업 알림 표시 완료:', notificationId);
       setTimeout(() => {
         notifee.cancelNotification('running_popup').catch(() => {});
       }, 3000);
-    } catch {}
+    } catch (error) {
+      console.error('[BG-NOTI] 팝업 알림 표시 실패:', error);
+    }
     bgNotiShownRef.current = true;
     // 진행 카드 실시간 갱신(조용히 업데이트)
     // 진행 카드 실시간 갱신 비활성화(Expo Location 카드만 유지)
@@ -185,13 +197,19 @@ export function useBackgroundRunning() {
 
   // Foreground Service 시작 (요청 시점에 앱이 백그라운드일 때만 1회 표시)
   const startForegroundService = async (session: RunningSessionState, isBackground: boolean = false) => {
+    console.log('[BG-NOTI] startForegroundService 호출:', {
+      isBackground,
+      appState: appState.current,
+      bgNotiShown: bgNotiShownRef.current,
+    });
     // 세션 저장은 비동기로 처리해 표시를 지연시키지 않음
     saveSession(session).catch(() => {});
     if (Platform.OS !== 'android') return;
     // 권한 확인은 러닝 시작 시점에서 수행됨. 여기서는 지연 없이 표시만 시도.
     // 앱이 백그라운드일 때만 표시, 이미 표시했다면 무시
     if ((isBackground || appState.current === 'background') && !bgNotiShownRef.current) {
-      showBackgroundOngoing(session);
+      console.log('[BG-NOTI] 백그라운드 알림 표시 조건 충족');
+      await showBackgroundOngoing(session);
     }
     // 백그라운드/포그라운드 모두 진행 중 알림을 고정 표시
     await renderOngoing(session);
@@ -299,12 +317,17 @@ export function useBackgroundRunning() {
   // AppState 변경 감지
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
+      console.log('[BG-NOTI] AppState 변경:', appState.current, '->', nextAppState);
       if (appState.current.match(/active/) && nextAppState === 'background') {
         // 앱이 백그라운드로 갈 때 최근 세션 정보를 읽어 1회성 알림 표시
         (async () => {
           try {
             const s = await loadSession();
+            console.log('[BG-NOTI] 세션 로드:', s);
             if (s?.isRunning) {
+              console.log('[BG-NOTI] 러닝 세션 활성화 상태, 알림 표시');
+              // bgNotiShownRef 리셋하여 매번 표시되도록 수정
+              bgNotiShownRef.current = false;
               await startForegroundService(s, true);
               // 보조: Expo Background Location 업데이트가 확실히 시작되도록 이곳에서도 시도
               /*
