@@ -2,7 +2,7 @@
 // 동적 이미지 그리드 - 2장은 캐러셀 형식
 
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Image, StyleSheet, Dimensions, TouchableOpacity, Text, ScrollView, NativeScrollEvent, NativeSyntheticEvent, FlatList } from 'react-native';
+import { View, Image, StyleSheet, Dimensions, TouchableOpacity, Text, ScrollView, NativeScrollEvent, NativeSyntheticEvent, FlatList, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import PagerView from 'react-native-pager-view';
 
@@ -19,14 +19,41 @@ export default function DynamicImageGrid({ images, onPressImage }: Props) {
   const scrollViewRef = useRef<ScrollView>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  // 스크롤 애니메이션 (HTML fadeInUp 효과)
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   if (count === 0) return null;
 
-  // HTML: .grid-1 (1장)
+  // HTML: .grid-1 (1장) + 애니메이션
   if (count === 1) {
     return (
-      <View style={styles.imageGrid}>
+      <Animated.View
+        style={[
+          styles.imageGrid,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
         <TouchableOpacity
-          activeOpacity={0.95}
+          activeOpacity={0.85}
           onPress={() => onPressImage?.(0)}
           style={[styles.gridItem, styles.gridItemHover]}
         >
@@ -36,7 +63,7 @@ export default function DynamicImageGrid({ images, onPressImage }: Props) {
             resizeMode="cover"
           />
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     );
   }
 
@@ -61,7 +88,15 @@ export default function DynamicImageGrid({ images, onPressImage }: Props) {
     }, [currentIndex, images.length]);
 
     return (
-      <View style={styles.imageGrid}>
+      <Animated.View
+        style={[
+          styles.imageGrid,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
         <PagerView
           ref={pagerRef}
           style={[styles.pagerView, { height: pagerHeight }]}
@@ -71,7 +106,7 @@ export default function DynamicImageGrid({ images, onPressImage }: Props) {
           {images.map((uri, idx) => (
             <View key={idx} style={styles.pagerPage}>
               <TouchableOpacity
-                activeOpacity={0.95}
+                activeOpacity={0.85}
                 onPress={() => onPressImage?.(idx)}
                 style={styles.carouselItem}
               >
@@ -97,7 +132,7 @@ export default function DynamicImageGrid({ images, onPressImage }: Props) {
             />
           ))}
         </View>
-      </View>
+      </Animated.View>
     );
   }
 
@@ -110,11 +145,19 @@ export default function DynamicImageGrid({ images, onPressImage }: Props) {
     const rightItemHeight = (leftWidth - GAP) / 2; // 비율 맞춤
 
     return (
-      <View style={styles.imageGrid}>
+      <Animated.View
+        style={[
+          styles.imageGrid,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
         <View style={[styles.grid3Container, { gap: GAP }]}>
-          {/* 좌측 큰 이미지 */}
+          {/* 좌측 큰 이미지 - HTML hover 효과 */}
           <TouchableOpacity
-            activeOpacity={0.95}
+            activeOpacity={0.85}
             onPress={() => onPressImage?.(0)}
             style={[styles.gridItem, styles.gridItemHover, styles.grid3Left, { width: leftWidth }]}
           >
@@ -130,7 +173,7 @@ export default function DynamicImageGrid({ images, onPressImage }: Props) {
             {images.slice(1, 3).map((uri, idx) => (
               <TouchableOpacity
                 key={idx + 1}
-                activeOpacity={0.95}
+                activeOpacity={0.85}
                 onPress={() => onPressImage?.(idx + 1)}
                 style={[styles.gridItem, styles.gridItemHover, { height: rightItemHeight }]}
               >
@@ -143,7 +186,7 @@ export default function DynamicImageGrid({ images, onPressImage }: Props) {
             ))}
           </View>
         </View>
-      </View>
+      </Animated.View>
     );
   }
 
@@ -155,12 +198,20 @@ export default function DynamicImageGrid({ images, onPressImage }: Props) {
   const moreCount = count - 4;
 
   return (
-    <View style={styles.imageGrid}>
+    <Animated.View
+      style={[
+        styles.imageGrid,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }]
+        }
+      ]}
+    >
       <View style={[styles.gridRow, { gap: GAP }]}>
         {visible.slice(0, 2).map((uri, idx) => (
           <TouchableOpacity
             key={idx}
-            activeOpacity={0.95}
+            activeOpacity={0.85}
             onPress={() => onPressImage?.(idx)}
             style={[styles.gridItem, styles.gridItemHover, { width: itemSize, height: itemSize }]}
           >
@@ -179,7 +230,7 @@ export default function DynamicImageGrid({ images, onPressImage }: Props) {
           return (
             <TouchableOpacity
               key={realIdx}
-              activeOpacity={0.95}
+              activeOpacity={0.85}
               onPress={() => onPressImage?.(realIdx)}
               style={[styles.gridItem, styles.gridItemHover, { width: itemSize, height: itemSize }]}
             >
@@ -188,7 +239,7 @@ export default function DynamicImageGrid({ images, onPressImage }: Props) {
                 style={styles.gridImageFull}
                 resizeMode="cover"
               />
-              {/* HTML: .more-overlay with backdrop blur */}
+              {/* HTML: .more-overlay with gradient backdrop */}
               {isLast && (
                 <LinearGradient
                   colors={['rgba(102, 126, 234, 0.85)', 'rgba(118, 75, 162, 0.85)']}
@@ -203,7 +254,7 @@ export default function DynamicImageGrid({ images, onPressImage }: Props) {
           );
         })}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -220,7 +271,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  // HTML: .grid-item with hover effects
+  // HTML: .grid-item with hover effects (transform: scale(1.02) + shadow)
   gridItem: {
     position: 'relative',
     borderRadius: 16,
@@ -231,12 +282,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(102, 126, 234, 0.1)',
   },
 
   gridItemHover: {
-    // 터치 시 시각 피드백 (scale은 애니메이션 필요)
-    borderWidth: 1,
-    borderColor: 'rgba(102, 126, 234, 0.1)',
+    // activeOpacity로 터치 피드백 (HTML hover 효과 대체)
   },
 
   // 1장일 때 - aspect-ratio: 16/9

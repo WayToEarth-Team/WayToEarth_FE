@@ -1,8 +1,8 @@
 // components/Landmark/StoryCard.tsx
 // 랜드마크 스토리 카드 컴포넌트 - 프리미엄 디자인 (HTML 완전 동일)
 
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { StoryCard as StoryCardType } from '../../types/landmark';
 import { STORY_TYPE_LABELS, STORY_TYPE_COLORS } from '../../types/landmark';
@@ -71,6 +71,25 @@ export default function StoryCard({
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
+  // HTML fadeInUp 애니메이션 (스크롤 시 나타나는 효과)
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   const parsedContent = useMemo((): StoryContent => {
     try {
       if (typeof story.content === 'object' && story.content !== null) {
@@ -115,7 +134,15 @@ export default function StoryCard({
   };
 
   return (
-    <View style={styles.storyCard}>
+    <Animated.View
+      style={[
+        styles.storyCard,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }]
+        }
+      ]}
+    >
       {/* 상단 그라디언트 라인 (hover 효과는 웹 전용이므로 제외) */}
       <LinearGradient
         colors={typeGradient}
@@ -440,7 +467,7 @@ export default function StoryCard({
         initialIndex={lightboxIndex}
         onClose={() => setLightboxVisible(false)}
       />
-    </View>
+    </Animated.View>
   );
 }
 

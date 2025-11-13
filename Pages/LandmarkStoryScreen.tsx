@@ -1,7 +1,7 @@
 // Pages/LandmarkStoryScreen.tsx
 // 랜드마크 스토리 상세 페이지 - 프리미엄 디자인 (HTML 완전 동일)
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import {
   TextInput,
   StatusBar,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import StoryCard from '../components/Landmark/StoryCard';
@@ -62,7 +63,28 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
   const [newStoryContent, setNewStoryContent] = useState('');
   const [newStoryType, setNewStoryType] = useState<StoryType>('HISTORY');
 
+  // HTML fadeInUp 애니메이션 (순차적 등장)
+  const heroFadeAnim = useRef(new Animated.Value(0)).current;
+  const heroSlideAnim = useRef(new Animated.Value(30)).current;
+  const tabsFadeAnim = useRef(new Animated.Value(0)).current;
+  const tabsSlideAnim = useRef(new Animated.Value(20)).current;
+  const contentFadeAnim = useRef(new Animated.Value(0)).current;
+  const contentSlideAnim = useRef(new Animated.Value(20)).current;
+
+  // landmarkId 변경 시 즉시 로딩 상태로 전환 + 애니메이션 리셋
   useEffect(() => {
+    setLoading(true);
+    setLandmark(null);
+    setError(null);
+
+    // 페이드 애니메이션 값 리셋
+    heroFadeAnim.setValue(0);
+    heroSlideAnim.setValue(30);
+    tabsFadeAnim.setValue(0);
+    tabsSlideAnim.setValue(20);
+    contentFadeAnim.setValue(0);
+    contentSlideAnim.setValue(20);
+
     loadLandmarkDetail();
   }, [landmarkId, userId]);
 
@@ -78,12 +100,66 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
     })();
   }, []);
 
+  // 위에서 아래로 순차적 애니메이션 (자연스러운 등장)
+  useEffect(() => {
+    if (landmark) {
+      // 1. Hero (즉시 시작)
+      Animated.parallel([
+        Animated.timing(heroFadeAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(heroSlideAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // 2. Tabs (150ms 후)
+      Animated.parallel([
+        Animated.timing(tabsFadeAnim, {
+          toValue: 1,
+          duration: 500,
+          delay: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(tabsSlideAnim, {
+          toValue: 0,
+          duration: 500,
+          delay: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // 3. Content (300ms 후)
+      Animated.parallel([
+        Animated.timing(contentFadeAnim, {
+          toValue: 1,
+          duration: 500,
+          delay: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentSlideAnim, {
+          toValue: 0,
+          duration: 500,
+          delay: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [landmark]);
+
   const loadLandmarkDetail = async () => {
     if (!landmarkId) {
       setError('랜드마크 ID가 없습니다.');
       setLoading(false);
       return;
     }
+
+    const startTime = Date.now();
+    const MIN_LOADING_TIME = 2000; // 최소 2초 로딩
 
     try {
       setLoading(true);
@@ -122,9 +198,25 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
         });
       }
 
+      // 최소 로딩 시간 보장 (부드러운 UX)
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = MIN_LOADING_TIME - elapsedTime;
+
+      if (remainingTime > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingTime));
+      }
+
       setLandmark(data);
     } catch (err: any) {
       console.error('[LandmarkStoryScreen] 랜드마크 로드 실패:', err);
+
+      // 에러 시에도 최소 로딩 시간 보장
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = MIN_LOADING_TIME - elapsedTime;
+      if (remainingTime > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingTime));
+      }
+
       setError(err?.response?.data?.message || '랜드마크 정보를 불러올 수 없습니다.');
       Alert.alert('오류', '랜드마크 정보를 불러올 수 없습니다.');
     } finally {
@@ -274,13 +366,13 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
     );
   };
 
+  // 깔끔한 로딩 스크린 (iOS 스타일)
   if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#667eea" />
-          <Text style={styles.loadingText}>불러오는 중...</Text>
-        </View>
+      <View style={styles.loadingScreen}>
+        <StatusBar barStyle="dark-content" />
+        <ActivityIndicator size="large" color="#667eea" />
+        <Text style={styles.loadingText}>로딩 중</Text>
       </View>
     );
   }
@@ -365,7 +457,15 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
           </TouchableOpacity>
 
           {/* HTML: .hero-content */}
-          <View style={styles.heroContent}>
+          <Animated.View
+            style={[
+              styles.heroContent,
+              {
+                opacity: heroFadeAnim,
+                transform: [{ translateY: heroSlideAnim }]
+              }
+            ]}
+          >
             {landmark.hasStamp && (
               <View style={styles.stampBadge}>
                 <Text style={styles.stampBadgeText}>✓ 스탬프 획득</Text>
@@ -376,56 +476,71 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
             <Text style={styles.heroDistance}>
               {(landmark.distanceFromStart / 1000).toFixed(1)}km 지점
             </Text>
-          </View>
+          </Animated.View>
         </View>
 
         {/* HTML: .tabs-container */}
-        <View style={styles.tabsContainer}>
+        <Animated.View
+          style={[
+            styles.tabsContainer,
+            {
+              opacity: tabsFadeAnim,
+              transform: [{ translateY: tabsSlideAnim }]
+            }
+          ]}
+        >
           <StoryTypeTabs
             selectedType={selectedType}
             onSelectType={setSelectedType}
           />
-        </View>
+        </Animated.View>
 
-        {/* 관리자 패널 */}
-        {showAdminView && (
-          <View style={styles.adminPanel}>
-            <Text style={styles.adminTitle}>관리자 이미지 업로드</Text>
-            <TextInput
-              style={styles.adminInput}
-              placeholder="여정 ID"
-              keyboardType="number-pad"
-              value={journeyIdInput}
-              onChangeText={setJourneyIdInput}
-              placeholderTextColor="#92400E"
-            />
-            <TouchableOpacity 
-              style={[styles.adminBtn, uploading && { opacity: 0.6 }]} 
-              disabled={uploading} 
-              onPress={handleUploadLandmarkImage}
-            >
-              <Text style={styles.adminBtnText}>
-                {uploading ? '업로드 중…' : '랜드마크 커버 이미지 업로드'}
-              </Text>
-            </TouchableOpacity>
-            <Text style={styles.adminHelp}>커버 이미지는 랜드마크 대표 이미지입니다.</Text>
-
-            {journeyIdInput && Number(journeyIdInput) > 0 && (
-              <GalleryManager
-                type="landmark"
-                targetId={landmarkId}
-                journeyId={Number(journeyIdInput)}
-                landmarkId={landmarkId}
-                images={landmark?.images || []}
-                onRefresh={loadLandmarkDetail}
-                isAdmin={showAdminView}
+        {/* 콘텐츠 영역 전체 (순차적 등장) */}
+        <Animated.View
+          style={{
+            opacity: contentFadeAnim,
+            transform: [{ translateY: contentSlideAnim }]
+          }}
+        >
+          {/* 관리자 패널 */}
+          {showAdminView && (
+            <View style={styles.adminPanel}>
+              <Text style={styles.adminTitle}>관리자 이미지 업로드</Text>
+              <TextInput
+                style={styles.adminInput}
+                placeholder="여정 ID"
+                keyboardType="number-pad"
+                value={journeyIdInput}
+                onChangeText={setJourneyIdInput}
+                placeholderTextColor="#92400E"
               />
-            )}
-          </View>
-        )}
+              <TouchableOpacity
+                style={[styles.adminBtn, uploading && { opacity: 0.6 }]}
+                disabled={uploading}
+                onPress={handleUploadLandmarkImage}
+              >
+                <Text style={styles.adminBtnText}>
+                  {uploading ? '업로드 중…' : '랜드마크 커버 이미지 업로드'}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.adminHelp}>커버 이미지는 랜드마크 대표 이미지입니다.</Text>
 
-        {/* HTML: .content-section */}
-        <View style={styles.contentSection}>
+              {journeyIdInput && Number(journeyIdInput) > 0 && (
+                <GalleryManager
+                  type="landmark"
+                  targetId={landmarkId}
+                  journeyId={Number(journeyIdInput)}
+                  landmarkId={landmarkId}
+                  images={landmark?.images || []}
+                  onRefresh={loadLandmarkDetail}
+                  isAdmin={showAdminView}
+                />
+              )}
+            </View>
+          )}
+
+          {/* HTML: .content-section */}
+          <View style={styles.contentSection}>
           {showAdminView && (
             <TouchableOpacity
               style={styles.createStoryBtn}
@@ -467,6 +582,7 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
             </View>
           )}
         </View>
+        </Animated.View>
       </ScrollView>
 
       {/* HTML: .floating-actions */}
@@ -672,10 +788,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 32,
   },
+  // 깔끔한 로딩 스크린
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   loadingText: {
-    marginTop: 12,
+    marginTop: 16,
     fontSize: 14,
-    color: '#6B7280',
+    fontWeight: '400',
+    color: '#999999',
+    letterSpacing: 0.5,
   },
   errorIcon: {
     fontSize: 48,
