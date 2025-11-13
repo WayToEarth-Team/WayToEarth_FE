@@ -45,9 +45,15 @@ export default function CrewRankingScreen({
     setLoading(true);
     try {
       const now = new Date();
-      const month = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const month = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(
+        2,
+        "0"
+      )}`;
       const paramMonth = selectedPeriod === "all" ? undefined : month;
-      const list = await getTopCrewsByDistance({ month: paramMonth, limit: 100 });
+      const list = await getTopCrewsByDistance({
+        month: paramMonth,
+        limit: 100,
+      });
       let mapped: CrewRanking[] = (list || []).map((t) => ({
         id: t.id,
         name: t.name,
@@ -55,7 +61,9 @@ export default function CrewRankingScreen({
         imageUrl: t.imageUrl || undefined,
       }));
       // 상세 정보 보강
-      const details = await Promise.allSettled(mapped.map((m) => getCrewById(String(m.id))));
+      const details = await Promise.allSettled(
+        mapped.map((m) => getCrewById(String(m.id)))
+      );
       mapped = mapped.map((m, i) => {
         const res = details[i];
         if (res.status === "fulfilled" && res.value) {
@@ -165,7 +173,10 @@ export default function CrewRankingScreen({
       ) : (
         <ScrollView style={s.scrollView} showsVerticalScrollIndicator={false}>
           {/* Top 3 Podium */}
-          <LinearGradient colors={["#F8FAFC", "#FFFFFF"]} style={s.podiumSection}>
+          <LinearGradient
+            colors={["#F8FAFC", "#FFFFFF"]}
+            style={s.podiumSection}
+          >
             {rankings.length === 2 ? (
               <View style={[s.podiumContainer, { alignItems: "center" }]}>
                 {[0, 1].map((idx) => (
@@ -179,7 +190,10 @@ export default function CrewRankingScreen({
                     </View>
                     <View style={[s.podiumAvatar]}>
                       {rankings[idx].imageUrl ? (
-                        <Image source={{ uri: rankings[idx].imageUrl }} style={s.avatarImage} />
+                        <Image
+                          source={{ uri: rankings[idx].imageUrl }}
+                          style={s.avatarImage}
+                        />
                       ) : (
                         <Ionicons name="people" size={32} color="#64748B" />
                       )}
@@ -187,7 +201,9 @@ export default function CrewRankingScreen({
                     <Text style={s.podiumName} numberOfLines={1}>
                       {rankings[idx].name}
                     </Text>
-                    <Text style={s.podiumDistance}>{rankings[idx].distance}km</Text>
+                    <Text style={s.podiumDistance}>
+                      {rankings[idx].distance}km
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -196,11 +212,18 @@ export default function CrewRankingScreen({
                 {rankings[1] && (
                   <View style={s.podiumItem}>
                     <View style={s.podiumRank}>
-                      <Ionicons name="medal" size={18} color={getRankColor(2)} />
+                      <Ionicons
+                        name="medal"
+                        size={18}
+                        color={getRankColor(2)}
+                      />
                     </View>
                     <View style={[s.podiumAvatar, s.podiumAvatar2]}>
                       {rankings[1].imageUrl ? (
-                        <Image source={{ uri: rankings[1].imageUrl }} style={s.avatarImage} />
+                        <Image
+                          source={{ uri: rankings[1].imageUrl }}
+                          style={s.avatarImage}
+                        />
                       ) : (
                         <Ionicons name="people" size={32} color="#64748B" />
                       )}
@@ -208,22 +231,34 @@ export default function CrewRankingScreen({
                     <Text style={s.podiumName} numberOfLines={1}>
                       {rankings[1].name}
                     </Text>
-                    <Text style={s.podiumDistance}>{rankings[1].distance}km</Text>
+                    <Text style={s.podiumDistance}>
+                      {rankings[1].distance}km
+                    </Text>
                   </View>
                 )}
                 {rankings[0] && (
                   <View style={[s.podiumItem, s.podiumFirst]}>
                     <View style={s.crownContainer}>
-                      <Ionicons name="trophy" size={18} color={getRankColor(1)} />
+                      <Ionicons
+                        name="trophy"
+                        size={18}
+                        color={getRankColor(1)}
+                      />
                     </View>
                     <View style={[s.podiumAvatar, s.podiumAvatar1]}>
                       {rankings[0].imageUrl ? (
-                        <Image source={{ uri: rankings[0].imageUrl }} style={s.avatarImage} />
+                        <Image
+                          source={{ uri: rankings[0].imageUrl }}
+                          style={s.avatarImage}
+                        />
                       ) : (
                         <Ionicons name="people" size={40} color="#F59E0B" />
                       )}
                     </View>
-                    <Text style={[s.podiumName, s.podiumName1]} numberOfLines={1}>
+                    <Text
+                      style={[s.podiumName, s.podiumName1]}
+                      numberOfLines={1}
+                    >
                       {rankings[0].name}
                     </Text>
                     <Text style={[s.podiumDistance, s.podiumDistance1]}>
@@ -234,11 +269,18 @@ export default function CrewRankingScreen({
                 {rankings[2] && (
                   <View style={s.podiumItem}>
                     <View style={s.podiumRank}>
-                      <Ionicons name="medal" size={18} color={getRankColor(3)} />
+                      <Ionicons
+                        name="medal"
+                        size={18}
+                        color={getRankColor(3)}
+                      />
                     </View>
                     <View style={[s.podiumAvatar, s.podiumAvatar3]}>
                       {rankings[2].imageUrl ? (
-                        <Image source={{ uri: rankings[2].imageUrl }} style={s.avatarImage} />
+                        <Image
+                          source={{ uri: rankings[2].imageUrl }}
+                          style={s.avatarImage}
+                        />
                       ) : (
                         <Ionicons name="people" size={32} color="#64748B" />
                       )}
@@ -246,7 +288,9 @@ export default function CrewRankingScreen({
                     <Text style={s.podiumName} numberOfLines={1}>
                       {rankings[2].name}
                     </Text>
-                    <Text style={s.podiumDistance}>{rankings[2].distance}km</Text>
+                    <Text style={s.podiumDistance}>
+                      {rankings[2].distance}km
+                    </Text>
                   </View>
                 )}
               </View>
