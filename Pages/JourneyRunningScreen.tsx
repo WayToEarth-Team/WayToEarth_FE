@@ -31,10 +31,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { LatLng } from "../types/types";
 import type { JourneyId } from "../types/journey";
 import { apiComplete } from "../utils/api/running";
+import EmblemCelebration from "../components/Effects/EmblemCelebration";
+import { awardEmblemByCode } from "../utils/api/emblems";
 import type { LandmarkSummary } from "../types/guestbook";
 import type { LandmarkDetail } from "../types/landmark";
 import { getMyProfile } from "../utils/api/users";
 import { getLandmarkDetail } from "../utils/api/landmarks";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { emitRunningSession } from "../utils/navEvents";
 
 type RouteParams = {
   route: {
@@ -143,6 +147,9 @@ export default function JourneyRunningScreen(props?: RouteParams) {
   const [landmarkMenuVisible, setLandmarkMenuVisible] = useState(false);
   const [menuLandmark, setMenuLandmark] = useState<any>(null);
   const [landmarkDetail, setLandmarkDetail] = useState<LandmarkDetail | null>(null);
+  const [celebrate, setCelebrate] = useState<{ visible: boolean; count?: number }>({ visible: false });
+  const celebratedKmRef = React.useRef<Set<number>>(new Set());
+  const celebratingRef = React.useRef(false);
 
   // 랜드마크 메뉴가 열릴 때 상세 정보 로드
   useEffect(() => {
@@ -249,9 +256,19 @@ export default function JourneyRunningScreen(props?: RouteParams) {
       console.log("[JourneyRunning] calling t.startJourneyRun()");
       t.startJourneyRun();
     });
+    // 탭바 숨김 즉시 반영 및 세션 플래그 저장
+    try {
+      await AsyncStorage.setItem('@running_session', JSON.stringify({ isRunning: true, sessionId: t.sessionId || `journey-${Date.now()}`, startTime: Date.now() }));
+    } catch {}
+    try { emitRunningSession(true); } catch {}
     // 알림 권한 요청은 비동기로 병렬 처리
     backgroundRunning.requestNotificationPermission().catch(() => {});
   }, [t, backgroundRunning]);
+
+  // 러닝 상태 변화에 따라 탭바 상태 즉시 동기화(보조 안전장치)
+  useEffect(() => {
+    try { emitRunningSession(!!t.isRunning); } catch {}
+  }, [t.isRunning]);
 
   // 랜드마크 마커 클릭 핸들러 - 스토리 페이지로 이동
   const handleLandmarkMarkerPress = useCallback((landmark: any) => {
@@ -292,6 +309,10 @@ export default function JourneyRunningScreen(props?: RouteParams) {
               await backgroundRunning.stopForegroundService();
               await backgroundRunning.clearSession();
               await t.stop();
+
+              // 탭바 재표시 및 세션 플래그 제거
+              try { await AsyncStorage.removeItem('@running_session'); } catch {}
+              try { emitRunningSession(false); } catch {}
 
               // 여정 상세 화면으로 이동
               navigation.navigate("JourneyRouteDetail", { id: journeyId });
@@ -346,7 +367,17 @@ export default function JourneyRunningScreen(props?: RouteParams) {
                 title: journeyTitle,
               });
 
+              // Extra client-side 10m emblem award (journey runs too)
+              try {
+                if (t.distance >= 0.01) {
+                  await awardEmblemByCode('DIST_10M');
+                }
+              } catch {}
+
               console.log("[JourneyRunning] apiComplete 응답:", { runId, data });
+
+              // 10m 엠블럼(사일런트)
+              try { if (t.distance >= 0.01) { await awardEmblemByCode('DIST_10M'); } } catch {}
 
               // 백그라운드 서비스 중지 및 세션 정리
               await backgroundRunning.stopForegroundService();
@@ -362,6 +393,10 @@ export default function JourneyRunningScreen(props?: RouteParams) {
 
               // 러닝 트래커 정리(백그라운드 위치 업데이트 종료 보장)
               await t.stop();
+
+              // 탭바 재표시 및 세션 플래그 제거
+              try { await AsyncStorage.removeItem('@running_session'); } catch {}
+              try { emitRunningSession(false); } catch {}
             } catch (e) {
               console.error("[JourneyRunning] 여정 러닝 완료 실패:", e);
               console.error("[JourneyRunning] 에러 상세:", JSON.stringify(e, null, 2));
@@ -679,6 +714,11 @@ export default function JourneyRunningScreen(props?: RouteParams) {
         seconds={3}
         onDone={handleCountdownDone}
       />
+
+      {/* Emblem Celebration */}
+      {celebrate.visible && (
+        <EmblemCelebration count={celebrate.count} />
+      )}
 
       {/* 방명록 작성 모달 */}
       {selectedLandmark && (
