@@ -170,6 +170,22 @@ export default function JourneyMapRoute({
   const currentLat = currentLocation?.latitude;
   const currentLng = currentLocation?.longitude;
 
+  // 현재 위치가 준비되면 해당 위치로 카메라 이동(초기/변경 시 리센터)
+  useEffect(() => {
+    if (!mapReady || !currentLocation || !mapRef.current) return;
+    try {
+      mapRef.current.animateToRegion(
+        {
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        },
+        500
+      );
+    } catch {}
+  }, [mapReady, currentLat, currentLng]);
+
   // 🏁 랜드마크 마커 캐싱: landmarks 배열이 실제로 변경될 때만 리렌더링
   const landmarkMarkers = useMemo(() => {
     return landmarks.map((landmark, index) => (
