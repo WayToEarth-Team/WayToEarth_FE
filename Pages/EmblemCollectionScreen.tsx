@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { NegativeAlert } from "../components/ui/AlertDialog";
 import type { Achievement, Summary, EmblemFilter } from "../types/emblem";
 import { getEmblemSummary, getEmblemCatalog } from "../utils/api/emblems";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const EmblemCollectionScreen: React.FC<{ navigation?: any }> = ({
   navigation,
@@ -17,12 +18,40 @@ const EmblemCollectionScreen: React.FC<{ navigation?: any }> = ({
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [sum, catalog] = await Promise.all([
+      const [sum, catalog, codesRaw] = await Promise.all([
         getEmblemSummary(),
         getEmblemCatalog({ filter: "ALL", size: 50 }),
+        AsyncStorage.getItem('@owned_emblem_codes').catch(() => '[]'),
       ]);
       setSummary(sum);
-      setAchievements(catalog);
+      const ownedCodes: string[] = (() => {
+        try {
+          const arr = JSON.parse(codesRaw || '[]');
+          return Array.isArray(arr) ? arr.map(String) : [];
+        } catch { return []; }
+      })();
+
+      // Mark 10m owned if code present
+      const dist10Owned = ownedCodes.includes('DIST_10M');
+      const updated = (catalog || []).map((a) => {
+        const is10m = typeof a?.name === 'string' && /10\s*m|10m|10 m|0\.01\s*km/i.test(a.name);
+        return is10m && dist10Owned ? { ...a, owned: true } : a;
+      });
+      // Append a local 10m emblem if not present (UI fallback)
+      const has10m = Array.isArray(updated) && updated.some((a) =>
+        typeof a?.name === 'string' && /10\s*m|10m|10 m|0\.01\s*km/i.test(a.name)
+      );
+      const list = has10m ? updated : [
+        ...updated,
+        {
+          emblem_id: 'local-10m',
+          name: '10m 러너',
+          description: '첫 10m 달성',
+          image_url: 'https://via.placeholder.com/120x120.png?text=10m',
+          owned: dist10Owned,
+        },
+      ];
+      setAchievements(list as any);
     } catch (e) {
       console.error(e);
       setAlert({ open:true, title:'에러', message:'엠블럼 데이터를 불러오지 못했습니다.' });
