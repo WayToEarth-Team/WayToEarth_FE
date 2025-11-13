@@ -3,6 +3,7 @@
 
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
 type Props = {
   progressPercent: number;
@@ -34,7 +35,10 @@ export default function JourneyProgressCard({
 
       <View style={styles.progressBarContainer}>
         <View style={styles.progressBarBg}>
-          <View
+          <LinearGradient
+            colors={["#10B981", "#34D399", "#6EE7B7"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
             style={[
               styles.progressBarFill,
               { width: `${Math.min(100, progressPercent)}%` },
@@ -70,7 +74,7 @@ export default function JourneyProgressCard({
                 style={styles.guestbookButton}
                 onPress={() => onPressGuestbook(nextLandmark.id!)}
               >
-                <Text style={styles.guestbookButtonText}>📝</Text>
+                <Text style={styles.guestbookButtonText}>📋</Text>
                 <Text style={styles.guestbookButtonLabel}>방명록</Text>
               </TouchableOpacity>
             )}
@@ -111,6 +115,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800",
     color: "#6366F1",
+    textShadowColor: "rgba(99, 102, 241, 0.3)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
   progressBarContainer: {
     marginBottom: 10,
@@ -123,8 +130,12 @@ const styles = StyleSheet.create({
   },
   progressBarFill: {
     height: "100%",
-    backgroundColor: "#10B981",
     borderRadius: 3,
+    shadowColor: "#10B981",
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 5,
   },
   stats: {
     flexDirection: "row",
