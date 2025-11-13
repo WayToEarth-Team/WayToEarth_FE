@@ -20,7 +20,6 @@ import {
   DestructiveConfirm,
 } from "../components/ui/AlertDialog";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { getMyProfile, getUserProfile } from "../utils/api/users";
 import {
   getMyCrewDetail,
@@ -83,15 +82,6 @@ export default function CrewDetailScreen() {
     profileImage?: string | null;
     userId?: string | number;
   } | null>(null);
-  const [memberRanking, setMemberRanking] = useState<
-    Array<{
-      userId: number;
-      userName: string;
-      totalDistance: number;
-      rank: number;
-      profileImage?: string | null;
-    }>
-  >([]);
 
   // 멤버 무한 스크롤 상태
   const [memberPage, setMemberPage] = useState(0);
@@ -163,7 +153,7 @@ export default function CrewDetailScreen() {
             }),
             getCrewMemberRanking(String(detail.crew.id), {
               month,
-              limit: 10,
+              limit: 1,
             }).catch((e) => {
               console.warn(
                 "[CREW_DETAIL] member ranking failed",
@@ -188,23 +178,6 @@ export default function CrewDetailScreen() {
             totalDistance: formatKm(dist),
             activeMembers: `${active}명`,
           });
-          // 0km 멤버 포함: 전체 멤버를 기준으로 API 결과를 병합하여 거리 미기록자도 표시
-          const apiMap = new Map<string, any>();
-          (ranking || []).forEach((r: any) => apiMap.set(String(r.userId), r));
-          const all = (detail.members || []).map((m: any) => {
-            const r = apiMap.get(String(m.id));
-            return {
-              userId: Number(m.id),
-              userName: String(m.nickname || ""),
-              totalDistance: r?.totalDistance ?? 0,
-              rank: 0,
-              profileImage: m.profileImage ?? null,
-            };
-          });
-          all.sort((a, b) => (b.totalDistance || 0) - (a.totalDistance || 0));
-          const ranked = all.map((x, i) => ({ ...x, rank: i + 1 }));
-          setMemberRanking(ranked);
-
           const top = ranking?.[0];
           if (top) {
             // MVP 사용자의 프로필 이미지 로드
@@ -565,200 +538,46 @@ export default function CrewDetailScreen() {
         {/* 통계 탭 내용 */}
         {selectedTab === "통계" && (
           <>
-            {/* 멤버 랭킹 표 */}
-            {memberRanking && memberRanking.length > 0 && (
-              <View style={s.rankCard}>
-                <View style={s.rankHeader}>
-                  <Text style={s.rankTitle}>멤버 랭킹</Text>
-                  <Text style={s.rankSubtitle}>이번 달 누적 거리 기준</Text>
-                </View>
-                <View>
-                  {memberRanking.map((r) => (
-                    <View key={r.userId} style={s.rankRow}>
-                      <View style={s.rankLeft}>
-                        <View
-                          style={[
-                            s.rankBadge,
-                            r.rank <= 3 && s[`rankBadgeTop${r.rank}` as const],
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              s.rankBadgeText,
-                              r.rank <= 3 && s.rankBadgeTextTop,
-                            ]}
-                          >
-                            {r.rank}
-                          </Text>
-                        </View>
-                        <View style={s.rankAvatarWrap}>
-                          {r.profileImage ? (
-                            <Image
-                              source={{ uri: r.profileImage }}
-                              style={s.rankAvatar}
-                            />
-                          ) : (
-                            <View style={s.rankAvatarPlaceholder}>
-                              <Ionicons
-                                name="person"
-                                size={16}
-                                color="#9CA3AF"
-                              />
-                            </View>
-                          )}
-                        </View>
-                        <Text style={s.rankName} numberOfLines={1}>
-                          {r.userName}
-                        </Text>
-                      </View>
-                      <View style={s.rankRight}>
-                        <Text style={s.rankDistance}>
-                          {(Math.round(r.totalDistance * 10) / 10).toFixed(
-                            r.totalDistance % 1 === 0 ? 0 : 1
-                          )}
-                        </Text>
-                        <Text style={s.rankUnit}>km</Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* 통계 및 MVP 섹션 */}
-
-            {/* MVP 섹션 (새 디자인) */}
-            {mvpMember && (
-              <View style={s.mvpSection}>
-                <LinearGradient
-                  colors={["#FEFCE8", "#FEF9C3", "#FEF3C7"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={s.mvpGradient}
-                >
-                  <View style={s.mvpDecoCircle1} />
-                  <View style={s.mvpDecoCircle2} />
-
-                  <View style={s.mvpContent}>
-                    <View style={s.mvpHeaderRow}>
-                      <View style={s.mvpTitleGroup}>
-                        <Text style={s.mvpEmoji}>🏆</Text>
-                        <Text style={s.mvpTitle}>이번 달 MVP</Text>
-                      </View>
-                      <View style={s.mvpBadge}>
-                        <Text style={s.mvpBadgeText}>MVP</Text>
-                      </View>
-                    </View>
-
-                    <View style={s.mvpCard}>
-                      <View style={s.mvpAvatarContainer}>
-                        {mvpMember.profileImage ? (
-                          <Image
-                            source={{
-                              uri: mvpMember.profileImage,
-                              cache: "force-cache",
-                            }}
-                            style={s.mvpAvatar}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <View style={s.mvpAvatarPlaceholder}>
-                            <Ionicons name="person" size={28} color="#F59E0B" />
-                          </View>
-                        )}
-                        <View style={s.crownBadge}>
-                          <Text style={s.crownEmoji}>👑</Text>
-                        </View>
-                      </View>
-
-                      <View style={s.mvpInfo}>
-                        <Text style={s.mvpName}>{mvpMember.name}</Text>
-                        <View style={s.mvpDistanceRow}>
-                          <Ionicons
-                            name="trending-up"
-                            size={16}
-                            color="#F59E0B"
-                          />
-                          <Text style={s.mvpDistance}>
-                            {mvpMember.distance}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-                </LinearGradient>
-              </View>
-            )}
-          </>
-        )}
-
-        {/* 멤버 탭 내용 */}
-        {selectedTab === "멤버" && (
-          <>
-            {/* 가입 신청 (관리자만 - 멤버 탭에 표시) */}
-            {isAdmin && (
+            {/* 가입 신청 (관리자만) */}
+            {isAdmin && pending.length > 0 && (
               <View style={s.applicationCard}>
-                <View style={s.applicationHeader}>
-                  <Text style={s.applicationTitle}>가입 신청</Text>
-                  {pending.length > 0 && (
-                    <View style={s.applicationBadge}>
-                      <Text style={s.applicationBadgeText}>
-                        {pending.length}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                {pending.length > 0 ? (
-                  pending.map((a) => (
-                    <View key={a.id} style={s.applicationRow}>
-                      <View style={s.applicantInfo}>
-                        {a.profileImage ? (
-                          <Image
-                            source={{ uri: a.profileImage }}
-                            style={s.applicantAvatar}
-                          />
-                        ) : (
-                          <View
-                            style={[
-                              s.applicantAvatar,
-                              s.applicantAvatarPlaceholder,
-                            ]}
-                          >
-                            <Ionicons name="person" size={20} color="#F59E0B" />
-                          </View>
-                        )}
-                        <View>
-                          <Text style={s.applicantName}>{a.nickname}</Text>
-                          <Text style={s.applicantLevel}>{a.level}</Text>
+                <Text style={s.applicationTitle}>가입 신청</Text>
+                {pending.map((a) => (
+                  <View key={a.id} style={s.applicationRow}>
+                    <View style={s.applicantInfo}>
+                      {a.profileImage ? (
+                        <Image
+                          source={{ uri: a.profileImage }}
+                          style={s.applicantAvatar}
+                        />
+                      ) : (
+                        <View style={s.applicantAvatar}>
+                          <Ionicons name="person" size={20} color="#999" />
                         </View>
+                      )}
+                      <View>
+                        <Text style={s.applicantName}>{a.nickname}</Text>
+                        <Text style={s.applicantLevel}>{a.level}</Text>
                       </View>
-                      <View style={s.applicationBtns}>
-                        <TouchableOpacity
-                          style={s.approvePill}
-                          onPress={async () => {
+                    </View>
+                    <View style={s.applicationBtns}>
+                      <TouchableOpacity
+                        style={s.approvePill}
+                        onPress={async () => {
+                          try {
+                            await approveRequest(a.id);
+                            await refresh({ silent: true });
+                          } catch (e: any) {
+                            // 500/409 등 재시도 플로우: 상세 재조회 후 이미 멤버라면 성공으로 간주
                             try {
-                              await approveRequest(a.id);
-                              await refresh({ silent: true });
-                            } catch (e: any) {
-                              try {
-                                const detail = await getMyCrewDetail();
-                                const already = detail?.members?.some(
-                                  (m) =>
-                                    a.userId &&
-                                    String(m.id) === String(a.userId)
-                                );
-                                if (already) await refresh({ silent: true });
-                                else
-                                  setAlert({
-                                    open: true,
-                                    kind: "negative",
-                                    title: "승인 실패",
-                                    message:
-                                      e?.response?.data?.message ||
-                                      "서버 오류로 승인에 실패했습니다. 잠시 후 다시 시도해주세요.",
-                                  });
-                              } catch {
+                              const detail = await getMyCrewDetail();
+                              const already = detail?.members?.some(
+                                (m) =>
+                                  a.userId && String(m.id) === String(a.userId)
+                              );
+                              if (already) {
+                                await refresh({ silent: true });
+                              } else {
                                 setAlert({
                                   open: true,
                                   kind: "negative",
@@ -768,272 +587,284 @@ export default function CrewDetailScreen() {
                                     "서버 오류로 승인에 실패했습니다. 잠시 후 다시 시도해주세요.",
                                 });
                               }
+                            } catch {
+                              setAlert({
+                                open: true,
+                                kind: "negative",
+                                title: "승인 실패",
+                                message:
+                                  e?.response?.data?.message ||
+                                  "서버 오류로 승인에 실패했습니다. 잠시 후 다시 시도해주세요.",
+                              });
                             }
-                          }}
-                          accessibilityLabel="승인"
-                        >
-                          <Text style={s.approvePillText}>승인</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={s.rejectPill}
-                          onPress={async () => {
-                            await rejectRequest(a.id);
-                            await refresh({ silent: true });
-                          }}
-                          accessibilityLabel="거부"
-                        >
-                          <Text style={s.rejectPillText}>거부</Text>
-                        </TouchableOpacity>
-                      </View>
+                          }
+                        }}
+                        accessibilityLabel="승인"
+                      >
+                        <Text style={s.approvePillText}>승인</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={s.rejectPill}
+                        onPress={async () => {
+                          await rejectRequest(a.id);
+                          await refresh({ silent: true });
+                        }}
+                        accessibilityLabel="거부"
+                      >
+                        <Text style={s.rejectPillText}>거부</Text>
+                      </TouchableOpacity>
                     </View>
-                  ))
-                ) : (
-                  <View style={s.emptyApplicationState}>
-                    <View style={s.emptyIconCircle}>
-                      <Ionicons
-                        name="people-outline"
-                        size={32}
-                        color="#D1D5DB"
-                      />
-                    </View>
-                    <Text style={s.emptyApplicationTitle}>
-                      새로운 가입 신청이 없습니다
-                    </Text>
-                    <Text style={s.emptyApplicationDesc}>
-                      크루에 가입 신청이 들어오면 여기에 표시됩니다
-                    </Text>
                   </View>
-                )}
+                ))}
               </View>
             )}
+            {/* 크루 통계 */}
 
-            <View style={s.membersSection}>
-              <Text style={s.sectionTitle}>멤버 목록 ({members.length}명)</Text>
-              {members.map((m) => {
-                console.log(
-                  "[MEMBER_RENDER] Rendering member:",
-                  m.nickname,
-                  "hasImage:",
-                  !!m.profileImage
-                );
-                const isSelf =
-                  (myUserId && String(m.id) === String(myUserId)) ||
-                  m.nickname === "나";
-                return (
-                  <View key={m.id} style={s.memberRow}>
-                    <View style={s.memberInfo}>
-                      <View style={s.memberAvatarContainer}>
-                        {m.profileImage ? (
-                          <Image
-                            source={{
-                              uri: m.profileImage,
-                              cache: "force-cache",
-                            }}
-                            style={s.memberAvatar}
-                            resizeMode="cover"
-                            onLoad={() =>
-                              console.log(
-                                "[MEMBER] Image loaded for:",
-                                m.nickname
-                              )
-                            }
-                            onError={(e) =>
-                              console.log(
-                                "[MEMBER] Image error for:",
-                                m.nickname,
-                                e.nativeEvent.error
-                              )
-                            }
-                          />
-                        ) : (
-                          <View style={s.memberAvatarPlaceholder}>
-                            <Ionicons name="person" size={20} color="#9CA3AF" />
-                          </View>
-                        )}
-                      </View>
-                      <View style={s.memberTextInfo}>
-                        <Text
-                          style={s.memberName}
-                          numberOfLines={1}
-                          ellipsizeMode="tail"
-                        >
-                          {m.nickname}
-                          {m.role === "ADMIN" && (
-                            <Text style={s.adminBadge}> 관리자</Text>
-                          )}
-                        </Text>
-                        <Text style={s.memberSub}>
-                          최근 러닝: {formatLastRunning(m.lastRunningDate)}
-                        </Text>
-                      </View>
-                    </View>
-                    {isAdmin && !isSelf && (
-                      <View style={s.actionGroup}>
-                        {/* 내보내기 버튼을 왼쪽에 */}
-                        {m.role !== "ADMIN" && (
-                          <TouchableOpacity
-                            style={s.roundIconBtn}
-                            onPress={() => {
-                              setConfirm({
-                                open: true,
-                                title: "확인",
-                                message: `${m.nickname} 님을 내보낼까요?`,
-                                destructive: true,
-                                onConfirm: async () => {
-                                  try {
-                                    await removeMember(crewId, m.id);
-                                    // Optimistic UI: 즉시 목록에서 제거
-                                    setMembers((prev) =>
-                                      prev.filter(
-                                        (x) => String(x.id) !== String(m.id)
-                                      )
-                                    );
-                                    // 멤버 수 텍스트 갱신
-                                    setCrewInfo((ci) => {
-                                      try {
-                                        const match = /\d+/.exec(
-                                          ci.members || ""
-                                        );
-                                        const prevCount = match
-                                          ? parseInt(match[0])
-                                          : members.length;
-                                        const nextCount = Math.max(
-                                          0,
-                                          prevCount - 1
-                                        );
-                                        return {
-                                          ...ci,
-                                          members: `멤버 ${nextCount}명`,
-                                        } as any;
-                                      } catch {
-                                        return ci as any;
-                                      }
-                                    });
-                                    setAlert({
-                                      open: true,
-                                      kind: "positive",
-                                      title: "완료",
-                                      message: `${m.nickname} 님을 내보냈습니다.`,
-                                    });
-                                    // 서버 동기화
-                                    await refresh({ silent: true });
-                                  } catch (e: any) {
-                                    const msg =
-                                      e?.response?.data?.message ||
-                                      e?.message ||
-                                      "내보내기에 실패했습니다.";
-                                    setAlert({
-                                      open: true,
-                                      kind: "negative",
-                                      title: "오류",
-                                      message: msg,
-                                    });
-                                  }
-                                },
-                              });
-                            }}
-                            accessibilityLabel="내보내기"
-                          >
-                            <Ionicons
-                              name="person-remove-outline"
-                              size={18}
-                              color="#EF4444"
-                            />
-                          </TouchableOpacity>
-                        )}
-
-                        {/* 매니저 임명/해제 아이콘을 그 오른쪽에 */}
-                        {m.role !== "ADMIN" ? (
-                          <TouchableOpacity
-                            style={s.roundIconBtn}
-                            onPress={() => {
-                              setConfirm({
-                                open: true,
-                                title: "관리자 임명",
-                                message: `${m.nickname} 님을 매니저(관리자)로 임명하시겠습니까?`,
-                                destructive: false,
-                                onConfirm: async () => {
-                                  await promoteMember(crewId, m.id);
-                                  await refresh({ silent: true });
-                                },
-                              });
-                            }}
-                            accessibilityLabel="관리자 지정"
-                          >
-                            <Ionicons
-                              name="star-outline"
-                              size={18}
-                              color="#F59E0B"
-                            />
-                          </TouchableOpacity>
-                        ) : (
-                          <TouchableOpacity
-                            style={s.roundIconBtn}
-                            onPress={() => {
-                              setConfirm({
-                                open: true,
-                                title: "권한 해제",
-                                message: `${m.nickname} 님의 매니저 권한을 해제하시겠습니까?`,
-                                destructive: true,
-                                onConfirm: async () => {
-                                  await demoteMember(crewId, m.id);
-                                  await refresh({ silent: true });
-                                },
-                              });
-                            }}
-                            accessibilityLabel="권한 해제"
-                          >
-                            <Ionicons name="star" size={18} color="#6B7280" />
-                          </TouchableOpacity>
-                        )}
-
-                        {/* 권한 이임(ADMIN일 때만) */}
-                        {m.role === "ADMIN" && (
-                          <TouchableOpacity
-                            style={s.roundIconBtn}
-                            onPress={() => {
-                              setConfirm({
-                                open: true,
-                                title: "권한 이임",
-                                message: `${m.nickname} 님에게 운영 권한을 이임하시겠습니까?`,
-                                destructive: true,
-                                onConfirm: async () => {
-                                  await transferOwnership(crewId, m.id);
-                                  await refresh({ silent: true });
-                                },
-                              });
-                            }}
-                            accessibilityLabel="권한 이임"
-                          >
-                            <Ionicons
-                              name="swap-horizontal"
-                              size={18}
-                              color="#3B82F6"
-                            />
-                          </TouchableOpacity>
-                        )}
+            {/* MVP 섹션 */}
+            {mvpMember && (
+              <View style={s.mvpSection}>
+                <View style={s.mvpHeader}>
+                  <Text style={s.mvpTitle}>🏆 이번 주 MVP</Text>
+                  <Text style={s.mvpDate}>3월 18일 - 3월 24일</Text>
+                </View>
+                <View style={s.mvpCard}>
+                  <View style={s.mvpAvatarContainer}>
+                    {mvpMember.profileImage ? (
+                      <Image
+                        source={{
+                          uri: mvpMember.profileImage,
+                          cache: "force-cache",
+                        }}
+                        style={s.mvpAvatar}
+                        resizeMode="cover"
+                        onError={(e) =>
+                          console.log(
+                            "[CREW_DETAIL] MVP image error:",
+                            e.nativeEvent.error
+                          )
+                        }
+                      />
+                    ) : (
+                      <View style={s.mvpAvatarPlaceholder}>
+                        <Ionicons name="person" size={24} color="#fff" />
                       </View>
                     )}
                   </View>
-                );
-              })}
-
-              {/* 무한 스크롤 로딩 인디케이터 */}
-              {loadingMoreMembers && (
-                <View style={s.loadingMore}>
-                  <ActivityIndicator size="small" color="#4A90E2" />
-                  <Text style={s.loadingText}>멤버 목록 불러오는 중...</Text>
+                  <View style={s.mvpInfo}>
+                    <Text style={s.mvpName}>{mvpMember.name}</Text>
+                    <Text style={s.mvpDistance}>
+                      월간 거리: {mvpMember.distance}
+                    </Text>
+                  </View>
+                  <View style={s.mvpBadge}>
+                    <Text style={s.mvpBadgeText}>MVP</Text>
+                  </View>
                 </View>
-              )}
-
-              {/* 더 이상 없음 표시 */}
-              {!hasMoreMembers && members.length > 0 && (
-                <View style={s.endMessage}>
-                  <Text style={s.endText}>모든 멤버를 불러왔습니다</Text>
-                </View>
-              )}
-            </View>
+              </View>
+            )}
           </>
+        )}
+
+        {/* 멤버 탭 내용 */}
+        {selectedTab === "멤버" && (
+          <View style={s.membersSection}>
+            <Text style={s.sectionTitle}>멤버 목록 ({members.length}명)</Text>
+            {members.map((m) => {
+              console.log(
+                "[MEMBER_RENDER] Rendering member:",
+                m.nickname,
+                "hasImage:",
+                !!m.profileImage
+              );
+              const isSelf =
+                (myUserId && String(m.id) === String(myUserId)) ||
+                m.nickname === "나";
+              return (
+                <View key={m.id} style={s.memberRow}>
+                  <View style={s.memberInfo}>
+                    <View style={s.memberAvatarContainer}>
+                      {m.profileImage ? (
+                        <Image
+                          source={{
+                            uri: m.profileImage,
+                            cache: "force-cache",
+                          }}
+                          style={s.memberAvatar}
+                          resizeMode="cover"
+                          onLoad={() =>
+                            console.log(
+                              "[MEMBER] Image loaded for:",
+                              m.nickname
+                            )
+                          }
+                          onError={(e) =>
+                            console.log(
+                              "[MEMBER] Image error for:",
+                              m.nickname,
+                              e.nativeEvent.error
+                            )
+                          }
+                        />
+                      ) : (
+                        <View style={s.memberAvatarPlaceholder}>
+                          <Ionicons name="person" size={20} color="#9CA3AF" />
+                        </View>
+                      )}
+                    </View>
+                    <View style={s.memberTextInfo}>
+                      <Text
+                        style={s.memberName}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {m.nickname}
+                        {m.role === "ADMIN" && (
+                          <Text style={s.adminBadge}> 관리자</Text>
+                        )}
+                      </Text>
+                      <Text style={s.memberSub}>
+                        최근 러닝: {formatLastRunning(m.lastRunningDate)}
+                      </Text>
+                    </View>
+                  </View>
+                  {isAdmin && !isSelf && (
+                    <View style={s.actionGroup}>
+                      {/* 내보내기 버튼을 왼쪽에 */}
+                      {m.role !== "ADMIN" && (
+                        <TouchableOpacity
+                          style={s.roundIconBtn}
+                          onPress={() => {
+                            setConfirm({
+                              open: true,
+                              title: "확인",
+                              message: `${m.nickname} 님을 내보낼까요?`,
+                              destructive: true,
+                              onConfirm: async () => {
+                                try {
+                                  await removeMember(crewId, m.id);
+                                  setAlert({
+                                    open: true,
+                                    kind: "positive",
+                                    title: "완료",
+                                    message: `${m.nickname} 님을 내보냈습니다.`,
+                                  });
+                                  await refresh({ silent: true });
+                                } catch (e: any) {
+                                  const msg =
+                                    e?.response?.data?.message ||
+                                    e?.message ||
+                                    "내보내기에 실패했습니다.";
+                                  setAlert({
+                                    open: true,
+                                    kind: "negative",
+                                    title: "오류",
+                                    message: msg,
+                                  });
+                                }
+                              },
+                            });
+                          }}
+                          accessibilityLabel="내보내기"
+                        >
+                          <Ionicons
+                            name="person-remove-outline"
+                            size={18}
+                            color="#EF4444"
+                          />
+                        </TouchableOpacity>
+                      )}
+
+                      {/* 매니저 임명/해제 아이콘을 그 오른쪽에 */}
+                      {m.role !== "ADMIN" ? (
+                        <TouchableOpacity
+                          style={s.roundIconBtn}
+                          onPress={() => {
+                            setConfirm({
+                              open: true,
+                              title: "관리자 임명",
+                              message: `${m.nickname} 님을 매니저(관리자)로 임명하시겠습니까?`,
+                              destructive: false,
+                              onConfirm: async () => {
+                                await promoteMember(crewId, m.id);
+                                await refresh({ silent: true });
+                              },
+                            });
+                          }}
+                          accessibilityLabel="관리자 지정"
+                        >
+                          <Ionicons
+                            name="star-outline"
+                            size={18}
+                            color="#F59E0B"
+                          />
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={s.roundIconBtn}
+                          onPress={() => {
+                            setConfirm({
+                              open: true,
+                              title: "권한 해제",
+                              message: `${m.nickname} 님의 매니저 권한을 해제하시겠습니까?`,
+                              destructive: true,
+                              onConfirm: async () => {
+                                await demoteMember(crewId, m.id);
+                                await refresh({ silent: true });
+                              },
+                            });
+                          }}
+                          accessibilityLabel="권한 해제"
+                        >
+                          <Ionicons name="star" size={18} color="#6B7280" />
+                        </TouchableOpacity>
+                      )}
+
+                      {/* 권한 이임(ADMIN일 때만) */}
+                      {m.role === "ADMIN" && (
+                        <TouchableOpacity
+                          style={s.roundIconBtn}
+                          onPress={() => {
+                            setConfirm({
+                              open: true,
+                              title: "권한 이임",
+                              message: `${m.nickname} 님에게 운영 권한을 이임하시겠습니까?`,
+                              destructive: true,
+                              onConfirm: async () => {
+                                await transferOwnership(crewId, m.id);
+                                await refresh({ silent: true });
+                              },
+                            });
+                          }}
+                          accessibilityLabel="권한 이임"
+                        >
+                          <Ionicons
+                            name="swap-horizontal"
+                            size={18}
+                            color="#3B82F6"
+                          />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+
+            {/* 무한 스크롤 로딩 인디케이터 */}
+            {loadingMoreMembers && (
+              <View style={s.loadingMore}>
+                <ActivityIndicator size="small" color="#4A90E2" />
+                <Text style={s.loadingText}>멤버 목록 불러오는 중...</Text>
+              </View>
+            )}
+
+            {/* 더 이상 없음 표시 */}
+            {!hasMoreMembers && members.length > 0 && (
+              <View style={s.endMessage}>
+                <Text style={s.endText}>모든 멤버를 불러왔습니다</Text>
+              </View>
+            )}
+          </View>
         )}
 
         {/* 설정 탭 내용 */}
@@ -1308,132 +1139,57 @@ const s = StyleSheet.create({
 
   // 가입 신청
   applicationCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#FFF8E1",
     marginHorizontal: 16,
     marginTop: 16,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#F3F4F6",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  applicationHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
   },
   applicationTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#111827",
-  },
-  applicationBadge: {
-    backgroundColor: "#FEF3C7",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    minWidth: 28,
-    alignItems: "center",
-  },
-  applicationBadgeText: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#F59E0B",
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#000",
+    marginBottom: 12,
   },
   applicationRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   applicantInfo: { flexDirection: "row", alignItems: "center", flex: 1 },
   applicantAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFB4B4",
     marginRight: 12,
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-  },
-  applicantAvatarPlaceholder: {
-    backgroundColor: "#FEF3C7",
     justifyContent: "center",
     alignItems: "center",
   },
   applicantName: {
     fontSize: 15,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 3,
+    fontWeight: "600",
+    color: "#000",
+    marginBottom: 2,
   },
-  applicantLevel: { fontSize: 13, color: "#6B7280", fontWeight: "500" },
-  applicationBtns: { flexDirection: "row", gap: 8, flexShrink: 0 },
+  applicantLevel: { fontSize: 12, color: "#666" },
+  applicationBtns: { flexDirection: "row", gap: 8 },
   // pill buttons for approve / reject
   approvePill: {
-    backgroundColor: "#10B981",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    shadowColor: "#10B981",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: "#22C55E",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
   },
-  approvePillText: { color: "#fff", fontSize: 13, fontWeight: "800" },
+  approvePillText: { color: "#fff", fontSize: 13, fontWeight: "700" },
   rejectPill: {
     backgroundColor: "#EF4444",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    shadowColor: "#EF4444",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
   },
-  rejectPillText: { color: "#fff", fontSize: 13, fontWeight: "800" },
-
-  // Empty State 스타일
-  emptyApplicationState: {
-    alignItems: "center",
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-  },
-  emptyIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#F9FAFB",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: "#F3F4F6",
-  },
-  emptyApplicationTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#374151",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  emptyApplicationDesc: {
-    fontSize: 14,
-    color: "#9CA3AF",
-    textAlign: "center",
-    lineHeight: 20,
-    maxWidth: 240,
-  },
+  rejectPillText: { color: "#fff", fontSize: 13, fontWeight: "700" },
 
   // 탭
   tabContainer: {
@@ -1503,151 +1259,53 @@ const s = StyleSheet.create({
 
   // MVP 섹션
   mvpSection: {
+    backgroundColor: "#3A3A3A",
     marginHorizontal: 16,
     marginTop: 16,
     marginBottom: 16,
-    borderRadius: 20,
-    overflow: "hidden",
-    shadowColor: "#F59E0B",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  mvpGradient: {
-    padding: 20,
-    position: "relative",
-  },
-  mvpDecoCircle1: {
-    position: "absolute",
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "rgba(251, 191, 36, 0.1)",
-    top: -30,
-    right: -30,
-  },
-  mvpDecoCircle2: {
-    position: "absolute",
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "rgba(245, 158, 11, 0.08)",
-    bottom: -20,
-    left: 20,
-  },
-  mvpContent: {
-    position: "relative",
-    zIndex: 1,
-  },
-  mvpHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  mvpTitleGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  mvpEmoji: {
-    fontSize: 22,
-  },
-  mvpTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#78350F",
-    letterSpacing: -0.3,
-  },
-  mvpBadge: {
-    backgroundColor: "#F59E0B",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
     borderRadius: 12,
-    shadowColor: "#F59E0B",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
+    padding: 16,
   },
-  mvpBadgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-  },
+  mvpHeader: { marginBottom: 16 },
+  mvpTitle: { fontSize: 16, fontWeight: "700", color: "#fff", marginBottom: 4 },
+  mvpDate: { fontSize: 12, color: "#9CA3AF" },
   mvpCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(251, 191, 36, 0.2)",
+    backgroundColor: "#4A4A4A",
+    padding: 12,
+    borderRadius: 12,
   },
   mvpAvatarContainer: {
-    position: "relative",
-    marginRight: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: "hidden",
+    marginRight: 12,
   },
   mvpAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 3,
-    borderColor: "#FBBF24",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   mvpAvatarPlaceholder: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#FEF3C7",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#6B7280",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 3,
-    borderColor: "#FBBF24",
   },
-  crownBadge: {
-    position: "absolute",
-    top: -4,
-    right: -4,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#fff",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#FBBF24",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  mvpInfo: { flex: 1 },
+  mvpName: { fontSize: 16, fontWeight: "700", color: "#fff", marginBottom: 4 },
+  mvpDistance: { fontSize: 13, color: "#9CA3AF" },
+  mvpBadge: {
+    backgroundColor: "#6B7280",
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 12,
   },
-  crownEmoji: {
-    fontSize: 16,
-  },
-  mvpInfo: {
-    flex: 1,
-  },
-  mvpName: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#0F172A",
-    marginBottom: 6,
-    letterSpacing: -0.3,
-  },
-  mvpDistanceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  mvpDistance: {
-    fontSize: 15,
-    color: "#92400E",
-    fontWeight: "700",
-  },
+  mvpBadgeText: { color: "#fff", fontSize: 12, fontWeight: "700" },
 
   // 멤버 섹션
   membersSection: {
@@ -1757,71 +1415,6 @@ const s = StyleSheet.create({
     color: "#6B7280",
     lineHeight: 18,
   },
-
-  // 랭킹 카드
-  rankCard: {
-    backgroundColor: "#fff",
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#F3F4F6",
-  },
-  rankHeader: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  rankTitle: { fontSize: 16, fontWeight: "800", color: "#0F172A" },
-  rankSubtitle: { fontSize: 12, color: "#64748B" },
-  rankRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    backgroundColor: "#F9FAFB",
-    borderRadius: 10,
-    marginTop: 6,
-  },
-  rankLeft: { flexDirection: "row", alignItems: "center", flex: 1, gap: 8 },
-  rankBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#E5E7EB",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rankBadgeTop1: { backgroundColor: "#F59E0B" },
-  rankBadgeTop2: { backgroundColor: "#94A3B8" },
-  rankBadgeTop3: { backgroundColor: "#EA580C" },
-  rankBadgeText: { fontSize: 13, fontWeight: "800", color: "#111827" },
-  rankBadgeTextTop: { color: "#fff" },
-  rankAvatarWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    overflow: "hidden",
-    backgroundColor: "#EEF2FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rankAvatar: { width: 28, height: 28, borderRadius: 14 },
-  rankAvatarPlaceholder: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rankName: { flex: 1, fontSize: 14, fontWeight: "700", color: "#1F2937" },
-  rankRight: { flexDirection: "row", alignItems: "baseline", gap: 2 },
-  rankDistance: { fontSize: 16, fontWeight: "800", color: "#0F172A" },
-  rankUnit: { fontSize: 12, fontWeight: "600", color: "#64748B" },
   closeCrewBtn: {
     flexDirection: "row",
     alignItems: "center",
