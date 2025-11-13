@@ -709,7 +709,10 @@ export default function JourneyRunningScreen(
               </Text>
             </View>
             <View style={styles.compactProgressBar}>
-              <View
+              <LinearGradient
+                colors={["#10B981", "#34D399", "#6EE7B7"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
                 style={[
                   styles.compactProgressFill,
                   { width: `${Math.min(100, t.progressPercent)}%` },
@@ -766,7 +769,6 @@ export default function JourneyRunningScreen(
                 (!t.isReady || t.isInitializing) && styles.startButtonDisabled,
               ]}
             >
-              <Text style={styles.startButtonIcon}>🏃</Text>
               <Text style={styles.startButtonText}>
                 {!t.isReady
                   ? "준비중..."
@@ -1006,11 +1008,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    backgroundColor: "#fff",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
   },
   startButtonDisabled: {
     shadowOpacity: 0,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "rgba(243, 244, 246, 0.8)",
   },
   startButtonIcon: {
     fontSize: 20,
@@ -1051,6 +1053,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
     color: "#6366F1",
+    textShadowColor: "rgba(99, 102, 241, 0.3)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
   compactProgressBar: {
     height: 5,
@@ -1061,8 +1066,12 @@ const styles = StyleSheet.create({
   },
   compactProgressFill: {
     height: "100%",
-    backgroundColor: "#10B981",
     borderRadius: 3,
+    shadowColor: "#10B981",
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 5,
   },
   compactNextLandmark: {
     fontSize: 10,
