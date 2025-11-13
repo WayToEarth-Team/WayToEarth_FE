@@ -34,7 +34,7 @@ console.log("- WebSocket:", !!WebSocket);
 
 const { width } = Dimensions.get("window");
 
-export default function ChatScreen({ route }: any) {
+export default function ChatScreen({ route }: any = { route: { params: {} } }) {
   const insets = useSafeAreaInsets();
   const [message, setMessage] = useState("");
   const [crewId, setCrewId] = useState<number | null>(
