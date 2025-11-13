@@ -632,19 +632,6 @@ export default function JourneyRunningScreen(
 
   return (
     <SafeLayout withBottomInset>
-      {/* 스탬프 바텀시트(스와이프 업) - 먼저 렌더해서 다른 UI가 위에 오도록 */}
-      <StampBottomSheet
-        userId={userId}
-        journeyId={journeyId}
-        progressPercent={t.progressPercent}
-        landmarks={landmarks.map(l => ({ id: parseInt(l.id), name: l.name, distanceM: l.distanceM }))}
-        currentLocation={t.route?.length ? t.route[t.route.length - 1] : null}
-        onCollected={(res: StampResponse) => {
-          const id = res?.landmark?.id;
-          if (typeof id === 'number') setCollectedSet((prev) => new Set(prev).add(id));
-        }}
-      />
-
       <JourneyMapRoute
         journeyRoute={journeyRoute}
         landmarks={t.landmarksWithReached}
@@ -933,7 +920,19 @@ export default function JourneyRunningScreen(
         </Pressable>
       </Modal>
 
-      {/* 스탬프 바텀시트(스와이프 업) - 컨트롤 위에 겹치지 않도록 먼저 렌더 */}
+      {/* 스탬프 바텀시트(스와이프 업) - 가장 마지막에 렌더링하여 터치 이벤트를 먼저 받도록 */}
+      <StampBottomSheet
+        userId={userId}
+        journeyId={journeyId}
+        progressPercent={t.progressPercent}
+        landmarks={landmarks.map(l => ({ id: parseInt(l.id), name: l.name, distanceM: l.distanceM }))}
+        currentLocation={t.route?.length ? t.route[t.route.length - 1] : null}
+        currentProgressM={t.progressM}
+        onCollected={(res: StampResponse) => {
+          const id = res?.landmark?.id;
+          if (typeof id === 'number') setCollectedSet((prev) => new Set(prev).add(id));
+        }}
+      />
     </SafeLayout>
   );
 }

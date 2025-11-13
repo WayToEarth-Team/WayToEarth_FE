@@ -32,19 +32,19 @@ import * as FileSystem from 'expo-file-system';
 import type { LandmarkDetail, StoryType } from '../types/landmark';
 
 type RouteParams = {
-  route: {
+  route?: {
     params?: {
       landmarkId: number;
       userId?: number;
     };
   };
-  navigation: any;
+  navigation?: any;
 };
 
 const { width, height } = Dimensions.get('window');
 
-export default function LandmarkStoryScreen({ route, navigation }: RouteParams) {
-  const params = route.params || {};
+export default function LandmarkStoryScreen({ route, navigation }: RouteParams = {}) {
+  const params = route?.params || {};
   const landmarkId = params.landmarkId;
   const userId = params.userId;
 

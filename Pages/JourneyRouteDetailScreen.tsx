@@ -6,9 +6,9 @@ import { getJourneyLandmarks } from '../utils/api/landmarks';
 import type { LandmarkSummary as JourneyLandmark } from '../types/landmark';
 import ImageCarousel from '../components/Common/ImageCarousel';
 
-type RouteParams = { route: { params?: { id?: RouteId } } ; navigation?: any };
+type RouteParams = { route?: { params?: { id?: RouteId } } ; navigation?: any };
 
-export default function RouteDetailScreen({ route, navigation }: RouteParams) {
+export default function RouteDetailScreen({ route, navigation }: RouteParams = {}) {
   const id = route?.params?.id;
   const { data, loading } = useRouteDetail(id);
   const [showLandmarks, setShowLandmarks] = useState(false);
