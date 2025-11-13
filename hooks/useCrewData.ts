@@ -57,76 +57,56 @@ export function useCrewData(searchText: string) {
         persistPending(cleared);
       }
       // 상단 랭킹 + 프로필 이미지 채우기: 목록 매칭 -> ID 상세 -> 이름 검색 순서
-      // 상단 TOP 크루: 0km도 포함하도록 보강
-      const topSafe = Array.isArray(top) ? top : [];
-      // 1) 현재 목록에서 이미지 빠르게 매핑
-      const listMap = new Map<string, string | null>();
-      (list || []).forEach((c: any) => listMap.set(String(c.id), c.imageUrl ?? null));
-      let enriched = topSafe.map((t) => ({
-        ...t,
-        imageUrl: listMap.get(String(t.id)) ?? null,
-      }));
+      if (top && top.length) {
+        // 1) 현재 목록에서 id 매칭으로 빠르게 채우기
+        const listMap = new Map<string, string | null>();
+        (list || []).forEach((c: any) => listMap.set(String(c.id), c.imageUrl ?? null));
+        let enriched = top.map((t) => ({
+          ...t,
+          imageUrl: listMap.get(String(t.id)) ?? null,
+        }));
 
-      // 2) 부족하면 0km 크루로 채우기 (최대 3개까지)
-      if (enriched.length < 3) {
-        const need = 3 - enriched.length;
-        // 전체 목록에서 아직 포함되지 않은 크루를 선별
-        const used = new Set(enriched.map((t) => String(t.id)));
-        const extras: TopCrewItemData[] = [];
-        (list || []).some((c: any) => {
-          const id = String(c.id);
-          if (used.has(id)) return false;
-          if (extras.length < need) {
-            extras.push({
-              id,
-              rank: `${enriched.length + extras.length + 1}위 크루`,
-              name: String(c.name ?? "크루"),
-              distance: "0km",
-              imageUrl: c.imageUrl ?? null,
-            });
-          }
-          return extras.length >= need;
-        });
-        enriched = [...enriched, ...extras];
-      }
-
-      // 3) 이미지가 비어있는 항목 보강: ID 상세 → 이름 검색 순서
-      const needById = enriched
-        .map((t, idx) => ({ t, idx }))
-        .filter(({ t }) => !t.imageUrl);
-      if (needById.length > 0) {
-        const results = await Promise.allSettled(
-          needById.map(({ t }) => getCrewById(String(t.id)))
-        );
-        results.forEach((res, i) => {
-          const { idx } = needById[i];
-          if (res.status === "fulfilled") {
-            enriched[idx] = {
-              ...enriched[idx],
-              imageUrl: (res.value as any)?.profileImageUrl ?? enriched[idx].imageUrl ?? null,
-            };
-          }
-        });
-      }
-
-      const needByName = enriched
-        .map((t, idx) => ({ t, idx }))
-        .filter(({ t }) => !t.imageUrl);
-      if (needByName.length > 0) {
-        try {
-          const searched = await Promise.all(
-            needByName.map(({ t }) => listCrews(String(t.name)).catch(() => [] as any[]))
+        // 2) 이미지 없는 항목은 ID로 상세 조회해 보강 (요구사항: crewId로 이미지 조회)
+        const needById = enriched
+          .map((t, idx) => ({ t, idx }))
+          .filter(({ t }) => !t.imageUrl);
+        if (needById.length > 0) {
+          const results = await Promise.allSettled(
+            needById.map(({ t }) => getCrewById(String(t.id)))
           );
-          needByName.forEach(({ t, idx }, i) => {
-            const arr = searched[i] as any[];
-            const hit = (arr || []).find((c) => String(c.id) === String(t.id));
-            if (hit && (hit as any).imageUrl) {
-              enriched[idx] = { ...enriched[idx], imageUrl: (hit as any).imageUrl };
+          results.forEach((res, i) => {
+            const { idx } = needById[i];
+            if (res.status === "fulfilled") {
+              enriched[idx] = {
+                ...enriched[idx],
+                imageUrl: (res.value as any)?.profileImageUrl ?? enriched[idx].imageUrl ?? null,
+              };
             }
           });
-        } catch {}
+        }
+
+        // 3) 그래도 비어있으면 이름 검색으로 보강 (fallback)
+        const needByName = enriched
+          .map((t, idx) => ({ t, idx }))
+          .filter(({ t }) => !t.imageUrl);
+        if (needByName.length > 0) {
+          try {
+            const searched = await Promise.all(
+              needByName.map(({ t }) => listCrews(String(t.name)).catch(() => [] as any[]))
+            );
+            needByName.forEach(({ t, idx }, i) => {
+              const arr = searched[i] as any[];
+              const hit = (arr || []).find((c) => String(c.id) === String(t.id));
+              if (hit && (hit as any).imageUrl) {
+                enriched[idx] = { ...enriched[idx], imageUrl: (hit as any).imageUrl };
+              }
+            });
+          } catch {}
+        }
+        setTopCrews(enriched);
+      } else {
+        setTopCrews([]);
       }
-      setTopCrews(enriched);
       // 내 크루가 목록에 있으면 중복 제거 (id 타입 차이 방지용 String 비교)
       const myId = m ? String((m as any).id) : "";
       const filtered = (list ?? []).filter((c) => String((c as any).id) !== myId);

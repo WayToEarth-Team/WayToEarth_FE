@@ -4,49 +4,29 @@ import type { TopCrewItemData } from "../../types/Crew";
 // Fetch top crew rankings by monthly total distance
 // Swagger: GET /v1/crews/statistics/rankings/distance
 // Query: month (YYYYMM, optional), limit (default 10)
-// Server may return different shapes depending on version.
-// Normalize across possible keys.
-type CrewRankingDto = any;
+type CrewRankingDto = {
+  month?: string;
+  crewId: number;
+  crewName: string;
+  totalDistance: number; // km
+  runCount?: number;
+  rank: number;
+};
 
 export async function getTopCrewsByDistance(
   params?: { month?: string; limit?: number }
 ): Promise<TopCrewItemData[]> {
   const { month, limit = 3 } = params || {};
-  const fetchOnce = async (m?: string) => {
-    const { data } = await client.get("/v1/crews/statistics/rankings/distance", {
-      params: { month: m, limit },
-    });
-    const raw = data as any;
-    const arr: CrewRankingDto[] = Array.isArray(raw?.content)
-      ? raw.content
-      : (Array.isArray(raw) ? raw : []);
-    const normalized = (arr as any[]).map((r: any, idx: number) => {
-      const id = r.crewId ?? r.id ?? r.crew?.id;
-      const name = r.crewName ?? r.name ?? r.crew?.name ?? "크루";
-      const distRaw = r.totalDistance ?? r.distance ?? r.total_distance ?? r.total_distance_km ?? 0;
-      const rank = r.rank ?? idx + 1;
-      return {
-        id: String(id ?? ""),
-        rank: `${rank}위 크루`,
-        name: String(name),
-        distance: `${formatKm(Number(String(distRaw).replace(/[^\d.]/g, "")) || 0)}`,
-        imageUrl: r.imageUrl ?? r.crew?.profileImageUrl ?? null,
-      } as TopCrewItemData;
-    });
-    return normalized as TopCrewItemData[];
-  };
-
-  let list: TopCrewItemData[] = [];
-  try {
-    list = await fetchOnce(month);
-  } catch {}
-  // Fallback: if empty or failed and month provided, retry without month
-  if ((!list || list.length === 0) && month) {
-    try {
-      list = await fetchOnce(undefined);
-    } catch {}
-  }
-  return (list || []).slice(0, limit);
+  const { data } = await client.get("/v1/crews/statistics/rankings/distance", {
+    params: { month, limit },
+  });
+  const list = (data ?? []) as CrewRankingDto[];
+  return list.slice(0, limit).map((r) => ({
+    id: String(r.crewId),
+    rank: `${r.rank}등 크루`,
+    name: r.crewName,
+    distance: `${formatKm(r.totalDistance)}`,
+  }));
 }
 
 function formatKm(n: number) {

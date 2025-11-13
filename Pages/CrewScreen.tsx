@@ -173,7 +173,7 @@ export default function CrewScreen() {
                           ? { uri: topCrews[2].imageUrl }
                           : undefined
                       }
-                      size="md"
+                      size="sm"
                     />
                   </View>
                 )}
@@ -606,7 +606,7 @@ const s = StyleSheet.create({
     backgroundColor: "#F3F4F6",
     borderRadius: 24,
     paddingHorizontal: 16,
-    paddingVertical: 5,
+    paddingVertical: 12,
     gap: 8,
   },
   searchInput: {
