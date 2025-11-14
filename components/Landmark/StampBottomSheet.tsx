@@ -14,6 +14,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import type { LatLng } from "../../types/types";
@@ -384,16 +385,18 @@ export default function StampBottomSheet({
                 >
                   <View style={styles.stampImageWrapper}>
                     {imageUrl ? (
-                      <View style={styles.stampPlaceholder}>
-                        <Text style={styles.stampEmoji}>🏛️</Text>
-                      </View>
+                      <Image
+                        source={{ uri: imageUrl }}
+                        style={styles.stampImage}
+                        resizeMode="cover"
+                      />
                     ) : (
                       <View style={styles.stampPlaceholder}>
                         <Text style={styles.stampEmoji}>🏛️</Text>
                       </View>
                     )}
 
-                    {/* 미수집: 잠금 오버레이 */}
+                    {/* 미수집: 반투명 오버레이 (이미지는 보이되 흐리게) */}
                     {!collected && (
                       <View style={styles.stampLockedOverlay}>
                         <Text style={styles.lockIcon}>🔒</Text>
@@ -624,6 +627,10 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     overflow: "hidden",
   },
+  stampImage: {
+    width: "100%",
+    height: "100%",
+  },
   stampPlaceholder: {
     width: "100%",
     height: "100%",
@@ -640,7 +647,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(0,0,0,0.3)",
     alignItems: "center",
     justifyContent: "center",
   },
