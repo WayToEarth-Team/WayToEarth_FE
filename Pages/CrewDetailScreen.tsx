@@ -38,6 +38,9 @@ import {
   getCrewMemberRanking,
 } from "../utils/api/crewStats";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import CrewRecord from "../components/Crew/CrewRecord";
+import CrewMVPCard from "../components/Crew/CrewMVPCard";
+import { useCrewWeeklyMVP } from "../hooks/useCrewWeeklyMVP";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Member = {
@@ -82,6 +85,29 @@ export default function CrewDetailScreen() {
     profileImage?: string | null;
     userId?: string | number;
   } | null>(null);
+
+  // 주간 MVP/랭킹 데이터 (CrewRecord용)
+  const {
+    loading: mvpLoading,
+    error: mvpError,
+    weeklyData,
+    rankingData,
+    totalDistance,
+    percentChange,
+  } = useCrewWeeklyMVP(crewId);
+
+  // 주간 기간 라벨 계산
+  const periodLabel = React.useMemo(() => {
+    const now = new Date();
+    const day = now.getDay();
+    const diffToMon = (day + 6) % 7; // Mon=0
+    const start = new Date(now);
+    start.setDate(now.getDate() - diffToMon);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const fmt = (d: Date) => `${d.getMonth() + 1}월 ${d.getDate()}일`;
+    return `${fmt(start)} - ${fmt(end)}`;
+  }, [crewId]);
 
   // 멤버 무한 스크롤 상태
   const [memberPage, setMemberPage] = useState(0);
@@ -623,42 +649,30 @@ export default function CrewDetailScreen() {
             {/* MVP 섹션 */}
             {mvpMember && (
               <View style={s.mvpSection}>
-                <View style={s.mvpHeader}>
-                  <Text style={s.mvpTitle}>🏆 이번 주 MVP</Text>
-                  <Text style={s.mvpDate}>3월 18일 - 3월 24일</Text>
+                {/* MVP 카드 (컴포넌트) */}
+                <View style={s.mvpCardContainer}>
+                  <CrewMVPCard
+                    mvp={{
+                      name: mvpMember.name,
+                      distanceKm:
+                        Number(
+                          String(mvpMember.distance).replace(/[^\d.]/g, "")
+                        ) || 0,
+                      profileImage: mvpMember.profileImage || undefined,
+                      periodLabel,
+                    }}
+                  />
                 </View>
-                <View style={s.mvpCard}>
-                  <View style={s.mvpAvatarContainer}>
-                    {mvpMember.profileImage ? (
-                      <Image
-                        source={{
-                          uri: mvpMember.profileImage,
-                          cache: "force-cache",
-                        }}
-                        style={s.mvpAvatar}
-                        resizeMode="cover"
-                        onError={(e) =>
-                          console.log(
-                            "[CREW_DETAIL] MVP image error:",
-                            e.nativeEvent.error
-                          )
-                        }
-                      />
-                    ) : (
-                      <View style={s.mvpAvatarPlaceholder}>
-                        <Ionicons name="person" size={24} color="#fff" />
-                      </View>
-                    )}
-                  </View>
-                  <View style={s.mvpInfo}>
-                    <Text style={s.mvpName}>{mvpMember.name}</Text>
-                    <Text style={s.mvpDistance}>
-                      월간 거리: {mvpMember.distance}
-                    </Text>
-                  </View>
-                  <View style={s.mvpBadge}>
-                    <Text style={s.mvpBadgeText}>MVP</Text>
-                  </View>
+                {/* CrewRecord: 이번주 통계 + 랭킹 */}
+                <View style={s.crewRecordContainer}>
+                  <CrewRecord
+                    embedded
+                    title="지난주 러닝"
+                    weeklyData={weeklyData}
+                    rankingData={rankingData}
+                    totalDistance={totalDistance}
+                    percentChange={percentChange}
+                  />
                 </View>
               </View>
             )}
@@ -1257,15 +1271,6 @@ const s = StyleSheet.create({
   },
   statsCardLabel: { fontSize: 12, color: "#6B7280" },
 
-  // MVP 섹션
-  mvpSection: {
-    backgroundColor: "#3A3A3A",
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 16,
-    borderRadius: 12,
-    padding: 16,
-  },
   mvpHeader: { marginBottom: 16 },
   mvpTitle: { fontSize: 16, fontWeight: "700", color: "#fff", marginBottom: 4 },
   mvpDate: { fontSize: 12, color: "#9CA3AF" },
@@ -1445,5 +1450,21 @@ const s = StyleSheet.create({
   endText: {
     fontSize: 13,
     color: "#9CA3AF",
+  },
+  // MVP 섹션 스타일
+  mvpSection: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 80, // 하단 여백
+  },
+
+  // CrewMVPCard 컴포넌트용 컨테이너
+  mvpCardContainer: {
+    marginBottom: 16,
+  },
+
+  // CrewRecord 컴포넌트용 컨테이너
+  crewRecordContainer: {
+    marginTop: 8,
   },
 });
