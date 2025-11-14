@@ -1,17 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  Modal,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  ActivityIndicator,
-  ScrollView,
-  TextInput,
-} from "react-native";
+import { Modal, View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { getCrewById, type CrewPublicDetail } from "../../utils/api/crews";
+import WeeklyMVPSection from "./WeeklyMVPSection";
+import CrewHeaderCard from "./CrewHeaderCard";
+import CrewDescription from "./CrewDescription";
+import JoinIntroInput from "./JoinIntroInput";
 
 type Props = {
   visible: boolean;
@@ -90,32 +84,17 @@ export default function CrewDetailModal({
           </View>
 
           <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
-            <View style={s.card}>
-              <View style={s.rowBetween}>
-                <View style={s.avatarWrap}>
-                  {detail?.profileImageUrl ? (
-                    <Image source={{ uri: detail.profileImageUrl }} style={s.avatarImg} />
-                  ) : (
-                    <View style={s.avatarFallback}>
-                      <Ionicons name="people" size={24} color="#6B7280" />
-                    </View>
-                  )}
-                </View>
-                {progress ? <Text style={s.progress}>{progress}</Text> : null}
-              </View>
-              <Text style={s.name}>{name}</Text>
-              {detail?.ownerNickname ? (
-                <Text style={s.subInfo}>리더 {detail.ownerNickname}</Text>
-              ) : null}
-              {detail?.isActive === false ? (
-                <Text style={s.inactive}>비활성 크루</Text>
-              ) : null}
-              {detail?.description ? (
-                <Text style={s.desc} numberOfLines={5}>
-                  {detail.description}
-                </Text>
-              ) : null}
-            </View>
+            <CrewHeaderCard
+              name={name}
+              progress={progress || undefined}
+              profileImageUrl={detail?.profileImageUrl}
+              ownerNickname={detail?.ownerNickname}
+              isActive={detail?.isActive}
+            />
+            <CrewDescription description={detail?.description} />
+
+            {/* 이번주 MVP 섹션: 훅 + 프리젠테이션 컴포넌트 */}
+            {crewId ? <WeeklyMVPSection crewId={crewId} /> : null}
 
             {loading && (
               <View style={s.loadingBox}>
@@ -130,21 +109,10 @@ export default function CrewDetailModal({
               </View>
             )}
 
-            <View style={s.inputWrap}>
-              <Text style={s.inputLabel}>가입 인사 (선택)</Text>
-              <TextInput
-                style={s.input}
-                placeholder="간단한 소개를 남겨보세요"
-                value={intro}
-                onChangeText={setIntro}
-                multiline
-              />
-            </View>
+            <JoinIntroInput value={intro} onChange={setIntro} onSubmit={submit} submitting={applying} />
           </ScrollView>
 
-          <TouchableOpacity style={[s.applyBtn, applying && { opacity: 0.6 }]} onPress={submit} disabled={applying}>
-            <Text style={s.applyText}>{applying ? "신청 중…" : "신청"}</Text>
-          </TouchableOpacity>
+          {/* 버튼은 JoinIntroInput 내부에서 렌더링 */}
         </View>
       </View>
     </Modal>
@@ -178,46 +146,8 @@ const s = StyleSheet.create({
     marginBottom: 8,
   },
   headerTitle: { fontSize: 18, fontWeight: "800", color: "#111827" },
-  card: {
-    backgroundColor: "#F9FAFB",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-  },
-  rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  avatarWrap: { width: 56, height: 56, borderRadius: 12, overflow: "hidden", backgroundColor: "#EEF2FF", alignItems: "center", justifyContent: "center" },
-  avatarImg: { width: 56, height: 56, resizeMode: "cover" },
-  avatarFallback: { width: 56, height: 56, alignItems: "center", justifyContent: "center" },
-  name: { fontSize: 16, fontWeight: "800", color: "#111827", marginTop: 8 },
-  subInfo: { marginTop: 4, fontSize: 12, color: "#6B7280" },
-  progress: { fontSize: 12, color: "#6B7280", fontWeight: "700" },
-  inactive: { marginTop: 4, fontSize: 12, color: "#ef4444", fontWeight: "700" },
-  desc: { marginTop: 10, fontSize: 13, color: "#374151", lineHeight: 18 },
   loadingBox: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8 },
   loadingText: { marginLeft: 8, color: "#6B7280", fontSize: 12 },
   errorBox: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8 },
   errorText: { marginLeft: 6, color: "#ef4444", fontSize: 12 },
-  inputWrap: { marginTop: 4 },
-  inputLabel: { fontSize: 12, color: "#6B7280", marginBottom: 6 },
-  input: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#fff",
-    minHeight: 84,
-    textAlignVertical: "top",
-  },
-  applyBtn: {
-    marginTop: 12,
-    backgroundColor: "#111827",
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  applyText: { color: "#fff", fontWeight: "800" },
 });
-
