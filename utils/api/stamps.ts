@@ -1,6 +1,7 @@
 // utils/api/stamps.ts
 // 스탬프 API: 수집/조회/확인/통계 (서버 규격에 맞춤)
 import { client } from "./client";
+import { emitStampCollected } from "../navEvents";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { JourneyId } from "../../types/journey";
 
@@ -86,7 +87,9 @@ export async function collectStampForProgress(
     collectionLocation: { latitude: coords.latitude, longitude: coords.longitude },
   };
   const res = await client.post(`/v1/stamps/collect`, body);
-  return (res.data?.data ?? res.data) as StampResponse;
+  const payload = (res.data?.data ?? res.data) as StampResponse;
+  try { emitStampCollected({ stamp: payload, landmarkId: Number(landmarkId) }); } catch {}
+  return payload;
 }
 
 // 진행별 수집 목록
