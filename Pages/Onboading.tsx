@@ -6,6 +6,8 @@ import {
   StatusBar,
   Animated,
   Dimensions,
+  Image,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ensureAccessToken } from "../utils/auth/tokenManager";
@@ -123,79 +125,25 @@ export default function Onboading() {
   return (
     <SafeAreaView edges={["top"]} style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      <View style={styles.topLine} />
       <View style={styles.content}>
-        {/* 장식 아이콘들 (부드러운 플로팅) */}
-        <Animated.View
-          style={[
-            styles.decorativeIcon,
-            styles.topLeftIcon,
-            {
-              transform: [
-                {
-                  translateY: floatAnim.interpolate({
-                    inputRange: [0, 0.5, 1],
-                    outputRange: [0, -10, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View style={[styles.diamond, { backgroundColor: "#FFB800" }]} />
-        </Animated.View>
-        <Animated.View
-          style={[
-            styles.decorativeIcon,
-            styles.topRightIcon,
-            {
-              transform: [
-                {
-                  translateY: floatAnim.interpolate({
-                    inputRange: [0, 0.5, 1],
-                    outputRange: [0, 8, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View style={[styles.circle, { backgroundColor: "#FF6B6B" }]} />
-        </Animated.View>
-        <Animated.View
-          style={[
-            styles.decorativeIcon,
-            styles.bottomIcon,
-            {
-              transform: [
-                {
-                  translateY: floatAnim.interpolate({
-                    inputRange: [0, 0.5, 1],
-                    outputRange: [0, -6, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View style={[styles.diamond, { backgroundColor: "#4ECDC4" }]} />
-        </Animated.View>
-
-        {/* 로고 + 러닝 아이콘 */}
+        {/* 로딩 이미지: 화면을 꽉 채우지 않도록 비율 유지 */}
+        <Image
+          source={require("../assets/WTE-applogo.png")}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
+        {/* 중앙 로딩 인디케이터 */}
         <Animated.View
           style={[
             styles.logoContainer,
             { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },
           ]}
         >
-          <View style={styles.textContainer}>
-            <Text style={styles.wayText}>WAY</Text>
-            <Text style={styles.toText}>TO</Text>
-            <Text style={styles.earthText}>EARTH</Text>
-          </View>
-          <View style={styles.earthIconContainer}>
-            <RunningIcon animatedValue={rotateAnim} />
-          </View>
+          <ActivityIndicator
+            style={{ marginTop: 24 }}
+            size="small"
+            color="#4A90E2"
+          />
         </Animated.View>
       </View>
     </SafeAreaView>
@@ -204,7 +152,6 @@ export default function Onboading() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#ffffff" },
-  topLine: { height: 2, backgroundColor: "#4A90E2", width: "100%" },
   content: {
     flex: 1,
     justifyContent: "center",
@@ -212,38 +159,5 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   logoContainer: { alignItems: "center", justifyContent: "center" },
-  textContainer: { alignItems: "center", marginBottom: 20 },
-  wayText: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#2C3E50",
-    letterSpacing: 2,
-    marginBottom: -2,
-  },
-  toText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#7F8C8D",
-    letterSpacing: 4,
-    marginBottom: -2,
-  },
-  earthText: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#2C3E50",
-    letterSpacing: 2,
-  },
-  earthIconContainer: { position: "absolute", right: -50, top: 10 },
-  runningEmoji: { fontSize: 40 },
-  decorativeIcon: { position: "absolute" },
-  topLeftIcon: { top: height * 0.25, left: width * 0.2 },
-  topRightIcon: { top: height * 0.3, right: width * 0.15 },
-  bottomIcon: { bottom: height * 0.35, left: width * 0.25 },
-  diamond: {
-    width: 8,
-    height: 8,
-    transform: [{ rotate: "45deg" }],
-    borderRadius: 1,
-  },
-  circle: { width: 6, height: 6, borderRadius: 3 },
+  logoImage: { width: width * 0.7, height: height * 0.35 },
 });
