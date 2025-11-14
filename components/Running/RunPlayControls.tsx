@@ -28,9 +28,8 @@ export default function RunPlayControls({
   const playIcon = !isRunning || isPaused ? "play" : "pause";
 
   return (
-    <View style={[styles.container, { bottom: bottomSafe + BASE }]}>
+    <View style={[styles.container, { bottom: bottomSafe + 28 }]}>
       <Pressable
-        android_ripple={{ color: "rgba(255,255,255,0.15)" }}
         style={({ pressed }) => [styles.circle, pressed && styles.pressed]}
         onPress={() => {
           if (!isRunning) onPlay();
@@ -42,11 +41,10 @@ export default function RunPlayControls({
           !isRunning ? "재생" : isPaused ? "재개" : "일시정지"
         }
       >
-        <Ionicons name={playIcon} size={28} color="#fff" />
+        <Ionicons name={playIcon} size={30} color="#111827" />
       </Pressable>
 
       <Pressable
-        android_ripple={{ color: "rgba(255,255,255,0.15)" }}
         style={({ pressed }) => [styles.circle, pressed && styles.pressed]}
         onPress={onStopTap}
         onLongPress={onStopLong}
@@ -54,7 +52,7 @@ export default function RunPlayControls({
         accessibilityRole="button"
         accessibilityLabel="종료"
       >
-        <Ionicons name="stop" size={26} color="#fff" />
+        <Ionicons name="stop" size={28} color="#111827" />
       </Pressable>
     </View>
   );
@@ -71,17 +69,22 @@ const styles = StyleSheet.create({
     gap: 28,
   },
   circle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "#111",
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
     alignItems: "center",
     justifyContent: "center",
     elevation: 4,
     shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 },
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.06)",
   },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+  pressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.94 }],
+  },
 });
