@@ -369,8 +369,29 @@ export default function RouteDetailScreen({ route, navigation }: RouteParams = {
                   { latitude: 37.5605, longitude: 126.9753 },
                 ],
               };
+              const totalDistanceKm = parseFloat(data.distance.replace('Km', '').replace('km', ''));
+              const journeyData = {
+                journeyId: String(id),
+                journeyTitle: data.title,
+                totalDistanceKm,
+                landmarks: landmarkData.map((lm) => {
+                  const raw = Number(lm.distanceFromStart ?? 0);
+                  const looksLikeIntegerKm = raw > 0 && raw <= totalDistanceKm + 1 && Math.abs(raw - Math.round(raw)) < 1e-9;
+                  const meters = looksLikeIntegerKm ? raw * 1000 : raw;
+                  return {
+                    id: String(lm.id),
+                    name: lm.name,
+                    distance: `${(meters / 1000).toFixed(1)}km 지??,`,
+                    distanceM: meters,
+                    position: { latitude: lm.latitude, longitude: lm.longitude },
+                  };
+                }),
+                journeyRoute: routeData
+                  .sort((a, b) => a.sequence - b.sequence)
+                  .map((r) => ({ latitude: r.latitude, longitude: r.longitude })),
+              };
 
-              navigation?.navigate?.('JourneyRunningScreen', palaceJourney);
+              navigation?.navigate?.('JourneyRunningScreen', journeyData);
             }}
           >
             <Text style={styles.modalStartButtonText}>여정 계속하기</Text>
