@@ -62,15 +62,12 @@ export async function getOrFetchProgressId(
 // 수집 가능 여부 확인
 export async function checkCollection(
   progressId: string | number,
-  landmarkId: number,
-  coords: Coordinates
+  landmarkId: number
 ): Promise<boolean> {
   const res = await client.get(`/v1/stamps/check-collection`, {
     params: {
       progressId,
       landmarkId,
-      latitude: coords.latitude,
-      longitude: coords.longitude,
     },
   });
   // 서버가 boolean을 직접 반환하도록 설계됨(true/false)

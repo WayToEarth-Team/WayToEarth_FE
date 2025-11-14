@@ -283,10 +283,7 @@ export default function StampBottomSheet({
     try {
       setError(null);
       setLoading(true);
-      const ok = await checkCollection(progressId, nextCollectable.id, {
-        latitude: currentLocation.latitude,
-        longitude: currentLocation.longitude,
-      });
+      const ok = await checkCollection(progressId, nextCollectable.id);
       if (!ok) {
         setError("스탬프 수집 조건이 충족되지 않았습니다 (거리/진행률 확인)");
         return;

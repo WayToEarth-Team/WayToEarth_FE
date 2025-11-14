@@ -107,7 +107,7 @@ export default function JourneyRunningScreen(
       const lastPoint = (t.route?.length ? t.route[t.route.length - 1] : null) as LatLng | null;
       const lmid = parseInt(landmark.id);
       if (pid && lastPoint && !collectedSet.has(lmid)) {
-        const can = await checkCollection(pid, lmid, { latitude: lastPoint.latitude, longitude: lastPoint.longitude });
+        const can = await checkCollection(pid, lmid);
         if (can) {
           await collectStampForProgress(pid, lmid, { latitude: lastPoint.latitude, longitude: lastPoint.longitude });
           setCollectedSet((prev) => new Set(prev).add(lmid));
@@ -307,7 +307,7 @@ export default function JourneyRunningScreen(
     collectingRef.current.add(idNum);
     (async () => {
       try {
-        const can = await checkCollection(progressId, idNum, { latitude: last.latitude, longitude: last.longitude });
+        const can = await checkCollection(progressId, idNum);
         if (!can) return;
         await collectStampForProgress(progressId, idNum, { latitude: last.latitude, longitude: last.longitude });
         setCollectedSet((prev) => new Set(prev).add(idNum));
