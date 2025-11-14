@@ -28,6 +28,7 @@ import {
 } from "../../utils/api/stamps";
 import { getLandmarkDetail } from "../../utils/api/landmarks";
 import { distanceKm } from "../../utils/geo";
+import { useNavigation } from "@react-navigation/native";
 import { addStampCollectedListener, type StampCollectedPayload } from "../../utils/navEvents";
 
 type LandmarkLite = { id: number; name: string; distanceM?: number };
@@ -57,6 +58,7 @@ export default function StampBottomSheet({
   onCollected,
   extraCollectedIds,
 }: Props) {
+  const navigation = useNavigation<any>();
   const translateY = useRef(new Animated.Value(MAX_HEIGHT - COLLAPSED_PEEK)).current;
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -399,6 +401,12 @@ export default function StampBottomSheet({
                   key={lm.id}
                   activeOpacity={0.85}
                   style={[styles.stampCard, collected && styles.stampCardCollected]}
+                  onPress={() => {
+                    if (!collected) return;
+                    try {
+                      navigation?.navigate?.("LandmarkGuestbookScreen", { landmarkId: lm.id });
+                    } catch {}
+                  }}
                 >
                   <View style={styles.stampImageWrapper}>
                     {imageUrl ? (
