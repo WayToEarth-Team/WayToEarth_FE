@@ -1,0 +1,1102 @@
+﻿// Pages/JourneyRunningScreen.tsx
+// ?ъ젙 ?щ떇 硫붿씤 ?붾㈃ (?ㅼ떆媛?異붿쟻 + 吏꾪뻾瑜?
+
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import * as Location from "expo-location";
+import SafeLayout from "../components/Layout/SafeLayout";
+import {
+  View,
+  Text,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Modal,
+  TouchableOpacity,
+  ScrollView,
+  AppState,
+} from "react-native";
+import JourneyMapRoute from "../components/Journey/JourneyMapRoute";
+import JourneyProgressCard from "../components/Journey/JourneyProgressCard";
+import RunStatsCard from "../components/Running/RunStatsCard";
+import RunPlayControls from "../components/Running/RunPlayControls";
+import CountdownOverlay from "../components/Running/CountdownOverlay";
+import WeatherWidget from "../components/Running/WeatherWidget";
+import GuestbookCreateModal from "../components/Guestbook/GuestbookCreateModal";
+import LandmarkStatistics from "../components/Guestbook/LandmarkStatistics";
+import ImageCarousel from "../components/Common/ImageCarousel";
+import StampBottomSheet from "../components/Landmark/StampBottomSheet";
+import { useJourneyRunning } from "../hooks/journey/useJourneyRunning";
+import { useBackgroundRunning } from "../hooks/journey/useBackgroundRunning";
+import { useWeather } from "../contexts/WeatherContext";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import type { LatLng } from "../types/types";
+import type { JourneyId } from "../types/journey";
+import { apiComplete } from "../utils/api/running";
+import EmblemCelebration from "../components/Effects/EmblemCelebration";
+import { awardEmblemByCode } from "../utils/api/emblems";
+import type { LandmarkSummary } from "../types/guestbook";
+import type { LandmarkDetail } from "../types/landmark";
+import { getMyProfile } from "../utils/api/users";
+import { getLandmarkDetail } from "../utils/api/landmarks";
+import { distanceKm } from "../utils/geo";
+import {
+  getOrFetchProgressId,
+  getProgressStamps,
+  checkCollection,
+  collectStampForProgress,
+  type StampResponse,
+} from "../utils/api/stamps";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { emitRunningSession } from "../utils/navEvents";
+
+type RouteParams = {
+  route: {
+    params?: {
+      journeyId?: JourneyId;
+      journeyTitle?: string;
+      totalDistanceKm?: number;
+      landmarks?: Array<{
+        id: string;
+        name: string;
+        position: LatLng;
+        distance: string;
+        distanceM: number;
+      }>;
+      journeyRoute?: LatLng[];
+    };
+  };
+  navigation?: any;
+};
+
+export default function JourneyRunningScreen(
+  props: RouteParams = { route: { params: {} } }
+) {
+  const route = props?.route as any;
+  const navigation = props?.navigation as any;
+  const params = route?.params || {};
+  const journeyId = params.journeyId; // 諛섎뱶???꾨떖?섏뼱????  const journeyTitle = params.journeyTitle || "?ъ젙 ?щ떇";
+  const totalDistanceKm = params.totalDistanceKm || 42.5;
+  const landmarks = params.landmarks || [];
+  const journeyRoute = params.journeyRoute || [];
+
+  // 濡쒓렇?몃맂 ?ъ슜??ID
+  const [userId, setUserId] = useState<number>(1);
+
+  // ?ъ슜???꾨줈??濡쒕뱶
+  useEffect(() => {
+    (async () => {
+      try {
+        const profile = await getMyProfile();
+        setUserId(profile.id);
+      } catch (err) {
+        console.warn("[JourneyRunning] ?ъ슜???꾨줈??濡쒕뱶 ?ㅽ뙣:", err);
+      }
+    })();
+  }, []);
+
+  // ?쒕뱶留덊겕 ?꾨떖 ???ㅽ꺃???섏쭛 諛?諛⑸챸濡??묒꽦 紐⑤떖 ?쒖떆
+  const handleLandmarkReached = useCallback(async (landmark: any) => {
+    console.log("[JourneyRunning] ?쒕뱶留덊겕 ?꾨떖:", landmark.name);
+
+    // ?ㅽ꺃???섏쭛 (?먮룞, ?쒕쾭 洹쒖튃 以?? progressId/醫뚰몴 ?꾩슂)
+    try {
+      const pid = progressId || (await getOrFetchProgressId(userId, journeyId));
+      const lastPoint = (t.route?.length ? t.route[t.route.length - 1] : null) as LatLng | null;
+      const lmid = parseInt(landmark.id);
+      if (pid && lastPoint && !collectedSet.has(lmid)) {
+        const can = await checkCollection(pid, lmid);
+        if (can) {
+          await collectStampForProgress(pid, lmid, { latitude: lastPoint.latitude, longitude: lastPoint.longitude });
+          setCollectedSet((prev) => new Set(prev).add(lmid));
+          console.log("[JourneyRunning] ???ㅽ꺃???섏쭛 ?꾨즺:", landmark.name);
+        } else {
+          console.log("[JourneyRunning] ?뱄툘 議곌굔 誘몄땐議깆쑝濡??먮룞 ?섏쭛 ?앸왂");
+        }
+      }
+    } catch (error) {
+      console.error("[JourneyRunning] ???ㅽ꺃???섏쭛 ?ㅽ뙣:", error);
+      // ?섏쭛 ?ㅽ뙣?대룄 怨꾩냽 吏꾪뻾 (諛⑸챸濡앹? ?묒꽦 媛??
+    }
+
+    // ?쒕뱶留덊겕瑜?LandmarkSummary ?뺤떇?쇰줈 蹂??    const landmarkSummary: LandmarkSummary = {
+      id: parseInt(landmark.id),
+      name: landmark.name,
+      cityName: "?쒖슱", // TODO: ?ㅼ젣 ?꾩떆紐낆쑝濡?援먯껜
+      countryCode: "KR",
+      imageUrl: "", // TODO: ?ㅼ젣 ?대?吏 URL濡?援먯껜
+    };
+
+    setSelectedLandmark(landmarkSummary);
+    setGuestbookModalVisible(true);
+
+    // 異뺥븯 ?뚮┝ ?쒖떆
+    Alert.alert(
+      `?럦 ${landmark.name} ?꾩갑!`,
+      "?ㅽ꺃?꾨? ?띾뱷?덉뒿?덈떎! ?쒕뱶留덊겕??諛⑸챸濡앹쓣 ?④꺼蹂댁꽭??",
+      [
+        {
+          text: "?섏쨷??,
+          style: "cancel",
+          onPress: () => {
+            setGuestbookModalVisible(false);
+            setSelectedLandmark(null);
+          },
+        },
+        { text: "諛⑸챸濡??묒꽦", onPress: () => {} },
+      ]
+    );
+  }, [userId, journeyId, progressId, collectedSet]);
+
+  const t = useJourneyRunning({
+    journeyId,
+    userId: String(userId), // number瑜?string?쇰줈 蹂??    totalDistanceM: totalDistanceKm * 1000,
+    landmarks,
+    journeyRoute,
+    onLandmarkReached: handleLandmarkReached,
+  });
+
+  // 諛깃렇?쇱슫???щ떇 ??  const backgroundRunning = useBackgroundRunning();
+
+  const insets = useSafeAreaInsets();
+  const [countdownVisible, setCountdownVisible] = useState(false);
+  const [guestbookModalVisible, setGuestbookModalVisible] = useState(false);
+  const [selectedLandmark, setSelectedLandmark] = useState<LandmarkSummary | null>(null);
+  const [landmarkMenuVisible, setLandmarkMenuVisible] = useState(false);
+  const [menuLandmark, setMenuLandmark] = useState<any>(null);
+  const [landmarkDetail, setLandmarkDetail] = useState<LandmarkDetail | null>(null);
+  const [progressId, setProgressId] = useState<string | null>(null);
+  const [collectedSet, setCollectedSet] = useState<Set<number>>(new Set());
+  const collectingRef = useRef<Set<number>>(new Set());
+  const [celebrate, setCelebrate] = useState<{ visible: boolean; count?: number }>({ visible: false });
+  const celebratedKmRef = React.useRef<Set<number>>(new Set());
+  const celebratingRef = React.useRef(false);
+
+  // ?쒕뱶留덊겕 硫붾돱媛 ?대┫ ???곸꽭 ?뺣낫 濡쒕뱶
+  useEffect(() => {
+    if (landmarkMenuVisible && menuLandmark) {
+      const fetchLandmarkDetail = async () => {
+        try {
+          const detail = await getLandmarkDetail(parseInt(menuLandmark.id), userId);
+          setLandmarkDetail(detail);
+        } catch (err) {
+          console.error("[JourneyRunning] ?쒕뱶留덊겕 ?곸꽭 濡쒕뱶 ?ㅽ뙣:", err);
+          setLandmarkDetail(null);
+        }
+      };
+      fetchLandmarkDetail();
+    } else {
+      setLandmarkDetail(null);
+    }
+  }, [landmarkMenuVisible, menuLandmark, userId]);
+
+  // 吏꾪뻾ID 諛??섏쭛???ㅽ꺃??紐⑸줉 濡쒕뱶
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const pid = await getOrFetchProgressId(userId, journeyId);
+        if (!alive) return;
+        setProgressId(pid);
+        if (pid) {
+          const list = await getProgressStamps(pid);
+          if (!alive) return;
+          const ids = new Set<number>(list.map((s) => s.landmark?.id).filter((v): v is number => v != null));
+          setCollectedSet(ids);
+        }
+      } catch {}
+    })();
+    return () => { alive = false; };
+  }, [userId, journeyId]);
+
+  // ?좎뵪 ?뺣낫 (???붾㈃?먯꽌留??꾩튂/?좎뵪 ?쒖꽦??
+  const { weather, loading: weatherLoading, enable: enableWeather, disable: disableWeather } = useWeather();
+  useEffect(() => {
+    try { enableWeather(); } catch {}
+    return () => { try { disableWeather(); } catch {} };
+  }, []);
+
+  // ?ㅼ쓬 ?쒕뱶留덊겕 怨꾩궛
+  // ?꾨떖???쒕뱶留덊겕 ID 紐⑸줉???낆쓽 landmarksWithReached?먯꽌 ?뚯깮
+  const reachedIds = useMemo(
+    () => t.landmarksWithReached.filter(lm => lm.reached).map(lm => lm.id),
+    [t.landmarksWithReached]
+  );
+
+  const nextLandmark = useMemo(() => {
+    const remaining = landmarks.filter(lm => !reachedIds.includes(lm.id));
+    return remaining[0]?.name;
+  }, [landmarks, reachedIds]);
+
+  // ?щ떇 ?몄뀡 ?곹깭 ?낅뜲?댄듃
+  useEffect(() => {
+    if (!t.isRunning) return;
+
+    const session = {
+      type: 'journey' as const,
+      journeyId,
+      journeyTitle,
+      sessionId: t.sessionId,
+      startTime: Date.now() - (t.elapsedSec * 1000),
+      distanceKm: t.distance,
+      durationSeconds: t.elapsedSec,
+      isRunning: t.isRunning,
+      isPaused: t.isPaused,
+      reachedLandmarks: reachedIds,
+    };
+
+    // Foreground Service ?낅뜲?댄듃
+    backgroundRunning.updateForegroundService(session, nextLandmark);
+
+    // ?몄뀡 ?곹깭 ???(諛깃렇?쇱슫??蹂듭썝??
+    backgroundRunning.saveSession(session);
+  }, [t.isRunning, t.distance, t.elapsedSec, t.isPaused, nextLandmark]);
+
+  // ?щ떇 ?쒖옉 ??Foreground Service ?쒖옉
+  useEffect(() => {
+    if (t.isRunning) {
+      const session = {
+        type: 'journey' as const,
+        journeyId,
+        journeyTitle,
+        sessionId: t.sessionId,
+        startTime: Date.now() - (t.elapsedSec * 1000),
+        distanceKm: t.distance,
+        durationSeconds: t.elapsedSec,
+        isRunning: true,
+        isPaused: t.isPaused,
+        reachedLandmarks: reachedIds,
+      };
+      backgroundRunning.startForegroundService(session);
+    }
+  }, [t.isRunning]);
+
+  // 而댄룷?뚰듃 ?몃쭏?댄듃 ???몄뀡 ?뺣━ (?꾨즺/痍⑥냼 ??
+  useEffect(() => {
+    return () => {
+      if (!t.isRunning) {
+        backgroundRunning.stopForegroundService();
+        backgroundRunning.clearSession();
+      }
+    };
+  }, []);
+
+  // ?꾩튂 ?낅뜲?댄듃留덈떎 50m 諛섍꼍 ?먮룞 ?섏쭛 ?쒕룄
+  useEffect(() => {
+    if (!t.isRunning || t.isPaused) return;
+    if (!progressId) return;
+    const last = t.route?.length ? t.route[t.route.length - 1] : null;
+    if (!last) return;
+
+    const target = landmarks.find((lm) => {
+      const id = parseInt(lm.id);
+      if (collectedSet.has(id) || collectingRef.current.has(id)) return false;
+      const pos = lm.position as LatLng | undefined;
+      if (!pos) return false;
+      const d = distanceKm(last, pos) * 1000;
+      return d <= 50;
+    });
+    if (!target) return;
+
+    const idNum = parseInt(target.id);
+    collectingRef.current.add(idNum);
+    (async () => {
+      try {
+        const can = await checkCollection(progressId, idNum);
+        if (!can) return;
+        await collectStampForProgress(progressId, idNum, { latitude: last.latitude, longitude: last.longitude });
+        setCollectedSet((prev) => new Set(prev).add(idNum));
+        Alert.alert(`?럦 ${target.name} ?꾩갑!`, "?ㅽ꺃?꾨? ?띾뱷?덉뒿?덈떎! ?쒕뱶留덊겕??諛⑸챸濡앹쓣 ?④꺼蹂댁꽭??");
+      } catch (e) {
+        // 臾댁떆: ?ㅼ쓬 ?낅뜲?댄듃?먯꽌 ?ъ떆??      } finally {
+        setTimeout(() => collectingRef.current.delete(idNum), 4000);
+      }
+    })();
+  }, [t.route?.length, t.isRunning, t.isPaused, progressId, landmarks, collectedSet]);
+
+  const handleStartPress = useCallback(() => {
+    console.log("[JourneyRunning] start pressed -> show countdown");
+    // 移댁슫?몃떎???숈븞 珥덇린 ?꾩튂瑜??덉뿴???뺥솗???뺣낫
+    try { (t as any).prime?.(); } catch {}
+    setCountdownVisible(true);
+  }, []);
+
+  const handleCountdownDone = useCallback(async () => {
+    console.log("[JourneyRunning] countdown done");
+    setCountdownVisible(false);
+    // 利됱떆 ?쒖옉 ?쒕룄 (沅뚰븳? ?대??먯꽌 泥섎━)
+    requestAnimationFrame(() => {
+      console.log("[JourneyRunning] calling t.startJourneyRun()");
+      t.startJourneyRun();
+    });
+    // ??컮 ?④? 利됱떆 諛섏쁺 諛??몄뀡 ?뚮옒洹????    try {
+      await AsyncStorage.setItem('@running_session', JSON.stringify({ isRunning: true, sessionId: t.sessionId || `journey-${Date.now()}`, startTime: Date.now() }));
+    } catch {}
+    try { emitRunningSession(true); } catch {}
+    // ?뚮┝ 沅뚰븳 ?붿껌? 鍮꾨룞湲곕줈 蹂묐젹 泥섎━
+    backgroundRunning.requestNotificationPermission().catch(() => {});
+  }, [t, backgroundRunning]);
+
+  // ?щ떇 ?곹깭 蹂?붿뿉 ?곕씪 ??컮 ?곹깭 利됱떆 ?숆린??蹂댁“ ?덉쟾?μ튂)
+  useEffect(() => {
+    try { emitRunningSession(!!t.isRunning); } catch {}
+  }, [t.isRunning]);
+
+  // ?쒕뱶留덊겕 留덉빱 ?대┃ ?몃뱾??- ?ㅽ넗由??섏씠吏濡??대룞
+  const handleLandmarkMarkerPress = useCallback((landmark: any) => {
+    console.log("[JourneyRunning] ?쒕뱶留덊겕 留덉빱 ?대┃:", landmark.name);
+    navigation?.navigate("LandmarkStoryScreen", {
+      landmarkId: parseInt(landmark.id),
+      userId: userId,
+    });
+  }, [navigation, userId]);
+
+  const handleComplete = useCallback(async () => {
+    // 癒쇱? ?쇱떆?뺤? ?곹깭濡??꾪솚
+    if (!t.isPaused) {
+      t.pause();
+    }
+
+    // ????щ? ?뺤씤
+    Alert.alert(
+      "?щ떇 醫낅즺",
+      "?щ떇 湲곕줉????ν븯?쒓쿋?듬땲源?",
+      [
+        {
+          text: "痍⑥냼",
+          style: "cancel",
+          onPress: () => {
+            // ?ㅼ떆 ?ш컻
+            if (t.isPaused) {
+              t.resume();
+            }
+          },
+        },
+        {
+          text: "???????,
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // 諛깃렇?쇱슫???쒕퉬??以묒? 諛??몄뀡 ?뺣━
+              await backgroundRunning.stopForegroundService();
+              await backgroundRunning.clearSession();
+              await t.stop();
+
+              // ??컮 ?ы몴??諛??몄뀡 ?뚮옒洹??쒓굅
+              try { await AsyncStorage.removeItem('@running_session'); } catch {}
+              try { emitRunningSession(false); } catch {}
+
+              // ?ъ젙 ?곸꽭 ?붾㈃?쇰줈 ?대룞
+              navigation.navigate("JourneyRouteDetail", { id: journeyId });
+            } catch (e) {
+              console.error("[JourneyRunning] ?щ떇 醫낅즺 ?ㅽ뙣:", e);
+            }
+          },
+        },
+        {
+          text: "???,
+          onPress: async () => {
+            try {
+              console.log("[JourneyRunning] ?꾨즺 泥섎━ ?쒖옉:", {
+                sessionId: t.sessionId,
+                distance: t.distance,
+                elapsedSec: t.elapsedSec,
+                routeLength: (t.route?.length ?? 0),
+              });
+
+              const avgPaceSec =
+                t.distance > 0 && Number.isFinite(t.elapsedSec / t.distance)
+                  ? Math.floor(t.elapsedSec / Math.max(t.distance, 0.000001))
+                  : null;
+
+              const now = Math.floor(Date.now() / 1000);
+              const routePoints = (t.route ?? []).map((p, i) => ({
+                latitude: p.latitude,
+                longitude: p.longitude,
+                sequence: i + 1,
+                t: now, // ??꾩뒪?ы봽 異붽?
+              }));
+
+              console.log("[JourneyRunning] apiComplete ?몄텧 吏곸쟾:", {
+                sessionId: t.sessionId,
+                distanceMeters: Math.round(t.distance * 1000),
+                durationSeconds: t.elapsedSec,
+                averagePaceSeconds: avgPaceSec,
+                calories: Math.round(t.kcal),
+                routePointsCount: routePoints.length,
+                title: journeyTitle,
+              });
+
+              // ?щ떇 ?꾨즺 API ?몄텧
+              const { runId, data } = await apiComplete({
+                sessionId: t.sessionId as string,
+                distanceMeters: Math.round(t.distance * 1000),
+                durationSeconds: t.elapsedSec,
+                averagePaceSeconds: avgPaceSec,
+                calories: Math.round(t.kcal),
+                routePoints,
+                endedAt: Date.now(),
+                title: journeyTitle,
+              });
+
+              // Extra client-side 10m emblem award (journey runs too)
+              try {
+                if (t.distance >= 0.01) {
+                  await awardEmblemByCode('DIST_10M');
+                }
+              } catch {}
+
+              console.log("[JourneyRunning] apiComplete ?묐떟:", { runId, data });
+
+              // 10m ?좊툝???ъ씪?고듃)
+              try { if (t.distance >= 0.01) { await awardEmblemByCode('DIST_10M'); } } catch {}
+
+              // 諛깃렇?쇱슫???쒕퉬??以묒? 諛??몄뀡 ?뺣━
+              await backgroundRunning.stopForegroundService();
+              await backgroundRunning.clearSession();
+
+              // ?ъ젙 吏꾪뻾瑜??낅뜲?댄듃
+              await t.completeJourneyRun();
+
+              console.log("[JourneyRunning] ?꾨즺 泥섎━ ?깃났, ?붿빟 ?붾㈃?쇰줈 ?대룞");
+
+              // ?ъ젙 ?щ떇? 醫낅즺 ???ъ젙 ?곸꽭(吏꾪뻾瑜?寃쎈줈 ?뺤씤) ?붾㈃?쇰줈 ?대룞
+              navigation.navigate("JourneyRouteDetail", { id: journeyId });
+
+              // ?щ떇 ?몃옒而??뺣━(諛깃렇?쇱슫???꾩튂 ?낅뜲?댄듃 醫낅즺 蹂댁옣)
+              await t.stop();
+
+              // ??컮 ?ы몴??諛??몄뀡 ?뚮옒洹??쒓굅
+              try { await AsyncStorage.removeItem('@running_session'); } catch {}
+              try { emitRunningSession(false); } catch {}
+            } catch (e) {
+              console.error("[JourneyRunning] ?ъ젙 ?щ떇 ?꾨즺 ?ㅽ뙣:", e);
+              console.error("[JourneyRunning] ?먮윭 ?곸꽭:", JSON.stringify(e, null, 2));
+              Alert.alert("????ㅽ뙣", "?ㅽ듃?뚰겕 ?먮뒗 ?쒕쾭 ?ㅻ쪟媛 諛쒖깮?덉뼱??");
+            }
+          },
+        },
+      ]
+    );
+  }, [navigation, t, journeyTitle, backgroundRunning, journeyId]);
+
+  const elapsedLabel = useMemo(() => {
+    const m = Math.floor(t.elapsedSec / 60);
+    const s = String(t.elapsedSec % 60).padStart(2, "0");
+    return `${m}:${s}`;
+  }, [t.elapsedSec]);
+
+  // 吏꾪뻾瑜좎뿉 ?곕Ⅸ ?ъ젙 寃쎈줈 ?곸쓽 媛???꾩튂 怨꾩궛 (嫄곕━ 湲곕컲?쇰줈 ?섏젙)
+  const virtualLocation = useMemo(() => {
+    if (!t.progressReady) return null; // 吏꾪뻾瑜?濡쒕뱶 ?꾩뿉??怨꾩궛 ?앸왂
+    if (journeyRoute.length === 0) return null;
+    if (journeyRoute.length === 1) return journeyRoute[0];
+
+    // ?뵩 ?섏젙: 媛??쒕뱶留덊겕 ?ъ씠瑜?嫄곕━ 鍮꾩쑉濡?遺꾪븷
+    // ?꾩옱 吏꾪뻾 嫄곕━濡??대뒓 援ш컙???덈뒗吏 李얘린
+    let currentSegmentStart = 0;
+    let currentSegmentEnd = landmarks.length > 1 ? landmarks[1].distanceM : totalDistanceKm * 1000;
+    let segmentStartIdx = 0;
+    let segmentEndIdx = 0;
+    if (landmarks.length > 1) {
+      const lm1 = landmarks[1] as any;
+      const hasPos = lm1 && lm1.position && typeof lm1.position.latitude === 'number' && typeof lm1.position.longitude === 'number';
+      if (hasPos) {
+        segmentEndIdx = journeyRoute.findIndex(p =>
+          Math.abs(p.latitude - lm1.position.latitude) < 0.0001 &&
+          Math.abs(p.longitude - lm1.position.longitude) < 0.0001
+        );
+      }
+      if (!hasPos || segmentEndIdx < 0) {
+        // 嫄곕━ 鍮꾩쑉濡?洹쇱궗 ?몃뜳???곗텧
+        const ratio = Math.min(1, Math.max(0, (lm1.distanceM || 0) / (totalDistanceKm * 1000)));
+        segmentEndIdx = Math.floor(ratio * (journeyRoute.length - 1));
+      }
+    } else {
+      segmentEndIdx = journeyRoute.length - 1;
+    }
+
+    // ?꾩옱 ?대뒓 ?쒕뱶留덊겕 援ш컙???덈뒗吏 李얘린
+    for (let i = 0; i < landmarks.length; i++) {
+      // ?뵩 ?섏젙: <= ???< ?ъ슜 (?쒕뱶留덊겕 ?뺥솗???꾨떖 ???ㅼ쓬 援ш컙?쇰줈)
+      if (t.progressM <= landmarks[i].distanceM || i === landmarks.length - 1) {
+        currentSegmentEnd = landmarks[i].distanceM;
+        currentSegmentStart = i > 0 ? landmarks[i - 1].distanceM : 0;
+
+        // ?대떦 ?쒕뱶留덊겕??寃쎈줈 ?몃뜳???곗텧(醫뚰몴 ?덉쑝硫?理쒓렐?? ?놁쑝硫?鍮꾩쑉 洹쇱궗)
+        const landmark = landmarks[i] as any;
+        const hasPos = landmark && landmark.position && typeof landmark.position.latitude === 'number' && typeof landmark.position.longitude === 'number';
+        if (hasPos) {
+          let minDist = 999999;
+          segmentEndIdx = journeyRoute.length - 1; // 湲곕낯媛? 留덉?留??ъ씤??          journeyRoute.forEach((point, idx) => {
+            const dist = Math.sqrt(
+              Math.pow(point.latitude - landmark.position.latitude, 2) +
+              Math.pow(point.longitude - landmark.position.longitude, 2)
+            );
+            if (dist < minDist) {
+              minDist = dist;
+              segmentEndIdx = idx;
+            }
+          });
+        } else {
+          const ratio = Math.min(1, Math.max(0, (landmark?.distanceM || 0) / (totalDistanceKm * 1000)));
+          segmentEndIdx = Math.floor(ratio * (journeyRoute.length - 1));
+        }
+
+        if (i > 0) {
+          const prevLandmark = landmarks[i - 1] as any;
+          const hasPrev = prevLandmark && prevLandmark.position && typeof prevLandmark.position.latitude === 'number' && typeof prevLandmark.position.longitude === 'number';
+          if (hasPrev) {
+            let minDist = 999999;
+            segmentStartIdx = 0; // 湲곕낯媛? 泥??ъ씤??            journeyRoute.forEach((point, idx) => {
+              const dist = Math.sqrt(
+                Math.pow(point.latitude - prevLandmark.position.latitude, 2) +
+                Math.pow(point.longitude - prevLandmark.position.longitude, 2)
+              );
+              if (dist < minDist) {
+                minDist = dist;
+                segmentStartIdx = idx;
+              }
+            });
+          } else {
+            const ratioStart = Math.min(1, Math.max(0, (prevLandmark?.distanceM || 0) / (totalDistanceKm * 1000)));
+            segmentStartIdx = Math.floor(ratioStart * (journeyRoute.length - 1));
+          }
+        } else {
+          segmentStartIdx = 0; // 泥?踰덉㎏ 援ш컙???쒖옉? 0
+        }
+
+        break;
+      }
+    }
+
+    // 援ш컙 ?댁뿉?쒖쓽 吏꾪뻾 鍮꾩쑉 怨꾩궛
+    const segmentDistance = currentSegmentEnd - currentSegmentStart;
+    const progressInSegment = t.progressM - currentSegmentStart;
+    const segmentRatio = segmentDistance > 0 ? progressInSegment / segmentDistance : 0;
+
+    // 寃쎈줈 ?ъ씤???몃뜳??怨꾩궛
+    const indexRange = segmentEndIdx - segmentStartIdx;
+    const exactIndex = segmentStartIdx + (indexRange * segmentRatio);
+    const beforeIndex = Math.floor(exactIndex);
+    const afterIndex = Math.min(beforeIndex + 1, journeyRoute.length - 1);
+    const ratio = exactIndex - beforeIndex;
+
+    const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+    const idxA = clamp(beforeIndex, 0, journeyRoute.length - 1);
+    const idxB = clamp(afterIndex, 0, journeyRoute.length - 1);
+    const pointA = journeyRoute[idxA];
+    const pointB = journeyRoute[idxB];
+
+    // 諛⑹뼱: 寃쎈줈媛 遺議깊븯嫄곕굹 ratio媛 鍮꾩젙?곸씠硫??덉쟾???ъ씤??諛섑솚
+    if (!pointA || !pointB || !Number.isFinite(ratio)) {
+      return {
+        location: pointA || journeyRoute[0],
+        routeIndex: idxA,
+      } as any;
+    }
+
+    // ?좏삎 蹂닿컙
+    const interpolated = {
+      latitude: pointA.latitude + (pointB.latitude - pointA.latitude) * ratio,
+      longitude: pointA.longitude + (pointB.longitude - pointA.longitude) * ratio,
+    };
+
+    return {
+      location: interpolated,
+      routeIndex: exactIndex, // 寃쎈줈 ?몃뜳?ㅻ룄 ?④퍡 諛섑솚
+    };
+  }, [journeyRoute, t.progressM, landmarks, totalDistanceKm]);
+
+  // 媛???꾩튂? ?몃뜳??遺꾨━
+  const virtualLocationPoint = virtualLocation?.location || null;
+  const virtualRouteIndex = virtualLocation?.routeIndex || 0;
+
+  // journeyId媛 ?놁쑝硫??덉쟾 以묐떒
+  if (!journeyId) {
+    return (
+      <SafeLayout withBottomInset>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text>?ъ젙 ?뺣낫媛 ?щ컮瑜댁? ?딆뒿?덈떎. 紐⑸줉?먯꽌 ?ㅼ떆 吏꾩엯?댁＜?몄슂.</Text>
+        </View>
+      </SafeLayout>
+    );
+  }
+
+  return (
+    <SafeLayout withBottomInset>
+      <JourneyMapRoute
+        journeyRoute={journeyRoute}
+        landmarks={t.landmarksWithReached}
+        userRoute={[]} // ?ъ젙 ?щ떇?먯꽌???ㅼ젣 GPS 寃쎈줈 ?쒖떆 ????        currentLocation={virtualLocationPoint}
+        progressPercent={t.progressPercent}
+        virtualRouteIndex={virtualRouteIndex}
+        onLandmarkPress={handleLandmarkMarkerPress}
+      />
+
+      {/* ?좎뵪 ?꾩젽 */}
+      <View
+        style={{
+          position: "absolute",
+          top: Math.max(insets.top, 12) + 12,
+          left: 16,
+          zIndex: 10,
+        }}
+      >
+        <WeatherWidget
+          emoji={weather?.emoji}
+          condition={weather?.condition}
+          temperature={weather?.temperature}
+          recommendation={weather?.recommendation}
+          loading={weatherLoading}
+        />
+      </View>
+
+      {/* ?щ떇 以묒씠 ?꾨땺 ?? ?ъ젙 吏꾪뻾瑜?移대뱶 */}
+      {!t.isRunning && !t.isPaused && t.progressReady && (
+        <JourneyProgressCard
+          progressPercent={t.progressPercent}
+          currentDistanceKm={t.progressM / 1000}
+          totalDistanceKm={totalDistanceKm}
+          nextLandmark={
+            t.nextLandmark
+              ? {
+                  name: t.nextLandmark.name,
+                  distanceKm: t.nextLandmark.distanceM / 1000,
+                  id: parseInt(t.nextLandmark.id),
+                }
+              : null
+          }
+          onPressGuestbook={(landmarkId) => {
+            const landmark = landmarks.find((lm) => parseInt(lm.id) === landmarkId);
+            if (landmark) {
+              navigation?.navigate("LandmarkGuestbookScreen", {
+                landmarkId,
+                landmarkName: landmark.name,
+              });
+            }
+          }}
+        />
+      )}
+
+      {/* ?щ떇 以묒씪 ?? ?щ떇 ?듦퀎 + 媛꾩냼?붾맂 吏꾪뻾瑜?*/}
+      {(t.isRunning || t.isPaused) && (
+        <>
+          <RunStatsCard
+            distanceKm={t.distance}
+            paceLabel={t.paceLabel}
+            kcal={t.kcal}
+            speedKmh={t.speedKmh}
+            elapsedSec={t.elapsedSec}
+          />
+
+          {/* 媛꾩냼?붾맂 吏꾪뻾瑜??쒖떆 */}
+          <View style={styles.compactProgressCard}>
+            <View style={styles.compactHeader}>
+              <Text style={styles.compactTitle}>?ъ젙 吏꾪뻾</Text>
+              <Text style={styles.compactPercent}>
+                {t.progressPercent.toFixed(1)}%
+              </Text>
+            </View>
+            <View style={styles.compactProgressBar}>
+              <View
+                style={[
+                  styles.compactProgressFill,
+                  { width: `${Math.min(100, t.progressPercent)}%` },
+                ]}
+              />
+            </View>
+            {t.nextLandmark && (
+              <Text style={styles.compactNextLandmark}>
+                ?ㅼ쓬: {t.nextLandmark.name} (
+                {(() => {
+                  const remaining = (t.nextLandmark.distanceM - t.progressM) / 1000;
+                  return remaining.toFixed(1);
+                })()}{" "}
+                km)
+              </Text>
+            )}
+          </View>
+        </>
+      )}
+
+      {/* ?쇱떆?뺤? ?ㅻ쾭?덉씠 */}
+      {t.isPaused && (
+        <>
+          {/* 諛곌꼍 ?먮┝ ?④낵 */}
+          <View pointerEvents="none" style={styles.pauseBlurOverlay} />
+
+          {/* ?쇱떆?뺤? ?띿뒪??*/}
+          <View pointerEvents="none" style={styles.pauseTextContainer}>
+            <Text style={styles.pauseTitle}>?쇱떆?뺤?</Text>
+            <Text style={styles.pauseDesc}>?ъ깮 ?????꾨Ⅴ硫??ㅼ떆 ?쒖옉?⑸땲??</Text>
+            <Text style={styles.pauseDesc}>
+              醫낅즺?섎젮硫???踰꾪듉??2珥덇컙 湲멸쾶 ?꾨Ⅴ?몄슂.
+            </Text>
+          </View>
+        </>
+      )}
+
+      {/* ?쒖옉 踰꾪듉 (?щ떇 ?? */}
+      {!t.isRunning && !t.isPaused && (
+        <View
+          style={[
+            styles.startButtonContainer,
+            { bottom: Math.max(insets.bottom, 12) + 100 },
+          ]}
+        >
+          <Pressable
+            onPress={handleStartPress}
+            disabled={!t.isReady || t.isInitializing}
+            style={[
+              styles.startButton,
+              (!t.isReady || t.isInitializing) && styles.startButtonDisabled,
+            ]}
+          >
+            <Text style={styles.startButtonText}>
+              {!t.isReady
+                ? "以鍮꾩쨷..."
+                : t.isInitializing
+                ? "?쒖옉以?.."
+                : "?ъ젙 ?щ떇 ?쒖옉"}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* ?щ떇 ?쒖뼱 踰꾪듉 (?щ떇 以? */}
+      {t.isRunning && (
+        <RunPlayControls
+          isRunning={t.isRunning}
+          isPaused={t.isPaused}
+          onPlay={() => t.start()}
+          onPause={() => t.pause()}
+          onResume={() => t.resume()}
+          onStopTap={() => Alert.alert("醫낅즺?섎젮硫?湲멸쾶 ?꾨Ⅴ?몄슂")}
+          onStopLong={handleComplete}
+        />
+      )}
+
+      {/* 移댁슫?몃떎???ㅻ쾭?덉씠 */}
+      <CountdownOverlay
+        visible={countdownVisible}
+        seconds={3}
+        onDone={handleCountdownDone}
+      />
+
+      {/* Emblem Celebration */}
+      {celebrate.visible && (
+        <EmblemCelebration count={celebrate.count} />
+      )}
+
+      {/* 諛⑸챸濡??묒꽦 紐⑤떖 */}
+      {selectedLandmark && (
+        <GuestbookCreateModal
+          visible={guestbookModalVisible}
+          onClose={() => {
+            setGuestbookModalVisible(false);
+            setSelectedLandmark(null);
+          }}
+          landmark={selectedLandmark}
+          userId={1} // TODO: ?ㅼ젣 userId濡?援먯껜
+          onSuccess={() => {
+            console.log("[JourneyRunning] 諛⑸챸濡??묒꽦 ?꾨즺");
+          }}
+        />
+      )}
+
+      {/* ?쒕뱶留덊겕 硫붾돱 諛뷀??쒗듃 */}
+      <Modal
+        visible={landmarkMenuVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setLandmarkMenuVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setLandmarkMenuVisible(false)}
+        >
+          <View style={styles.bottomSheet}>
+            <View style={styles.bottomSheetHandle} />
+
+            {menuLandmark && (
+              <>
+                {/* ?쒕뱶留덊겕 ?대?吏 罹먮윭? */}
+                {(() => {
+                  // 1. ?쒕뱶留덊겕 ????대?吏 (imageUrl)
+                  // 2. ?쒕뱶留덊겕 媛ㅻ윭由??대?吏??(images[])
+                  const carouselImages: string[] = [];
+
+                  if (landmarkDetail?.imageUrl) {
+                    carouselImages.push(landmarkDetail.imageUrl);
+                  }
+
+                  if (landmarkDetail?.images && Array.isArray(landmarkDetail.images)) {
+                    const galleryUrls = landmarkDetail.images
+                      .map((img: any) => typeof img === 'string' ? img : img?.imageUrl)
+                      .filter((url): url is string => url !== null && url !== undefined && url.trim() !== '');
+                    carouselImages.push(...galleryUrls);
+                  }
+
+                  return (
+                    <ImageCarousel
+                      images={carouselImages}
+                      height={180}
+                      borderRadius={0}
+                      autoPlayInterval={4000}
+                    />
+                  );
+                })()}
+
+                <View style={styles.bottomSheetHeader}>
+                  <Text style={styles.bottomSheetTitle}>
+                    {menuLandmark.name}
+                  </Text>
+                  <Text style={styles.bottomSheetSubtitle}>
+                    {menuLandmark.distance}
+                  </Text>
+                </View>
+
+                {/* ?쒕뱶留덊겕 ?듦퀎 */}
+                <View style={styles.statisticsContainer}>
+                  <LandmarkStatistics
+                    landmarkId={parseInt(menuLandmark.id)}
+                  />
+                </View>
+
+                {/* 硫붾돱 ?듭뀡 */}
+                <View style={styles.menuOptions}>
+                  <TouchableOpacity
+                    style={styles.menuOption}
+                    onPress={() => {
+                      setLandmarkMenuVisible(false);
+                      const landmarkSummary: LandmarkSummary = {
+                        id: parseInt(menuLandmark.id),
+                        name: menuLandmark.name,
+                        cityName: "?쒖슱",
+                        countryCode: "KR",
+                        imageUrl: "",
+                      };
+                      setSelectedLandmark(landmarkSummary);
+                      setGuestbookModalVisible(true);
+                    }}
+                  >
+                    <Text style={styles.menuOptionIcon}>?랃툘</Text>
+                    <Text style={styles.menuOptionText}>諛⑸챸濡??묒꽦</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.menuOption}
+                    onPress={() => {
+                      setLandmarkMenuVisible(false);
+                      navigation?.navigate("LandmarkGuestbookScreen", {
+                        landmarkId: parseInt(menuLandmark.id),
+                        landmarkName: menuLandmark.name,
+                      });
+                    }}
+                  >
+                    <Text style={styles.menuOptionIcon}>?뱰</Text>
+                    <Text style={styles.menuOptionText}>諛⑸챸濡?蹂닿린</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.menuOption, styles.menuOptionCancel]}
+                    onPress={() => setLandmarkMenuVisible(false)}
+                  >
+                    <Text style={styles.menuOptionText}>?リ린</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* ?ㅽ꺃??諛뷀??쒗듃(?ㅼ??댄봽 ?? - 媛??留덉?留됱뿉 ?뚮뜑留곹븯???곗튂 ?대깽?몃? 癒쇱? 諛쏅룄濡?*/}
+      <StampBottomSheet
+        userId={userId}
+        journeyId={journeyId}
+        progressPercent={t.progressPercent}
+        landmarks={landmarks.map(l => ({ id: parseInt(l.id), name: l.name, distanceM: l.distanceM }))}
+        currentLocation={t.route?.length ? t.route[t.route.length - 1] : null}
+        currentProgressM={t.progressM}
+        onCollected={(res: StampResponse) => {
+          const id = res?.landmark?.id;
+          if (typeof id === 'number') setCollectedSet((prev) => new Set(prev).add(id));
+        }}
+      />
+    </SafeLayout>
+  );
+}
+
+const styles = StyleSheet.create({
+  pauseBlurOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  pauseTextContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pauseTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    marginBottom: 8,
+    color: "#fff",
+  },
+  pauseDesc: {
+    color: "#fff",
+    marginTop: 2,
+    fontSize: 14,
+  },
+  startButtonContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  startButton: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "#6366F1",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  },
+  startButtonDisabled: {
+    backgroundColor: "rgba(0,0,0,0.1)",
+  },
+  startButtonText: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#fff",
+    textAlign: "center",
+  },
+  compactProgressCard: {
+    position: "absolute",
+    top: 120,
+    left: 16,
+    right: 16,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  compactHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  compactTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#6B7280",
+  },
+  compactPercent: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#6366F1",
+  },
+  compactProgressBar: {
+    height: 6,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 3,
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+  compactProgressFill: {
+    height: "100%",
+    backgroundColor: "#10B981",
+    borderRadius: 3,
+  },
+  compactNextLandmark: {
+    fontSize: 12,
+    color: "#4B5563",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  bottomSheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 8,
+    minHeight: 400,
+  },
+  bottomSheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  bottomSheetHeader: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  bottomSheetTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#111827",
+    marginBottom: 4,
+  },
+  bottomSheetSubtitle: {
+    fontSize: 14,
+    color: "#6B7280",
+  },
+  statisticsContainer: {
+    marginBottom: 20,
+  },
+  menuOptions: {
+    gap: 12,
+  },
+  menuOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3F4F6",
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+  },
+  menuOptionIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  menuOptionText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  menuOptionCancel: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    marginTop: 8,
+  },
+});
+
