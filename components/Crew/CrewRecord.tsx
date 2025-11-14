@@ -62,7 +62,12 @@ export default function CrewRecord({
       <View style={s.statsCard}>
         <View style={s.statsHeader}>
           <View style={s.statsHeaderLeft}>
-            <Ionicons name="walk-outline" size={20} color="#1F2937" style={{ marginRight: 8 }} />
+            <Ionicons
+              name="walk-outline"
+              size={20}
+              color="#1F2937"
+              style={{ marginRight: 8 }}
+            />
             <Text style={s.statsTitle}>{title}</Text>
           </View>
           <Ionicons name="chevron-forward-outline" size={18} color="#9CA3AF" />
@@ -75,7 +80,8 @@ export default function CrewRecord({
             percentChange < 0 ? { color: "#EF4444" } : { color: "#10B981" },
           ]}
         >
-          지난주 대비 {percentChange >= 0 ? "↑" : "↓"} {Math.abs(percentChange)}%
+          지난주 대비 {percentChange >= 0 ? "↑" : "↓"} {Math.abs(percentChange)}
+          %
         </Text>
 
         {/* 막대 그래프 */}
@@ -108,7 +114,12 @@ export default function CrewRecord({
       <View style={s.rankingCard}>
         <View style={s.rankingHeader}>
           <View style={s.rankingHeaderLeft}>
-            <Ionicons name="medal-outline" size={20} color="#1F2937" style={{ marginRight: 8 }} />
+            <Ionicons
+              name="medal-outline"
+              size={20}
+              color="#1F2937"
+              style={{ marginRight: 8 }}
+            />
             <Text style={s.rankingTitle}>주간 랭킹</Text>
           </View>
           <Ionicons name="chevron-forward-outline" size={18} color="#9CA3AF" />
