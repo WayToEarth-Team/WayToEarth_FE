@@ -28,9 +28,24 @@ import {
 import { getMyProfile } from "../utils/api/users";
 import { useFocusEffect } from "@react-navigation/native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { PositiveAlert, NegativeAlert, MessageAlert, DestructiveConfirm } from "../components/ui/AlertDialog";
+import {
+  PositiveAlert,
+  NegativeAlert,
+  MessageAlert,
+  DestructiveConfirm,
+} from "../components/ui/AlertDialog";
 
 const { width, height } = Dimensions.get("window");
+// 로컬 지구 아이콘(없으면 Ionicons 폴백)
+let EARTH_IMG: any = null;
+try {
+  // 프로젝트의 assets 폴더에 Earth.png가 있어야 합니다.
+  // 없으면 아래 폴백(Ionicons)이 사용됩니다.
+  // @ts-ignore
+  EARTH_IMG = require("../assets/Earth.png");
+} catch (e) {
+  EARTH_IMG = null;
+}
 
 const formatRelativeTime = (timestamp: string): string => {
   const date = new Date(timestamp);
@@ -84,8 +99,8 @@ const AnimatedLikeButton = ({
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
         <Ionicons
           name={liked ? "heart" : "heart-outline"}
-          size={24}
-          color={liked ? "#FF3B5C" : "#1F2937"}
+          size={26}
+          color={liked ? "#FF3B5C" : "#374151"}
         />
       </Animated.View>
       {likeCount > 0 && (
@@ -106,8 +121,16 @@ export default function FeedScreen({ navigation, route }: any) {
   const [error, setError] = useState<string | null>(null);
   const [myNickname, setMyNickname] = useState<string | null>(null);
   const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; id?: number }>({ open: false });
-  const [dialog, setDialog] = useState<{ open: boolean; kind: 'positive'|'negative'|'message'; title?: string; message?: string }>({ open: false, kind: 'message' });
+  const [confirmDelete, setConfirmDelete] = useState<{
+    open: boolean;
+    id?: number;
+  }>({ open: false });
+  const [dialog, setDialog] = useState<{
+    open: boolean;
+    kind: "positive" | "negative" | "message";
+    title?: string;
+    message?: string;
+  }>({ open: false, kind: "message" });
 
   const fetchFeeds = useCallback(async () => {
     try {
@@ -224,13 +247,27 @@ export default function FeedScreen({ navigation, route }: any) {
         ? avgPaceLabel(distanceKm, durationSec)
         : undefined);
 
+    // Get route/map data
+    const routeImageUrl =
+      (item as any)?.routeImageUrl ||
+      (item as any)?.route_image_url ||
+      (item as any)?.mapImageUrl ||
+      (item as any)?.map_image_url ||
+      null;
+
     const fmtHMS = (sec?: number) => {
       if (!isFinite(Number(sec)) || Number(sec) <= 0) return undefined;
       const s = Math.floor(Number(sec));
       const h = Math.floor(s / 3600);
       const m = Math.floor((s % 3600) / 60);
       const r = s % 60;
-      return `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+      if (h > 0) {
+        return `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(
+          2,
+          "0"
+        )}`;
+      }
+      return `${m}m ${String(r).padStart(2, "0")}s`;
     };
 
     return (
@@ -268,59 +305,78 @@ export default function FeedScreen({ navigation, route }: any) {
                 pressed && styles.pressed,
               ]}
             >
-              <Ionicons name="ellipsis-horizontal" size={20} color="#9CA3AF" />
+              <Ionicons name="ellipsis-horizontal" size={22} color="#9CA3AF" />
             </Pressable>
           )}
         </View>
 
-        {/* Image */}
-        {item.imageUrl && (
+        {/* Route Map with Stats Overlay */}
+        {(item.imageUrl || routeImageUrl) && (
           <View style={styles.imageContainer}>
-            <Image source={{ uri: item.imageUrl }} style={styles.feedImage} />
+            <Image
+              source={{ uri: routeImageUrl || item.imageUrl }}
+              style={styles.feedImage}
+            />
 
-            {/* Glassmorphism Metrics Overlay */}
+            {/* Dark gradient overlay for better text readability */}
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.4)", "rgba(0,0,0,0.7)"]}
+              style={styles.gradientOverlay}
+            />
+
+            {/* Globe Icon - Top Right */}
+            <View style={styles.globeIcon}>
+              {EARTH_IMG ? (
+                <Image source={EARTH_IMG} style={styles.earthImg} />
+              ) : (
+                <Ionicons name="globe-outline" size={24} color="#FFFFFF" />
+              )}
+            </View>
+
+            {/* Stats Overlay - Nike Run Club Style */}
             {!!distanceKm && (
-              <BlurView intensity={80} tint="light" style={styles.metricsBlur}>
-                <View style={styles.metricsContent}>
-                  <View style={styles.distanceRow}>
-                    <Text style={styles.distanceNumber}>
-                      {Number(distanceKm).toFixed(2)}
+              <View style={styles.statsOverlay}>
+                {/* Time */}
+                {fmtHMS(durationSec) && (
+                  <View style={styles.statItemHorizontal}>
+                    <Ionicons name="time-outline" size={20} color="#FFFFFF" />
+                    <Text style={styles.statValueHorizontal} numberOfLines={1}>
+                      {fmtHMS(durationSec)}
                     </Text>
-                    <Text style={styles.distanceUnit}>km</Text>
                   </View>
-                  <View style={styles.statsRow}>
-                    {fmtHMS(durationSec) && (
-                      <View style={styles.statItem}>
-                        <Ionicons name="time" size={16} color="#6B7280" />
-                        <Text style={styles.statText}>
-                          {fmtHMS(durationSec)}
-                        </Text>
-                      </View>
-                    )}
-                    {paceLabel && (
-                      <View style={styles.statItem}>
-                        <Ionicons
-                          name="speedometer"
-                          size={16}
-                          color="#6B7280"
-                        />
-                        <Text style={styles.statText}>{paceLabel}</Text>
-                      </View>
-                    )}
-                  </View>
+                )}
+
+                {/* Distance */}
+                <View style={styles.statItemHorizontal}>
+                  <Ionicons name="map-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.statValueHorizontal} numberOfLines={1}>
+                    {Number(distanceKm).toFixed(2)} km
+                  </Text>
                 </View>
-              </BlurView>
+
+                {/* Pace */}
+                {paceLabel && (
+                  <View style={styles.statItemHorizontal}>
+                    <Ionicons name="speedometer-outline" size={20} color="#FFFFFF" />
+                    <Text style={styles.statValueHorizontal} numberOfLines={1}>
+                      {paceLabel}
+                    </Text>
+                  </View>
+                )}
+              </View>
             )}
           </View>
         )}
 
         {/* Actions & Caption */}
         <View style={styles.bottomSection}>
-          <AnimatedLikeButton
-            liked={item.liked}
-            likeCount={item.likeCount || 0}
-            onPress={() => like(item.id, item.liked)}
-          />
+          <View style={styles.actionRow}>
+            <AnimatedLikeButton
+              liked={item.liked}
+              likeCount={item.likeCount || 0}
+              onPress={() => like(item.id, item.liked)}
+            />
+          </View>
 
           {!!(item.content && item.content.trim().length > 0) && (
             <Text style={styles.caption}>
@@ -336,7 +392,7 @@ export default function FeedScreen({ navigation, route }: any) {
   if (loading && !refreshing) {
     return (
       <View style={styles.screen}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FAFAFA" />
+        <StatusBar barStyle="light-content" backgroundColor="#1F2937" />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#10B981" />
         </View>
@@ -347,7 +403,7 @@ export default function FeedScreen({ navigation, route }: any) {
   if (error && !refreshing) {
     return (
       <View style={styles.screen}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FAFAFA" />
+        <StatusBar barStyle="light-content" backgroundColor="#1F2937" />
         <View style={[styles.centered, { paddingHorizontal: 24 }]}>
           <Ionicons name="cloud-offline-outline" size={64} color="#E5E7EB" />
           <Text style={styles.errorText}>{error}</Text>
@@ -367,14 +423,10 @@ export default function FeedScreen({ navigation, route }: any) {
 
   return (
     <View style={styles.screen}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FAFAFA" />
+      <StatusBar barStyle="light-content" backgroundColor="#1F2937" />
 
-      {/* Minimal Top Bar */}
-      <BlurView
-        intensity={100}
-        tint="light"
-        style={[styles.topBar, { paddingTop: insets.top + 8 }]}
-      >
+      {/* Dark Top Bar */}
+      <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
         <View style={styles.topBarRow}>
           <Pressable
             onPress={() => navigation.goBack()}
@@ -384,18 +436,18 @@ export default function FeedScreen({ navigation, route }: any) {
             ]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="chevron-back" size={28} color="#10B981" />
+            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
           </Pressable>
           <Text style={styles.topBarTitle}>피드</Text>
         </View>
-      </BlurView>
+      </View>
 
       {/* Feed List */}
       <FlatList
         data={feeds}
         renderItem={renderFeedItem}
         keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={{ paddingBottom: tabBarHeight + 16 }}
+        contentContainerStyle={{ paddingTop: 12, paddingBottom: tabBarHeight + 16 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -406,15 +458,31 @@ export default function FeedScreen({ navigation, route }: any) {
         }
         showsVerticalScrollIndicator={false}
       />
+
       {/* Alerts */}
-      {dialog.open && dialog.kind === 'positive' && (
-        <PositiveAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open: false, kind: 'message' })} />
+      {dialog.open && dialog.kind === "positive" && (
+        <PositiveAlert
+          visible
+          title={dialog.title}
+          message={dialog.message}
+          onClose={() => setDialog({ open: false, kind: "message" })}
+        />
       )}
-      {dialog.open && dialog.kind === 'negative' && (
-        <NegativeAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open: false, kind: 'message' })} />
+      {dialog.open && dialog.kind === "negative" && (
+        <NegativeAlert
+          visible
+          title={dialog.title}
+          message={dialog.message}
+          onClose={() => setDialog({ open: false, kind: "message" })}
+        />
       )}
-      {dialog.open && dialog.kind === 'message' && (
-        <MessageAlert visible title={dialog.title} message={dialog.message} onClose={() => setDialog({ open: false, kind: 'message' })} />
+      {dialog.open && dialog.kind === "message" && (
+        <MessageAlert
+          visible
+          title={dialog.title}
+          message={dialog.message}
+          onClose={() => setDialog({ open: false, kind: "message" })}
+        />
       )}
 
       {/* Delete Confirm */}
@@ -431,10 +499,23 @@ export default function FeedScreen({ navigation, route }: any) {
             try {
               await deleteFeed(id);
               setFeeds((prev) => prev.filter((f) => f.id !== id));
-              setDialog({ open: true, kind: 'positive', title: '삭제 완료', message: '피드가 삭제되었습니다.' });
+              setDialog({
+                open: true,
+                kind: "positive",
+                title: "삭제 완료",
+                message: "피드가 삭제되었습니다.",
+              });
             } catch (e: any) {
-              const msg = e?.response?.data?.message || e?.message || '삭제에 실패했습니다.';
-              setDialog({ open: true, kind: 'negative', title: '오류', message: msg });
+              const msg =
+                e?.response?.data?.message ||
+                e?.message ||
+                "삭제에 실패했습니다.";
+              setDialog({
+                open: true,
+                kind: "negative",
+                title: "오류",
+                message: msg,
+              });
             }
           }}
         />
@@ -446,7 +527,7 @@ export default function FeedScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#F3F4F6",
   },
   centered: {
     flex: 1,
@@ -478,10 +559,14 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   topBar: {
+    backgroundColor: "#1F2937",
     paddingHorizontal: 16,
     paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.05)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   topBarRow: {
     flexDirection: "row",
@@ -494,25 +579,34 @@ const styles = StyleSheet.create({
   topBarTitle: {
     fontSize: 24,
     fontWeight: "800",
-    color: "#111827",
+    color: "#FFFFFF",
     letterSpacing: -0.5,
   },
   cardContainer: {
     backgroundColor: "#FFFFFF",
-    marginBottom: 2,
+    marginBottom: 16,
+    borderRadius: 20,
+    marginHorizontal: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
   cardHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
     flexDirection: "row",
     alignItems: "center",
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 2,
-    borderColor: "#FFFFFF",
+    borderColor: "#E5E7EB",
   },
   avatarFallback: {
     justifyContent: "center",
@@ -520,7 +614,7 @@ const styles = StyleSheet.create({
   },
   avatarFallbackText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
   },
   userInfo: {
@@ -528,22 +622,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "700",
     color: "#111827",
+    marginBottom: 2,
   },
   timeAgo: {
     fontSize: 13,
     color: "#9CA3AF",
-    marginTop: 2,
   },
   deleteBtn: {
-    padding: 4,
+    padding: 6,
   },
   imageContainer: {
-    width: width,
-    height: height * 0.65,
-    backgroundColor: "#F9FAFB",
+    width: "100%",
+    height: height * 0.45,
+    backgroundColor: "#1F2937",
     position: "relative",
   },
   feedImage: {
@@ -551,61 +645,68 @@ const styles = StyleSheet.create({
     height: "100%",
     resizeMode: "cover",
   },
-  metricsBlur: {
+  gradientOverlay: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: "hidden",
+    height: "40%",
   },
-  metricsContent: {
-    padding: 20,
+  globeIcon: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    // 배경/그림자 제거, 콘텐츠 크기만
+    justifyContent: "center",
+    alignItems: "center",
   },
-  distanceRow: {
+  earthImg: { width: 24, height: 24, resizeMode: "contain" },
+  statsOverlay: {
+    position: "absolute",
+    bottom: 20,
+    left: 20,
+    right: 20,
     flexDirection: "row",
-    alignItems: "baseline",
-    marginBottom: 12,
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
   },
-  distanceNumber: {
-    fontSize: 32,
-    fontWeight: "900",
-    color: "#111827",
-    letterSpacing: -1,
-  },
-  distanceUnit: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#6B7280",
-    marginLeft: 4,
-  },
-  statsRow: {
-    flexDirection: "row",
-    gap: 16,
-  },
-  statItem: {
+  statItemHorizontal: {
+    // 내용물 크기만큼만 차지해서 줄바꿈 방지
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
-  statText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#4B5563",
+  statValueHorizontal: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    textAlign: "left",
   },
   bottomSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   likeButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 8,
+    paddingVertical: 4,
   },
   likeCount: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "700",
     color: "#6B7280",
   },
@@ -613,10 +714,10 @@ const styles = StyleSheet.create({
     color: "#FF3B5C",
   },
   caption: {
-    fontSize: 14,
+    fontSize: 15,
     color: "#374151",
-    lineHeight: 20,
-    marginTop: 4,
+    lineHeight: 22,
+    marginTop: 12,
   },
   captionName: {
     fontWeight: "700",
