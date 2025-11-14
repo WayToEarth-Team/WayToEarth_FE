@@ -28,6 +28,7 @@ import {
 } from "../../utils/api/stamps";
 import { getLandmarkDetail } from "../../utils/api/landmarks";
 import { distanceKm } from "../../utils/geo";
+import { addStampCollectedListener, type StampCollectedPayload } from "../../utils/navEvents";
 
 type LandmarkLite = { id: number; name: string; distanceM?: number };
 
@@ -39,6 +40,7 @@ type Props = {
   currentLocation: LatLng | null;
   currentProgressM: number; // 현재 진행한 거리(미터)
   onCollected?: (stamp: StampResponse) => void;
+  extraCollectedIds?: number[];
 };
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -53,6 +55,7 @@ export default function StampBottomSheet({
   currentLocation,
   currentProgressM,
   onCollected,
+  extraCollectedIds,
 }: Props) {
   const translateY = useRef(new Animated.Value(MAX_HEIGHT - COLLAPSED_PEEK)).current;
   const [expanded, setExpanded] = useState(false);
@@ -88,6 +91,22 @@ export default function StampBottomSheet({
     })();
   }, [userId, journeyId]);
 
+  // 외부에서 스탬프가 수집되면(예: 자동 수집) 즉시 반영
+  useEffect(() => {
+    const sub = addStampCollectedListener((p: StampCollectedPayload) => {
+      try {
+        const s = p?.stamp as any;
+        const lmId = Number(p?.landmarkId || s?.landmark?.id || NaN);
+        if (!lmId || Number.isNaN(lmId)) return;
+        setStamps((prev) => {
+          const exists = prev.some((it) => Number(it?.landmark?.id) === lmId);
+          return exists ? prev : [s as StampResponse, ...prev];
+        });
+      } catch {}
+    });
+    return () => { try { sub.remove(); } catch {} };
+  }, []);
+
   // 각 랜드마크의 상세 정보 로드 (이미지, 위치 등) - 최초 1회만
   const loadedIdsRef = useRef(new Set<number>());
 
@@ -108,10 +127,11 @@ export default function StampBottomSheet({
     });
   }, [landmarks.map(l => l.id).join(','), userId]);
 
-  const collectedIds = useMemo(
-    () => new Set(stamps.map((s) => s.landmark?.id).filter(Boolean) as number[]),
-    [stamps]
-  );
+  const collectedIds = useMemo(() => {
+    const internalIds = stamps.map((s) => s.landmark?.id).filter(Boolean) as number[];
+    const extra = Array.isArray(extraCollectedIds) ? extraCollectedIds : [];
+    return new Set<number>([...internalIds, ...extra]);
+  }, [stamps, extraCollectedIds]);
 
   // 현재 위치에서 각 랜드마크까지의 거리 계산
   const landmarksWithDistance = useMemo(() => {
