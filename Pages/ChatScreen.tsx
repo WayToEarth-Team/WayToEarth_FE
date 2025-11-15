@@ -15,6 +15,7 @@ import {
   Keyboard,
   Animated,
   Easing,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ensureAccessToken, getAccessToken } from "../utils/auth/tokenManager";
@@ -26,6 +27,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { getMyProfile } from "../utils/api/users";
 import { formatTimeLocalHHmm } from "../utils/datetime";
+import { getCrewMembers as getCrewMembersPaged, getCrewMember as getCrewMemberById } from "../utils/api/crews";
 
 console.log("WebSocket 확인:");
 console.log("- global.WebSocket:", !!(global as any).WebSocket);
@@ -43,6 +45,7 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
   );
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentNickname, setCurrentNickname] = useState<string | null>(null);
+  const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const atBottomRef = useRef(true);
   const { activeTab, onTabPress } = useBottomNav("crew");
@@ -57,6 +60,14 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
   const justFocusedRef = useRef(false);
   const predictedRef = useRef<{ active: boolean; at: number }>({ active: false, at: 0 });
   const USE_SYSTEM_PAN = false; // 양 플랫폼 모두 커스텀 애니메이션 사용
+  const [avatarByNickname, setAvatarByNickname] = useState<Record<string, string | null>>({});
+  const avatarFetchSetRef = useRef<Set<string>>(new Set());
+
+  const normalizeName = (s: string) =>
+    String(s || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\u200B-\u200D\uFEFF]/g, "");
 
   const {
     messages,
@@ -146,6 +157,8 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
         if (!alive) return;
         setCurrentUserId(me?.id != null ? String(me.id) : null);
         setCurrentNickname(me?.nickname ? String(me.nickname) : null);
+        const av = (me as any)?.profile_image_url || (me as any)?.profileImageUrl || null;
+        setMyAvatarUrl(av ? String(av).split('?')[0] : null);
       } catch {}
     })();
     return () => {
@@ -179,6 +192,35 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
       loadUnreadCount();
     }
   }, [token, currentUserId]);
+
+  // 크루 멤버 아바타 로드 (닉네임 기반 매핑)
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!crewId) return;
+        const { members } = await getCrewMembersPaged(String(crewId), 0, 200);
+        const byName: Record<string, string | null> = {};
+        for (const m of members) {
+          const url = m.profileImage ? String(m.profileImage) : null;
+          const nameRaw = m.nickname ? String(m.nickname) : "";
+          const keyLower = nameRaw.trim().toLowerCase();
+          const keyNorm = normalizeName(nameRaw);
+          if (nameRaw) {
+            byName[nameRaw] = url;
+            byName[keyLower] = url;
+            byName[keyNorm] = url;
+          }
+        }
+        setAvatarByNickname(byName);
+        if (__DEV__) {
+          try {
+            const sampleKeys = Object.keys(byName).slice(0, 5);
+            console.log('[CHAT][avatarLoad] crewId=', crewId, 'loaded members=', members.length, 'sampleKeys=', sampleKeys);
+          } catch {}
+        }
+      } catch {}
+    })();
+  }, [crewId]);
 
   // Debug: log a few timestamps to verify normalization path
   useEffect(() => {
@@ -456,38 +498,82 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
                       </Text>
                     </View>
                   ) : computedOwn ? (
-                    <TouchableOpacity
-                      style={styles.responseContainer}
-                      onLongPress={onLong}
-                      delayLongPress={500}
-                    >
-                      <View style={styles.responseBackground}>
-                        <Text style={styles.responseText}>{msg.message}</Text>
-                        <Text style={styles.responseTime}>
-                          {formatTime(msg.timestamp)}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity style={styles.messageContainer}>
-                      <Text style={styles.messageLabel}>{msg.senderName}</Text>
-                      <View
-                        style={[
-                          styles.messageBackgroundBorder,
-                          !msg.isRead && styles.unreadMessageBorder,
-                        ]}
-                      >
-                        <Text style={styles.messageText}>{msg.message}</Text>
-                        <View style={styles.messageFooter}>
-                          <Text style={styles.messageTime}>
-                            {formatTime(msg.timestamp)}
-                          </Text>
-                          {!msg.isRead && (
-                            <View style={styles.unreadIndicator} />
-                          )}
+                    <View style={{ alignItems: 'flex-end', marginBottom: 12 }}>
+                      <View style={styles.rowRight}>
+                        <Text style={[styles.timeInline, { marginRight: 4 }]}>{formatTime(msg.timestamp)}</Text>
+                        <View style={styles.responseBackground}>
+                          <Text style={styles.responseText}>{msg.message}</Text>
                         </View>
                       </View>
-                    </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.otherMessageRow}>
+                      {(() => {
+                        const nameRaw = String(((msg as any)?.senderName || ""));
+                        const keyLower = nameRaw.trim().toLowerCase();
+                        const keyNorm = normalizeName(nameRaw);
+                        let raw =
+                          avatarByNickname[nameRaw] ??
+                          avatarByNickname[keyLower] ??
+                          avatarByNickname[keyNorm] ??
+                          null;
+                        // 지연 로드: 닉네임 기반으로 첫 페이지에서 검색
+                        const fetchKey = keyNorm || keyLower || nameRaw;
+                        if (!raw && crewId && fetchKey && !avatarFetchSetRef.current.has(fetchKey)) {
+                          avatarFetchSetRef.current.add(fetchKey);
+                          if (__DEV__) console.log('[CHAT][avatarFetch] start for', { crewId, fetchKey, nameRaw });
+                          getCrewMembersPaged(String(crewId), 0, 200)
+                            .then(({ members }) => {
+                              const found = members.find((m) => normalizeName(m.nickname) === fetchKey);
+                              const profile = found?.profileImage ?? null;
+                              if (found?.nickname) {
+                                setAvatarByNickname((prev) => ({
+                                  ...prev,
+                                  [found.nickname]: profile,
+                                  [found.nickname.trim().toLowerCase()]: profile,
+                                  [normalizeName(found.nickname)]: profile,
+                                }));
+                                if (__DEV__) console.log('[CHAT][avatarFetch] found', { nickname: found.nickname, profile });
+                              } else {
+                                if (__DEV__) console.log('[CHAT][avatarFetch] not found for', fetchKey);
+                              }
+                            })
+                            .catch(() => {})
+                            .finally(() => {});
+                        }
+                        const url = raw ? String(raw) : null;
+                        if (__DEV__) {
+                          try {
+                            console.log('[CHAT][avatarResolve]', { nameRaw, keyLower, keyNorm, hit: !!url, url });
+                          } catch {}
+                        }
+                        return url ? (
+                          <Image
+                            source={{ uri: url, cache: 'force-cache' as any }}
+                            style={styles.avatar}
+                            resizeMode="cover"
+                            onError={(e) => { if (__DEV__) console.log('[CHAT][avatarError]', nameRaw, e?.nativeEvent?.error); }}
+                            onLoad={() => { if (__DEV__) console.log('[CHAT][avatarLoadOK]', nameRaw); }}
+                          />
+                        ) : (
+                          <View style={[styles.avatar, styles.avatarPlaceholder]} />
+                        );
+                      })()}
+                      <View style={{ maxWidth: '72%' }}>
+                        <Text style={styles.nicknameText}>{msg.senderName}</Text>
+                        <View style={styles.rowLeft}>
+                          <View
+                            style={[
+                              styles.messageBackgroundBorder,
+                              !msg.isRead && styles.unreadMessageBorder,
+                            ]}
+                          >
+                            <Text style={styles.messageText}>{msg.message}</Text>
+                          </View>
+                          <Text style={styles.timeInline}>{formatTime(msg.timestamp)}</Text>
+                        </View>
+                      </View>
+                    </View>
                   )}
                 </View>
               );
@@ -584,11 +670,24 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     marginLeft: 12,
   },
+  nicknameText: {
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  nicknameInline: {
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: "700",
+    marginRight: 6,
+    alignSelf: 'flex-start',
+  },
   messageBackgroundBorder: {
     backgroundColor: "#ffffff",
-    borderRadius: 18,
+    borderRadius: 14,
     borderWidth: 0,
-    padding: 14,
+    padding: 10,
     maxWidth: "100%",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -598,9 +697,9 @@ const styles = StyleSheet.create({
   },
   messageText: {
     color: "#1e293b",
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "400",
-    lineHeight: 22,
+    lineHeight: 20,
   },
   messageTime: {
     color: "#94a3b8",
@@ -616,8 +715,8 @@ const styles = StyleSheet.create({
   },
   responseBackground: {
     backgroundColor: "#667eea",
-    borderRadius: 18,
-    padding: 14,
+    borderRadius: 16,
+    padding: 12,
     maxWidth: "100%",
     shadowColor: "#667eea",
     shadowOffset: { width: 0, height: 2 },
@@ -627,9 +726,9 @@ const styles = StyleSheet.create({
   },
   responseText: {
     color: "#ffffff",
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "400",
-    lineHeight: 22,
+    lineHeight: 20,
   },
   responseTime: {
     color: "#e0e7ff",
@@ -637,6 +736,53 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     textAlign: "right",
     marginTop: 6,
+  },
+  timeInline: {
+    color: "#94a3b8",
+    fontSize: 9,
+    fontWeight: "500",
+    marginLeft: 5,
+    marginBottom: 1,
+    alignSelf: 'flex-end',
+  },
+  timeOutside: {
+    color: "#94a3b8",
+    fontSize: 10,
+    fontWeight: "400",
+    marginTop: 3,
+    marginHorizontal: 4,
+  },
+  otherMessageRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginBottom: 12,
+  },
+  selfMessageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
+    gap: 6,
+    marginBottom: 6,
+  },
+  rowLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 5,
+  },
+  rowRight: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 5,
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#e2e8f0",
+  },
+  avatarPlaceholder: {
+    backgroundColor: "#e5e7eb",
   },
   inputContainer: {
     paddingHorizontal: 12,
