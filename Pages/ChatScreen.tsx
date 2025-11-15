@@ -281,6 +281,23 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
 
   const formatTime = (timestamp?: string) => (timestamp ? formatTimeLocalHHmm(timestamp) : "");
 
+  // Helpers for grouping and ownership
+  const computeOwn = (m: any) => {
+    return Boolean(
+      m?.isOwn === true ||
+        (currentUserId != null && m?.senderId != null && String(m.senderId) === String(currentUserId)) ||
+        (currentNickname && typeof m?.senderName === 'string' && m.senderName === currentNickname)
+    );
+  };
+  const isSameMinute = (a?: string, b?: string) => {
+    if (!a || !b) return false;
+    try {
+      const da = new Date(a);
+      const db = new Date(b);
+      return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate() && da.getHours() === db.getHours() && da.getMinutes() === db.getMinutes();
+    } catch { return false; }
+  };
+
   // 탭바/안전영역 기반 하단 오프셋 계산
   // 입력창 절대 배치 및 스크롤 패딩 계산
   const bottomNavHeight = BOTTOM_NAV_MIN_HEIGHT + (insets.bottom || 0);
@@ -482,6 +499,14 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
                 (currentUserId != null && (msg as any)?.senderId != null && String((msg as any).senderId) === String(currentUserId)) ||
                 (currentNickname && typeof (msg as any)?.senderName === 'string' && (msg as any).senderName === currentNickname)
               );
+              const next = messages[index + 1];
+              const nextOwn = next ? computeOwn(next as any) : false;
+              const sameSender = next ? ((computedOwn && nextOwn) || (!computedOwn && !nextOwn && (next as any)?.senderName === (msg as any)?.senderName)) : false;
+              const showTime = !next || !(sameSender && isSameMinute(msg.timestamp, next.timestamp));
+              const prev = messages[index - 1];
+              const prevOwn = prev ? computeOwn(prev as any) : false;
+              const prevSameSender = prev ? ((computedOwn && prevOwn) || (!computedOwn && !prevOwn && (prev as any)?.senderName === (msg as any)?.senderName)) : false;
+              const showHeader = !prev || !(prevSameSender && isSameMinute(prev?.timestamp, msg.timestamp));
               const onLong = () => {
                 if (computedOwn && msg.id)
                   Alert.alert("메시지 삭제", "이 메시지를 삭제하시겠습니까?", [
@@ -505,78 +530,84 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
                   ) : computedOwn ? (
                     <View style={{ alignItems: 'flex-end', marginBottom: 12 }}>
                       <View style={styles.rowRight}>
-                        <Text style={[styles.timeInline, { marginRight: 4 }]}>{formatTime(msg.timestamp)}</Text>
+                        {showTime ? (
+                          <Text style={[styles.timeInline, { marginRight: 4 }]}>{formatTime(msg.timestamp)}</Text>
+                        ) : null}
                         <View style={styles.responseBackground}>
                           <Text style={styles.responseText}>{msg.message}</Text>
                         </View>
                       </View>
                     </View>
                   ) : (
-                    <View style={styles.otherMessageRow}>
-                      {(() => {
-                        const nameRaw = String(((msg as any)?.senderName || ""));
-                        const keyLower = nameRaw.trim().toLowerCase();
-                        const keyNorm = normalizeName(nameRaw);
-                        let raw =
-                          avatarByNickname[nameRaw] ??
-                          avatarByNickname[keyLower] ??
-                          avatarByNickname[keyNorm] ??
-                          null;
-                        // 지연 로드: 닉네임 기반으로 첫 페이지에서 검색
-                        const fetchKey = keyNorm || keyLower || nameRaw;
-                        if (!raw && crewId && fetchKey && !avatarFetchSetRef.current.has(fetchKey)) {
-                          avatarFetchSetRef.current.add(fetchKey);
-                          if (__DEV__) console.log('[CHAT][avatarFetch] start for', { crewId, fetchKey, nameRaw });
-                          getCrewMembersPaged(String(crewId), 0, 200)
-                            .then(({ members }) => {
-                              const found = members.find((m) => normalizeName(m.nickname) === fetchKey);
-                              const profile = found?.profileImage ?? null;
-                              if (found?.nickname) {
-                                setAvatarByNickname((prev) => ({
-                                  ...prev,
-                                  [found.nickname]: profile,
-                                  [found.nickname.trim().toLowerCase()]: profile,
-                                  [normalizeName(found.nickname)]: profile,
-                                }));
-                                if (__DEV__) console.log('[CHAT][avatarFetch] found', { nickname: found.nickname, profile });
-                              } else {
-                                if (__DEV__) console.log('[CHAT][avatarFetch] not found for', fetchKey);
-                              }
-                            })
-                            .catch(() => {})
-                            .finally(() => {});
-                        }
-                        const url = raw ? String(raw) : null;
-                        if (__DEV__) {
-                          try {
-                            console.log('[CHAT][avatarResolve]', { nameRaw, keyLower, keyNorm, hit: !!url, url });
-                          } catch {}
-                        }
-                        return url ? (
-                          <Image
-                            source={{ uri: url, cache: 'force-cache' as any }}
-                            style={styles.avatar}
-                            resizeMode="cover"
-                            onError={(e) => { if (__DEV__) console.log('[CHAT][avatarError]', nameRaw, e?.nativeEvent?.error); }}
-                            onLoad={() => { if (__DEV__) console.log('[CHAT][avatarLoadOK]', nameRaw); }}
-                          />
-                        ) : (
-                          <View style={[styles.avatar, styles.avatarPlaceholder]} />
-                        );
-                      })()}
-                      <View style={{ maxWidth: '72%' }}>
-                        <Text style={styles.nicknameText}>{msg.senderName}</Text>
-                        <View style={styles.rowLeft}>
-                          <View
-                            style={[
-                              styles.messageBackgroundBorder,
-                              !msg.isRead && styles.unreadMessageBorder,
-                            ]}
-                          >
-                            <Text style={styles.messageText}>{msg.message}</Text>
-                          </View>
-                          <Text style={styles.timeInline}>{formatTime(msg.timestamp)}</Text>
+                    <View style={styles.otherMessageContainer}>
+                      {showHeader && (
+                        <View style={styles.rowAvatarNick}>
+                          {(() => {
+                          const nameRaw = String(((msg as any)?.senderName || ""));
+                          const keyLower = nameRaw.trim().toLowerCase();
+                          const keyNorm = normalizeName(nameRaw);
+                          let raw =
+                            avatarByNickname[nameRaw] ??
+                            avatarByNickname[keyLower] ??
+                            avatarByNickname[keyNorm] ??
+                            null;
+                          // 지연 로드: 닉네임 기반으로 첫 페이지에서 검색
+                          const fetchKey = keyNorm || keyLower || nameRaw;
+                          if (!raw && crewId && fetchKey && !avatarFetchSetRef.current.has(fetchKey)) {
+                            avatarFetchSetRef.current.add(fetchKey);
+                            if (__DEV__) console.log('[CHAT][avatarFetch] start for', { crewId, fetchKey, nameRaw });
+                            getCrewMembersPaged(String(crewId), 0, 200)
+                              .then(({ members }) => {
+                                const found = members.find((m) => normalizeName(m.nickname) === fetchKey);
+                                const profile = found?.profileImage ?? null;
+                                if (found?.nickname) {
+                                  setAvatarByNickname((prev) => ({
+                                    ...prev,
+                                    [found.nickname]: profile,
+                                    [found.nickname.trim().toLowerCase()]: profile,
+                                    [normalizeName(found.nickname)]: profile,
+                                  }));
+                                  if (__DEV__) console.log('[CHAT][avatarFetch] found', { nickname: found.nickname, profile });
+                                } else {
+                                  if (__DEV__) console.log('[CHAT][avatarFetch] not found for', fetchKey);
+                                }
+                              })
+                              .catch(() => {})
+                              .finally(() => {});
+                          }
+                          const url = raw ? String(raw) : null;
+                          if (__DEV__) {
+                            try {
+                              console.log('[CHAT][avatarResolve]', { nameRaw, keyLower, keyNorm, hit: !!url, url });
+                            } catch {}
+                          }
+                          return url ? (
+                            <Image
+                              source={{ uri: url, cache: 'force-cache' as any }}
+                              style={styles.avatar}
+                              resizeMode="cover"
+                              onError={(e) => { if (__DEV__) console.log('[CHAT][avatarError]', nameRaw, e?.nativeEvent?.error); }}
+                              onLoad={() => { if (__DEV__) console.log('[CHAT][avatarLoadOK]', nameRaw); }}
+                            />
+                          ) : (
+                            <View style={[styles.avatar, styles.avatarPlaceholder]} />
+                          );
+                        })()}
+                          <Text style={styles.nicknameText}>{msg.senderName}</Text>
                         </View>
+                      )}
+                      <View style={[styles.rowLeft, { marginLeft: 44, maxWidth: '78%' }]}>
+                        <View
+                          style={[
+                            styles.messageBackgroundBorder,
+                            !msg.isRead && styles.unreadMessageBorder,
+                          ]}
+                        >
+                          <Text style={styles.messageText}>{msg.message}</Text>
+                        </View>
+                        {showTime ? (
+                          <Text style={styles.timeInline}>{formatTime(msg.timestamp)}</Text>
+                        ) : null}
                       </View>
                     </View>
                   )}
@@ -762,6 +793,14 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 8,
     marginBottom: 12,
+  },
+  otherMessageContainer: {
+    marginBottom: 12,
+  },
+  rowAvatarNick: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   selfMessageRow: {
     flexDirection: 'row',
