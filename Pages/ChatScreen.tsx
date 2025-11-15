@@ -23,7 +23,7 @@ import { useBottomNav } from "../hooks/useBottomNav";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { useChatHistory } from "../hooks/useChatHistory";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { getMyProfile } from "../utils/api/users";
 import { formatTimeLocalHHmm } from "../utils/datetime";
 
@@ -35,6 +35,7 @@ console.log("- WebSocket:", !!WebSocket);
 const { width } = Dimensions.get("window");
 
 export default function ChatScreen({ route }: any = { route: { params: {} } }) {
+  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const [message, setMessage] = useState("");
   const [crewId, setCrewId] = useState<number | null>(
@@ -213,6 +214,14 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
 
       <View style={styles.chatHeader}>
         <View style={styles.chatHeaderLeft}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={() => navigation.goBack()}
+            style={styles.backBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="arrow-back" size={22} color="#1e293b" />
+          </TouchableOpacity>
           <Text style={styles.chatTitle}>
             {crewInfo ? `${crewInfo.name}` : "크루 채팅"}
           </Text>
@@ -665,6 +674,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+  },
+  backBtn: {
+    padding: 4,
+    marginRight: 2,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
   },
   chatHeaderRight: {
     flexDirection: "row",

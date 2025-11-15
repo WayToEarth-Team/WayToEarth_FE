@@ -475,14 +475,6 @@ export default function CrewDetailScreen() {
             <TouchableOpacity
               style={s.chatBtn}
               onPress={() => {
-                setAlert({
-                  open: true,
-                  kind: "message",
-                  title: "채팅 이동",
-                  message: crewId
-                    ? `크루(${crewName || ""}) 채팅으로 이동 시도`
-                    : "크루 정보를 불러오지 못했습니다.",
-                });
                 if (!crewId) {
                   setAlert({
                     open: true,

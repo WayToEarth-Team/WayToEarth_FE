@@ -155,6 +155,8 @@ export default function App() {
                 gestureEnabled: true,
                 gestureDirection: "horizontal",
                 cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                animationEnabled: true,
+                animationTypeForReplace: "pop",
                 transitionSpec: {
                   open: TransitionSpecs.TransitionIOSSpec,
                   close: TransitionSpecs.TransitionIOSSpec,
