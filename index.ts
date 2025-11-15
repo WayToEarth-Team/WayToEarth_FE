@@ -1,3 +1,4 @@
+import 'react-native-gesture-handler';
 import { registerRootComponent } from "expo";
 import firebase from "@react-native-firebase/app"; // Firebase App 초기화 (messaging보다 먼저 import 필수)
 import messaging from "@react-native-firebase/messaging";

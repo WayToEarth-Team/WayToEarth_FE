@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
+import { getApiBaseUrl, joinApiUrl } from "../config/api";
 
 // Secure storage (Expo SecureStore) is preferred; fallback to AsyncStorage if unavailable
 let SecureStore: any = null;
@@ -94,7 +95,7 @@ export async function getRefreshToken(): Promise<string | null> {
 }
 
 // Attempt to ensure we have an in-memory access token, using refresh token if possible
-export async function ensureAccessToken(baseURL = "https://api.waytoearth.cloud"): Promise<string | null> {
+export async function ensureAccessToken(baseURL = getApiBaseUrl()): Promise<string | null> {
   if (accessTokenMemory) return accessTokenMemory;
   const rt = await getRefreshToken();
   if (rt) {
@@ -114,7 +115,7 @@ export async function ensureAccessToken(baseURL = "https://api.waytoearth.cloud"
 }
 
 let refreshing: Promise<string | null> | null = null;
-export async function refreshAccessToken(baseURL = "https://api.waytoearth.cloud"): Promise<string | null> {
+export async function refreshAccessToken(baseURL = getApiBaseUrl()): Promise<string | null> {
   if (refreshing) return refreshing;
   refreshing = (async () => {
     try {
@@ -123,7 +124,7 @@ export async function refreshAccessToken(baseURL = "https://api.waytoearth.cloud
         await clearTokens();
         return null;
       }
-      const url = `${baseURL.replace(/\/+$/, "")}/v1/auth/refresh`;
+      const url = joinApiUrl(baseURL, "/v1/auth/refresh");
       const res = await axios.post(url, { refreshToken }, { timeout: 10000 });
       const payload = res?.data && typeof res.data === "object" && "data" in res.data ? (res.data as any).data : res?.data;
       const accessToken: string | undefined = payload?.accessToken;

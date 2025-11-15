@@ -8,6 +8,7 @@ import React, {
 import { StackActions, useFocusEffect } from "@react-navigation/native";
 import { navigationRef } from "../navigation/RootNavigation";
 import * as Location from "expo-location";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import SafeLayout from "../components/Layout/SafeLayout";
 import {
   StyleSheet,
@@ -37,6 +38,7 @@ import { useBackgroundRunning } from "../hooks/journey/useBackgroundRunning";
 import { emitRunningSession } from "../utils/navEvents";
 import { useWeather } from "../contexts/WeatherContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { apiComplete } from "../utils/api/running"; // ✅ 추가
 import { awardEmblemByCode } from "../utils/api/emblems";
 import {
@@ -71,6 +73,7 @@ export default function LiveRunningScreen({
   const snapshotFnRef = useRef<(() => Promise<string | null>) | undefined>(
     undefined
   );
+  const forceCenterRef = useRef<((p: { latitude: number; longitude: number }) => void) | null>(null);
   const isStoppingRef = useRef(false);
   const [alert, setAlert] = useState<{
     open: boolean;
@@ -251,18 +254,16 @@ export default function LiveRunningScreen({
         setWatchRunning(true);
 
         // AsyncStorage에 러닝 세션 저장 (탭 바 숨김용)
-        import("@react-native-async-storage/async-storage").then(
-          ({ default: AsyncStorage }) => {
-            AsyncStorage.setItem(
-              "@running_session",
-              JSON.stringify({
-                isRunning: true,
-                sessionId: data.sessionId,
-                startTime: Date.now(),
-              })
-            );
-          }
-        );
+        try {
+          AsyncStorage.setItem(
+            "@running_session",
+            JSON.stringify({
+              isRunning: true,
+              sessionId: data.sessionId,
+              startTime: Date.now(),
+            })
+          ).catch(() => {});
+        } catch {}
 
         // 즉시 탭바 숨김 반영
         try {
@@ -340,11 +341,7 @@ export default function LiveRunningScreen({
           }
 
           // AsyncStorage 세션 정보 제거
-          import("@react-native-async-storage/async-storage").then(
-            ({ default: AsyncStorage }) => {
-              AsyncStorage.removeItem("@running_session");
-            }
-          );
+          try { await AsyncStorage.removeItem("@running_session"); } catch {}
 
           // 위치를 강제로 다시 가져오기 (메인 페이지 지도를 위해)
           console.log(
@@ -436,9 +433,6 @@ export default function LiveRunningScreen({
         console.log("[LiveRunning] Watch session started:", sessionId);
         // 워치 모드 시작과 동시에 탭바 숨김 즉시 반영
         try {
-          const { default: AsyncStorage } = await import(
-            "@react-native-async-storage/async-storage"
-          );
           await AsyncStorage.setItem(
             "@running_session",
             JSON.stringify({
@@ -482,9 +476,6 @@ export default function LiveRunningScreen({
       });
       // 러닝 세션 시작 표시 -> 탭 네비 잠금에 사용
       try {
-        const { default: AsyncStorage } = await import(
-          "@react-native-async-storage/async-storage"
-        );
         await AsyncStorage.setItem(
           "@running_session",
           JSON.stringify({
@@ -546,11 +537,7 @@ export default function LiveRunningScreen({
       await backgroundRunning.clearSession();
 
       // AsyncStorage 세션 정보도 제거
-      import("@react-native-async-storage/async-storage").then(
-        ({ default: AsyncStorage }) => {
-          AsyncStorage.removeItem("@running_session");
-        }
-      );
+      try { await AsyncStorage.removeItem("@running_session"); } catch {}
       // 즉시 탭바 복귀
       try {
         emitRunningSession(false);
@@ -588,11 +575,11 @@ export default function LiveRunningScreen({
     if (navigationRef.isReady()) {
       navigationRef.dispatch(StackActions.replace("MainTabs"));
     } else {
-      const rootParent = navigation.getParent?.()?.getParent?.();
+      const rootParent = navigation?.getParent?.()?.getParent?.();
       if (rootParent && typeof rootParent.dispatch === "function") {
         rootParent.dispatch(StackActions.replace("MainTabs"));
       } else {
-        navigation.navigate("MainTabs", { screen: "LiveRunningScreen" });
+        navigation?.navigate?.("MainTabs", { screen: "LiveRunningScreen" });
       }
     }
 
@@ -666,7 +653,15 @@ export default function LiveRunningScreen({
         try {
           emitRunningSession(false);
         } catch {}
-        navigation.navigate("RunSummary", {
+        // 네비게이션 안전 가드
+        const go = (params: any) => {
+          if (navigationRef.isReady()) {
+            navigationRef.navigate("RunSummary" as never, params as never);
+          } else {
+            navigation?.navigate?.("RunSummary", params);
+          }
+        };
+        go({
           runId: watchCompleteData.runId || null, // watchSync.ts에서 apiComplete 결과로 받은 runId
           defaultTitle: "오늘의 러닝",
           distanceKm,
@@ -739,7 +734,14 @@ export default function LiveRunningScreen({
         try {
           emitRunningSession(false);
         } catch {}
-        navigation.navigate("RunSummary", {
+        const go2 = (params: any) => {
+          if (navigationRef.isReady()) {
+            navigationRef.navigate("RunSummary" as never, params as never);
+          } else {
+            navigation?.navigate?.("RunSummary", params);
+          }
+        };
+        go2({
           runId,
           defaultTitle: "오늘의 러닝",
           distanceKm: t.distance,
@@ -875,12 +877,62 @@ export default function LiveRunningScreen({
         }
         liveMode
         onBindCenter={t.bindMapCenter}
+        onBindForceCenter={(fn) => { forceCenterRef.current = fn; }}
         onBindSnapshot={(fn) => {
           snapshotFnRef.current = fn;
         }}
         useCurrentLocationOnMount
         onMapReady={() => setMapReady(true)}
       />
+
+      {/* 현 위치로 돌아오기 버튼: 러닝 중에만 표시, 좌상단 */}
+      {(t.isRunning || watchRunning) && (
+      <TouchableOpacity
+        onPress={async () => {
+          try {
+            let perm = await Location.getForegroundPermissionsAsync();
+            if (perm.status !== "granted") {
+              perm = await Location.requestForegroundPermissionsAsync();
+              if (perm.status !== "granted") return;
+            }
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            const p = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+            // 강제 센터 이동 바인딩이 있으면 우선 사용
+            if (forceCenterRef.current) {
+              forceCenterRef.current(p);
+            } else if (t.bindMapCenter) {
+              // 폴백: 일반 바인딩 (사용자 제스처로 잠시 무시될 수 있음)
+              t.bindMapCenter(p as any);
+            }
+          } catch (e) {
+            console.warn('[LiveRunning] recenter failed', e);
+          }
+        }}
+        activeOpacity={0.8}
+        style={{
+          position: "absolute",
+          left: 16,
+          top: Math.max(insets.top, 12) + 70,
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          backgroundColor: "rgba(255,255,255,0.95)",
+          alignItems: "center",
+          justifyContent: "center",
+          shadowColor: "#000",
+          shadowOpacity: 0.15,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 3 },
+          elevation: 6,
+          borderWidth: 1,
+          borderColor: "rgba(0,0,0,0.06)",
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="현 위치로 이동"
+      >
+        <Ionicons name="locate" size={20} color="#111827" />
+      </TouchableOpacity>
+      )}
 
       {/* 상단 비네팅 효과 */}
       <LinearGradient
