@@ -381,7 +381,7 @@ export default function RouteDetailScreen({ route, navigation }: RouteParams = {
                   return {
                     id: String(lm.id),
                     name: lm.name,
-                    distance: `${(meters / 1000).toFixed(1)}km 지??,`,
+                    distance: `${(meters / 1000).toFixed(1)}km 지점,`,
                     distanceM: meters,
                     position: { latitude: lm.latitude, longitude: lm.longitude },
                   };
