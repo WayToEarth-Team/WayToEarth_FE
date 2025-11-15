@@ -262,7 +262,12 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
   useEffect(() => {
     return () => {
       disconnect();
-      clearMessages();
+      try {
+        // Prefer full reset to avoid stale dedupe state on next mount
+        (resetAll as any)?.();
+      } catch {
+        clearMessages();
+      }
     };
   }, [disconnect, clearMessages]);
 

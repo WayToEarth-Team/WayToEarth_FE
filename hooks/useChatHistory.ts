@@ -52,7 +52,7 @@ export function useChatHistory({ crewId, currentUserId }: { crewId: string | num
     try {
       const { data } = await client.get(`/v1/crews/${crewId}/chat/messages/recent`, { params: { limit: pageSizeRef.current } });
       const list: any[] = data ?? [];
-      const mapped = list
+      let mapped = list
         .map(mapDto)
         // Hide server-side system notices that are not user messages
         .filter((m) => {
@@ -70,6 +70,14 @@ export function useChatHistory({ crewId, currentUserId }: { crewId: string | num
           idSetRef.current.add(key);
           return true;
         });
+      // Ensure ascending time order (oldest -> newest) so newest is at bottom
+      try {
+        mapped = mapped.sort((a, b) => {
+          const ta = new Date(a.timestamp || 0).getTime();
+          const tb = new Date(b.timestamp || 0).getTime();
+          return ta - tb;
+        });
+      } catch {}
       setMessages(mapped);
       setPage(1);
       setHasMore((list?.length ?? 0) >= pageSizeRef.current);
@@ -179,6 +187,11 @@ export function useChatHistory({ crewId, currentUserId }: { crewId: string | num
   }, [mapDto]);
 
   const clearMessages = useCallback(() => setMessages([]), []);
+  // Reset dedupe set when clearing
+  const resetAll = useCallback(() => {
+    idSetRef.current = new Set();
+    setMessages([]);
+  }, []);
 
   return {
     messages,
@@ -196,5 +209,6 @@ export function useChatHistory({ crewId, currentUserId }: { crewId: string | num
     deleteMessage,
     addNewMessage,
     clearMessages,
+    resetAll,
   };
 }
