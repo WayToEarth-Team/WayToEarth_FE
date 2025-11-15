@@ -11,14 +11,12 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ensureAccessToken, getAccessToken } from "../utils/auth/tokenManager";
-import BottomNavigation, {
-  BOTTOM_NAV_MIN_HEIGHT,
-} from "../components/Layout/BottomNav";
+import BottomNavigation, { BOTTOM_NAV_MIN_HEIGHT } from "../components/Layout/BottomNav";
 import { useBottomNav } from "../hooks/useBottomNav";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { useChatHistory } from "../hooks/useChatHistory";
@@ -46,6 +44,9 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
   const scrollViewRef = useRef<ScrollView>(null);
   const { activeTab, onTabPress } = useBottomNav("crew");
   const [token, setToken] = useState<string | null>(null);
+  const [kbVisible, setKbVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [inputHeight, setInputHeight] = useState(72);
 
   const {
     messages,
@@ -89,6 +90,28 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
     })();
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  // 키보드 표시/숨김 상태 추적 → 입력창 하단 여백 동적 조정
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.select({ ios: "keyboardWillShow", android: "keyboardDidShow" }) || "keyboardDidShow",
+      (e: any) => {
+        setKbVisible(true);
+        const h = Number(e?.endCoordinates?.height || e?.end?.height || 0);
+        if (Number.isFinite(h)) setKeyboardHeight(h);
+      }
+    );
+    const hide = Keyboard.addListener(
+      Platform.select({ ios: "keyboardWillHide", android: "keyboardDidHide" }) || "keyboardDidHide",
+      () => {
+        setKbVisible(false);
+        setKeyboardHeight(0);
+      }
+    );
+    return () => {
+      try { show.remove(); hide.remove(); } catch {}
     };
   }, []);
 
@@ -189,6 +212,18 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
 
   const formatTime = (timestamp?: string) => (timestamp ? formatTimeLocalHHmm(timestamp) : "");
 
+  // 탭바/안전영역 기반 하단 오프셋 계산
+  // 입력창 절대 배치 및 스크롤 패딩 계산
+  const bottomNavHeight = BOTTOM_NAV_MIN_HEIGHT + (insets.bottom || 0);
+  const LIFT_WHEN_CLOSED = 12; // 기본 상태에서 더 위로 띄우기
+  const LIFT_WHEN_OPEN = 8; // 키보드 열린 상태에서 살짝 더 띄우기
+  const inputAbsoluteBottom = keyboardHeight > 0
+    ? keyboardHeight + LIFT_WHEN_OPEN
+    : bottomNavHeight + LIFT_WHEN_CLOSED;
+  const scrollBottomPad = keyboardHeight > 0
+    ? keyboardHeight + inputHeight + LIFT_WHEN_OPEN + 8
+    : inputHeight + bottomNavHeight + LIFT_WHEN_CLOSED + 8;
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -275,16 +310,14 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
         </View>
       )}
 
-      <KeyboardAvoidingView
-        style={styles.chatContainer}
-        behavior={Platform.select({ ios: "padding", android: undefined })}
-        keyboardVerticalOffset={(insets.bottom || 0) + BOTTOM_NAV_MIN_HEIGHT}
-      >
+      <View style={styles.chatContainer}>
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPad }]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.select({ ios: "interactive", android: "on-drag" })}
           onScroll={(e) => {
             const { contentOffset } = e.nativeEvent;
             if (
@@ -393,10 +426,19 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
           style={[
             styles.inputContainer,
             {
-              marginBottom: (insets.bottom || 0) + BOTTOM_NAV_MIN_HEIGHT + 8,
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: inputAbsoluteBottom,
+              zIndex: 200,
+              elevation: 8,
               paddingBottom: Platform.OS === "ios" ? 8 : 12,
             },
           ]}
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            if (h && Math.abs(h - inputHeight) > 1) setInputHeight(h);
+          }}
         >
           <View style={styles.inputWrapper}>
             <TextInput
@@ -424,7 +466,7 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
             )}
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
 
       <BottomNavigation activeTab={activeTab} onTabPress={onTabPress} />
     </SafeAreaView>
