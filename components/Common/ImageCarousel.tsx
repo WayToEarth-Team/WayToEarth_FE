@@ -26,6 +26,7 @@ type ImageCarouselProps = {
   showIndicators?: boolean; // 인디케이터 dots 표시 여부 (기본: true)
   borderRadius?: number; // 모서리 둥글기 (기본: 0)
   style?: ViewStyle; // 추가 스타일
+  showPlaceholder?: boolean; // 로딩/이미지 없음 플레이스홀더 표시 여부 (기본: true)
 };
 
 export default function ImageCarousel({
@@ -36,6 +37,7 @@ export default function ImageCarousel({
   showIndicators = true,
   borderRadius = 0,
   style,
+  showPlaceholder = true,
 }: ImageCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -78,9 +80,13 @@ export default function ImageCarousel({
   if (validImages.length === 0) {
     return (
       <View style={[styles.container, { height, borderRadius }, style]}>
-        <View style={styles.placeholder}>
-          <Text style={styles.placeholderIcon}>🏞️</Text>
-        </View>
+        {showPlaceholder ? (
+          <View style={styles.placeholder}>
+            <Text style={styles.placeholderIcon}>🏞️</Text>
+          </View>
+        ) : (
+          <View style={[styles.placeholder, { backgroundColor: '#F3F4F6' }]} />
+        )}
       </View>
     );
   }
@@ -154,7 +160,7 @@ export default function ImageCarousel({
       </Animated.View>
 
       {/* 로딩 중 플레이스홀더 */}
-      {!imageLoaded && (
+      {!imageLoaded && showPlaceholder && (
         <View style={[StyleSheet.absoluteFill, styles.loadingPlaceholder]}>
           <Text style={styles.placeholderIcon}>🏞️</Text>
         </View>
