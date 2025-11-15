@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Image as RNImage } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import useRouteList from "../hooks/journey/useJourneyRouteList";
 import type { RouteSummary } from "../utils/api/journeyRoutes";
@@ -50,19 +50,31 @@ export default function RouteListScreen({ navigation }: any) {
   useEffect(() => {
     if (!routes || routes.length === 0) return;
     (async () => {
-      const imagesMap: Record<string, string[]> = {};
-      for (const r of routes) {
-        try {
-          const lms = await getJourneyLandmarks(Number(r.id));
-          const urls = (lms || [])
-            .map((lm) => lm.imageUrl)
-            .filter((u): u is string => !!u?.trim());
-          if (urls.length) imagesMap[String(r.id)] = urls;
-        } catch (err) {
-          if (__DEV__) console.warn("[RouteList] landmark images failed:", err);
+      try {
+        const pairs = await Promise.all(
+          routes.map(async (r) => {
+            try {
+              const lms = await getJourneyLandmarks(Number(r.id));
+              const urls = (lms || [])
+                .map((lm) => lm.imageUrl)
+                .filter((u): u is string => !!u?.trim());
+              // 첫 이미지 선프리페치(플리커 완화)
+              if (urls[0]) {
+                try { await RNImage.prefetch(urls[0]); } catch {}
+              }
+              return [String(r.id), urls] as const;
+            } catch (err) {
+              if (__DEV__) console.warn("[RouteList] landmark images failed:", err);
+              return [String(r.id), []] as const;
+            }
+          })
+        );
+        const map: Record<string, string[]> = {};
+        for (const [id, urls] of pairs) {
+          if (urls.length) map[id] = urls;
         }
-      }
-      setJourneyImages(imagesMap);
+        setJourneyImages(map);
+      } catch {}
     })();
   }, [routes]);
 
@@ -107,7 +119,26 @@ export default function RouteListScreen({ navigation }: any) {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
-        {loading && <Text style={styles.loadingText}>로딩 중...</Text>}
+        {loading && (
+          <>
+            {[0,1,2].map((i) => (
+              <View key={`sk-${i}`} style={styles.routeCard}>
+                <View style={[styles.routeImageContainer, { backgroundColor: colors.gray300 }]} />
+                <View style={styles.routeInfo}>
+                  <View style={{ height: 18, backgroundColor: colors.gray300, borderRadius: 6, width: '60%', marginBottom: 10 }} />
+                  <View style={{ height: 14, backgroundColor: colors.gray200, borderRadius: 6, width: '90%', marginBottom: 6 }} />
+                  <View style={{ height: 14, backgroundColor: colors.gray200, borderRadius: 6, width: '70%', marginBottom: 12 }} />
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                    <View style={{ height: 22, width: 60, backgroundColor: colors.gray200, borderRadius: 999 }} />
+                    <View style={{ height: 22, width: 60, backgroundColor: colors.gray200, borderRadius: 999 }} />
+                    <View style={{ height: 22, width: 60, backgroundColor: colors.gray200, borderRadius: 999 }} />
+                  </View>
+                  <View style={{ height: 12, backgroundColor: colors.gray200, borderRadius: 6, width: '40%' }} />
+                </View>
+              </View>
+            ))}
+          </>
+        )}
         {filtered.map((route: RouteSummary) => {
           // 여정의 랜드마크 이미지 사용
           const carouselImages = journeyImages[String(route.id)] || [];
@@ -126,6 +157,7 @@ export default function RouteListScreen({ navigation }: any) {
                   height={200}
                   borderRadius={0}
                   autoPlayInterval={4000}
+                  showPlaceholder={false}
                 />
                 <View style={styles.progressBadge}>
                   <Text style={styles.progressText}>

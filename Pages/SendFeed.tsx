@@ -15,9 +15,9 @@ import { createFeed } from "../utils/api/feeds";
 import * as ImagePicker from "expo-image-picker";
 import { PositiveAlert, NegativeAlert, MessageAlert } from "../components/ui/AlertDialog";
 
-export default function FeedComposeScreen({ route, navigation }: any) {
+export default function FeedComposeScreen({ route, navigation }: any = { route: { params: {} } }) {
   const { runId, defaultTitle, distanceKm, paceLabel, kcal } =
-    route.params || {};
+    (route?.params as any) || {};
 
   const [title, setTitle] = useState(defaultTitle || "");
   const [content, setContent] = useState("");

@@ -61,6 +61,7 @@ import MyGuestbookScreen from "./Pages/MyGuestbookScreen";
 import GuestbookScreen from "./Pages/GuestbookScreen";
 import LandmarkStoryScreen from "./Pages/LandmarkStoryScreen";
 import ChatScreen from "./Pages/ChatScreen";
+import ScreenFade from "./components/Layout/ScreenFade";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -72,11 +73,46 @@ function MainTabs() {
       tabBar={(props) => <TabBarAdapter {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="LiveRunningScreen" component={LiveRunningScreen} />
-      <Tab.Screen name="Feed" component={Feed2} />
-      <Tab.Screen name="Record" component={Record} />
-      <Tab.Screen name="Crew" component={CrewScreen} />
-      <Tab.Screen name="Profile" component={Profile} />
+      <Tab.Screen
+        name="LiveRunningScreen"
+        children={() => (
+          <ScreenFade duration={340} scaleFrom={0.988} translateYFrom={10}>
+            <LiveRunningScreen />
+          </ScreenFade>
+        )}
+      />
+      <Tab.Screen
+        name="Feed"
+        children={() => (
+          <ScreenFade duration={340} scaleFrom={0.988} translateYFrom={10}>
+            <Feed2 />
+          </ScreenFade>
+        )}
+      />
+      <Tab.Screen
+        name="Record"
+        children={() => (
+          <ScreenFade duration={340} scaleFrom={0.988} translateYFrom={10}>
+            <Record />
+          </ScreenFade>
+        )}
+      />
+      <Tab.Screen
+        name="Crew"
+        children={() => (
+          <ScreenFade duration={340} scaleFrom={0.988} translateYFrom={10}>
+            <CrewScreen />
+          </ScreenFade>
+        )}
+      />
+      <Tab.Screen
+        name="Profile"
+        children={() => (
+          <ScreenFade duration={340} scaleFrom={0.988} translateYFrom={10}>
+            <Profile />
+          </ScreenFade>
+        )}
+      />
     </Tab.Navigator>
   );
 }
@@ -155,6 +191,8 @@ export default function App() {
                 gestureEnabled: true,
                 gestureDirection: "horizontal",
                 cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                animationEnabled: true,
+                animationTypeForReplace: "pop",
                 transitionSpec: {
                   open: TransitionSpecs.TransitionIOSSpec,
                   close: TransitionSpecs.TransitionIOSSpec,

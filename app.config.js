@@ -23,6 +23,10 @@ export default {
       bundleIdentifier: "com.waytoearth", // ???�수 추�?
       supportsTablet: true,
       config: { googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY },
+      infoPlist: {
+        NSPhotoLibraryUsageDescription: "WayToEarth가 사진을 업로드하기 위해 갤러리 접근 권한이 필요합니다.",
+        NSCameraUsageDescription: "WayToEarth가 사진을 촬영하기 위해 카메라 접근 권한이 필요합니다.",
+      },
     },
 
     android: {
@@ -36,6 +40,10 @@ export default {
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION",
         "POST_NOTIFICATIONS",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES",
+        "CAMERA",
       ],
       config: { googleMaps: { apiKey: process.env.GOOGLE_MAPS_API_KEY } },
       adaptiveIcon: {
@@ -43,6 +51,8 @@ export default {
         backgroundColor: "#ffffff",
       },
       edgeToEdgeEnabled: true,
+      // KakaoTalk-like keyboard behavior: pan content smoothly instead of overlay
+      softwareKeyboardLayoutMode: "pan",
     },
 
     web: { favicon: "./assets/favicon.png" },
@@ -64,6 +74,13 @@ export default {
       ],
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
+      [
+        "expo-image-picker",
+        {
+          photosPermission: "WayToEarth가 사진을 업로드하기 위해 갤러리 접근 권한이 필요합니다.",
+          cameraPermission: "WayToEarth가 사진을 촬영하기 위해 카메라 접근 권한이 필요합니다.",
+        },
+      ],
     ],
 
     extra: {

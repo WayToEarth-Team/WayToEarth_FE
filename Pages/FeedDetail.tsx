@@ -8,8 +8,8 @@ import { deleteFeed as apiDeleteFeed } from "../utils/api/feeds";
 const { width } = Dimensions.get("window");
 // 공용 client를 사용해 HTTPS 및 JWT 자동 처리를 일원화합니다.
 
-export default function FeedDetail({ route, navigation }: any) {
-  const { feed } = route.params;
+export default function FeedDetail({ route, navigation }: any = { route: { params: {} } }) {
+  const { feed } = route?.params || {} as any;
   const [me, setMe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState<{ open:boolean; title?:string; message?:string; kind?:'positive'|'negative'|'message' }>({ open:false, kind:'message' });

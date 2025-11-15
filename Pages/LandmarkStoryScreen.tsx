@@ -1,7 +1,7 @@
 // Pages/LandmarkStoryScreen.tsx
-// 랜드마크 스토리 상세 페이지
+// 랜드마크 스토리 상세 페이지 - 프리미엄 디자인 (HTML 완전 동일)
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,8 +14,11 @@ import {
   Modal,
   Pressable,
   TextInput,
+  StatusBar,
+  Dimensions,
+  Animated,
 } from 'react-native';
-import SafeLayout from '../components/Layout/SafeLayout';
+import { LinearGradient } from 'expo-linear-gradient';
 import StoryCard from '../components/Landmark/StoryCard';
 import StoryTypeTabs from '../components/Landmark/StoryTypeTabs';
 import GuestbookCreateModal from '../components/Guestbook/GuestbookCreateModal';
@@ -24,24 +27,24 @@ import GalleryManager from '../components/Landmark/GalleryManager';
 import { getLandmarkDetail } from '../utils/api/landmarks';
 import { getMyProfile } from '../utils/api/users';
 import { presignLandmarkImage, presignStoryImage, updateLandmarkImage, updateStoryImage, uploadToS3, guessImageMime, createStoryCard, updateStoryCard, deleteStoryCard } from '../utils/api/admin';
-import type { StoryCardCreateRequest } from '../utils/api/admin';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import type { LandmarkDetail, StoryType } from '../types/landmark';
-import type { LandmarkSummary } from '../types/guestbook';
 
 type RouteParams = {
-  route: {
+  route?: {
     params?: {
       landmarkId: number;
       userId?: number;
     };
   };
-  navigation: any;
+  navigation?: any;
 };
 
-export default function LandmarkStoryScreen({ route, navigation }: RouteParams) {
-  const params = route.params || {};
+const { width, height } = Dimensions.get('window');
+
+export default function LandmarkStoryScreen({ route, navigation }: RouteParams = {}) {
+  const params = route?.params || {};
   const landmarkId = params.landmarkId;
   const userId = params.userId;
 
@@ -52,6 +55,7 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
   const [guestbookModalVisible, setGuestbookModalVisible] = useState(false);
   const [bottomSheetVisible, setBottomSheetVisible] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [forceUserView, setForceUserView] = useState(false);
   const [journeyIdInput, setJourneyIdInput] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -59,8 +63,28 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
   const [newStoryContent, setNewStoryContent] = useState('');
   const [newStoryType, setNewStoryType] = useState<StoryType>('HISTORY');
 
-  // 랜드마크 상세 정보 로드
+  // HTML fadeInUp 애니메이션 (순차적 등장)
+  const heroFadeAnim = useRef(new Animated.Value(0)).current;
+  const heroSlideAnim = useRef(new Animated.Value(30)).current;
+  const tabsFadeAnim = useRef(new Animated.Value(0)).current;
+  const tabsSlideAnim = useRef(new Animated.Value(20)).current;
+  const contentFadeAnim = useRef(new Animated.Value(0)).current;
+  const contentSlideAnim = useRef(new Animated.Value(20)).current;
+
+  // landmarkId 변경 시 즉시 로딩 상태로 전환 + 애니메이션 리셋
   useEffect(() => {
+    setLoading(true);
+    setLandmark(null);
+    setError(null);
+
+    // 페이드 애니메이션 값 리셋
+    heroFadeAnim.setValue(0);
+    heroSlideAnim.setValue(30);
+    tabsFadeAnim.setValue(0);
+    tabsSlideAnim.setValue(20);
+    contentFadeAnim.setValue(0);
+    contentSlideAnim.setValue(20);
+
     loadLandmarkDetail();
   }, [landmarkId, userId]);
 
@@ -68,17 +92,64 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
     (async () => {
       try {
         const me = await getMyProfile();
-        console.log('[LandmarkStory] 사용자 정보:', me);
-        console.log('[LandmarkStory] role 값:', me?.role);
         const adminCheck = String(me?.role || '').toUpperCase() === 'ADMIN';
-        console.log('[LandmarkStory] isAdmin:', adminCheck);
         setIsAdmin(adminCheck);
       } catch (error) {
-        console.log('[LandmarkStory] 권한 확인 실패:', error);
         setIsAdmin(false);
       }
     })();
   }, []);
+
+  // 위에서 아래로 순차적 애니메이션 (자연스러운 등장)
+  useEffect(() => {
+    if (landmark) {
+      // 1. Hero (즉시 시작)
+      Animated.parallel([
+        Animated.timing(heroFadeAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(heroSlideAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // 2. Tabs (150ms 후)
+      Animated.parallel([
+        Animated.timing(tabsFadeAnim, {
+          toValue: 1,
+          duration: 500,
+          delay: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(tabsSlideAnim, {
+          toValue: 0,
+          duration: 500,
+          delay: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // 3. Content (300ms 후)
+      Animated.parallel([
+        Animated.timing(contentFadeAnim, {
+          toValue: 1,
+          duration: 500,
+          delay: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentSlideAnim, {
+          toValue: 0,
+          duration: 500,
+          delay: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [landmark]);
 
   const loadLandmarkDetail = async () => {
     if (!landmarkId) {
@@ -87,29 +158,39 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
       return;
     }
 
+    const startTime = Date.now();
+    const MIN_LOADING_TIME = 2000; // 최소 2초 로딩
+
     try {
       setLoading(true);
       setError(null);
       const data = await getLandmarkDetail(landmarkId, userId);
 
-      // 백엔드가 images를 문자열 배열로 보내는 경우 GalleryImage[] 형태로 변환
+      console.log('[LandmarkStoryScreen] 백엔드 응답 원본:', JSON.stringify({
+        landmarkImages: data.images,
+        firstStoryImages: data.storyCards?.[0]?.images
+      }, null, 2));
+
       if (data.images && Array.isArray(data.images)) {
         data.images = data.images.map((img: any, idx: number) => {
           if (typeof img === 'string') {
+            console.warn('[LandmarkStoryScreen] ⚠️ 랜드마크 이미지가 문자열로 옴:', img);
             return { id: -(idx + 1), imageUrl: img, orderIndex: idx };
           }
+          console.log('[LandmarkStoryScreen] ✅ 랜드마크 이미지 객체:', img);
           return img;
         });
       }
 
-      // storyCards의 images도 동일하게 변환
       if (data.storyCards && Array.isArray(data.storyCards)) {
         data.storyCards = data.storyCards.map((story: any) => {
           if (story.images && Array.isArray(story.images)) {
             story.images = story.images.map((img: any, idx: number) => {
               if (typeof img === 'string') {
+                console.warn(`[LandmarkStoryScreen] ⚠️ 스토리 ${story.id} 이미지가 문자열로 옴:`, img);
                 return { id: -(idx + 1), imageUrl: img, orderIndex: idx };
               }
+              console.log(`[LandmarkStoryScreen] ✅ 스토리 ${story.id} 이미지 객체:`, img);
               return img;
             });
           }
@@ -117,11 +198,25 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
         });
       }
 
-      console.log('[LandmarkStoryScreen] 랜드마크 데이터:', data);
-      console.log('[LandmarkStoryScreen] 갤러리 이미지:', data.images);
+      // 최소 로딩 시간 보장 (부드러운 UX)
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = MIN_LOADING_TIME - elapsedTime;
+
+      if (remainingTime > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingTime));
+      }
+
       setLandmark(data);
     } catch (err: any) {
       console.error('[LandmarkStoryScreen] 랜드마크 로드 실패:', err);
+
+      // 에러 시에도 최소 로딩 시간 보장
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = MIN_LOADING_TIME - elapsedTime;
+      if (remainingTime > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingTime));
+      }
+
       setError(err?.response?.data?.message || '랜드마크 정보를 불러올 수 없습니다.');
       Alert.alert('오류', '랜드마크 정보를 불러올 수 없습니다.');
     } finally {
@@ -129,14 +224,19 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
     }
   };
 
-  // 스토리 타입 필터링
+  const showAdminView = isAdmin && !forceUserView;
+
   const filteredStories = landmark?.storyCards.filter((story) => {
     if (selectedType === null) return true;
     return story.type === selectedType;
   }) || [];
 
   const pickImage = async (): Promise<{ uri: string; mime: string; size: number } | null> => {
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.9 });
+    const res = await ImagePicker.launchImageLibraryAsync({ 
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, 
+      allowsEditing: true, 
+      quality: 0.9 
+    });
     if (res.canceled) return null;
     const asset = res.assets[0];
     const uri = asset.uri;
@@ -182,7 +282,6 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
       const jid = ensureJourneyId();
       if (!jid) return;
 
-      // 현재 스토리 찾기
       const currentStory = landmark?.storyCards.find(s => s.id === storyId);
       if (!currentStory) {
         return Alert.alert('오류', '스토리를 찾을 수 없습니다.');
@@ -194,7 +293,6 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
       const presign = await presignStoryImage({ journeyId: jid, landmarkId, storyId, contentType: sel.mime, size: sel.size });
       await uploadToS3(presign.upload_url, sel.uri, sel.mime);
 
-      // 백엔드 스펙: 모든 필드 필수 (title, content, type, orderIndex)
       await updateStoryCard(storyId, {
         title: currentStory.title,
         content: currentStory.content,
@@ -268,22 +366,20 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
     );
   };
 
-  // 로딩 중 표시
+  // 깔끔한 로딩 스크린 (iOS 스타일)
   if (loading) {
     return (
-      <SafeLayout>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#6366F1" />
-          <Text style={styles.loadingText}>불러오는 중...</Text>
-        </View>
-      </SafeLayout>
+      <View style={styles.loadingScreen}>
+        <StatusBar barStyle="dark-content" />
+        <ActivityIndicator size="large" color="#667eea" />
+        <Text style={styles.loadingText}>로딩 중</Text>
+      </View>
     );
   }
 
-  // 에러 발생 시
   if (error || !landmark) {
     return (
-      <SafeLayout>
+      <View style={styles.container}>
         <View style={styles.centerContainer}>
           <Text style={styles.errorIcon}>⚠️</Text>
           <Text style={styles.errorText}>{error || '랜드마크를 찾을 수 없습니다.'}</Text>
@@ -291,17 +387,15 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
             <Text style={styles.retryButtonText}>다시 시도</Text>
           </TouchableOpacity>
         </View>
-      </SafeLayout>
+      </View>
     );
   }
 
-  // 방명록 작성 모달 열기
   const handleOpenGuestbook = () => {
     setBottomSheetVisible(false);
     setGuestbookModalVisible(true);
   };
 
-  // 방명록 목록 보기
   const handleViewGuestbooks = () => {
     setBottomSheetVisible(false);
     navigation.navigate('LandmarkGuestbookScreen', {
@@ -311,10 +405,41 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
   };
 
   return (
-    <SafeLayout>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {/* 랜드마크 헤더 */}
-        <View style={styles.header}>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+      >
+        {/* HTML: .hero-header */}
+        <View style={styles.heroHeader}>
+          {landmark.imageUrl ? (
+            <Image
+              source={{ uri: landmark.imageUrl }}
+              style={styles.heroBg}
+              resizeMode="cover"
+            />
+          ) : (
+            <LinearGradient
+              colors={['#667eea', '#764ba2']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroBg}
+            >
+              <Text style={styles.heroPlaceholderText}>🏛️</Text>
+            </LinearGradient>
+          )}
+
+          {/* HTML: .hero-overlay */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={styles.heroOverlay}
+          />
+
           {/* 뒤로가기 버튼 */}
           <TouchableOpacity
             style={styles.backButton}
@@ -323,7 +448,7 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
             <Text style={styles.backButtonText}>‹</Text>
           </TouchableOpacity>
 
-          {/* 메뉴 버튼 (방명록, 통계) */}
+          {/* 메뉴 버튼 */}
           <TouchableOpacity
             style={styles.menuButton}
             onPress={() => setBottomSheetVisible(true)}
@@ -331,106 +456,115 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
             <Text style={styles.menuButtonText}>⋯</Text>
           </TouchableOpacity>
 
-          {/* 랜드마크 이미지 */}
-          {landmark.imageUrl ? (
-            <Image
-              source={{ uri: landmark.imageUrl }}
-              style={styles.headerImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={[styles.headerImage, styles.headerImagePlaceholder]}>
-              <Text style={styles.headerImagePlaceholderText}>🏛️</Text>
+          {/* HTML: .hero-content */}
+          <Animated.View
+            style={[
+              styles.heroContent,
+              {
+                opacity: heroFadeAnim,
+                transform: [{ translateY: heroSlideAnim }]
+              }
+            ]}
+          >
+            {landmark.hasStamp && (
+              <View style={styles.stampBadge}>
+                <Text style={styles.stampBadgeText}>✓ 스탬프 획득</Text>
+              </View>
+            )}
+            <Text style={styles.heroTitle}>{landmark.name}</Text>
+            <Text style={styles.heroDescription}>{landmark.description}</Text>
+            <Text style={styles.heroDistance}>
+              {(landmark.distanceFromStart / 1000).toFixed(1)}km 지점
+            </Text>
+          </Animated.View>
+        </View>
+
+        {/* HTML: .tabs-container */}
+        <Animated.View
+          style={[
+            styles.tabsContainer,
+            {
+              opacity: tabsFadeAnim,
+              transform: [{ translateY: tabsSlideAnim }]
+            }
+          ]}
+        >
+          <StoryTypeTabs
+            selectedType={selectedType}
+            onSelectType={setSelectedType}
+          />
+        </Animated.View>
+
+        {/* 콘텐츠 영역 전체 (순차적 등장) */}
+        <Animated.View
+          style={{
+            opacity: contentFadeAnim,
+            transform: [{ translateY: contentSlideAnim }]
+          }}
+        >
+          {/* 관리자 패널 */}
+          {showAdminView && (
+            <View style={styles.adminPanel}>
+              <Text style={styles.adminTitle}>관리자 이미지 업로드</Text>
+              <TextInput
+                style={styles.adminInput}
+                placeholder="여정 ID"
+                keyboardType="number-pad"
+                value={journeyIdInput}
+                onChangeText={setJourneyIdInput}
+                placeholderTextColor="#92400E"
+              />
+              <TouchableOpacity
+                style={[styles.adminBtn, uploading && { opacity: 0.6 }]}
+                disabled={uploading}
+                onPress={handleUploadLandmarkImage}
+              >
+                <Text style={styles.adminBtnText}>
+                  {uploading ? '업로드 중…' : '랜드마크 커버 이미지 업로드'}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.adminHelp}>커버 이미지는 랜드마크 대표 이미지입니다.</Text>
+
+              {journeyIdInput && Number(journeyIdInput) > 0 && (
+                <GalleryManager
+                  type="landmark"
+                  targetId={landmarkId}
+                  journeyId={Number(journeyIdInput)}
+                  landmarkId={landmarkId}
+                  images={landmark?.images || []}
+                  onRefresh={loadLandmarkDetail}
+                  isAdmin={showAdminView}
+                />
+              )}
             </View>
           )}
 
-          {/* 랜드마크 기본 정보 */}
-          <View style={styles.headerInfo}>
-            <View style={styles.headerTop}>
-              <Text style={styles.headerTitle}>{landmark.name}</Text>
-              {landmark.hasStamp && (
-                <View style={styles.stampBadge}>
-                  <Text style={styles.stampBadgeText}>✓ 스탬프 획득</Text>
-                </View>
-              )}
-            </View>
-
-            <Text style={styles.headerDescription}>{landmark.description}</Text>
-
-            <View style={styles.headerDetails}>
-              <View style={styles.headerDetailItem}>
-                <Text style={styles.headerDetailLabel}>위치</Text>
-                <Text style={styles.headerDetailValue}>
-                  {landmark.cityName}, {landmark.countryCode}
-                </Text>
-              </View>
-              <View style={styles.headerDetailItem}>
-                <Text style={styles.headerDetailLabel}>거리</Text>
-                <Text style={styles.headerDetailValue}>
-                  {(landmark.distanceFromStart / 1000).toFixed(1)} km 지점
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* 스토리 타입 필터 탭 */}
-        <StoryTypeTabs
-          selectedType={selectedType}
-          onSelectType={setSelectedType}
-        />
-
-        {isAdmin && (
-          <View style={styles.adminPanel}>
-            <Text style={styles.adminTitle}>관리자 이미지 업로드</Text>
-            <TextInput
-              style={styles.adminInput}
-              placeholder="여정 ID"
-              keyboardType="number-pad"
-              value={journeyIdInput}
-              onChangeText={setJourneyIdInput}
-            />
-            <TouchableOpacity style={[styles.adminBtn, uploading && { opacity: 0.6 }]} disabled={uploading} onPress={handleUploadLandmarkImage}>
-              <Text style={styles.adminBtnText}>{uploading ? '업로드 중…' : '랜드마크 커버 이미지 업로드'}</Text>
-            </TouchableOpacity>
-            <Text style={styles.adminHelp}>커버 이미지는 랜드마크 대표 이미지입니다.</Text>
-
-            {/* 랜드마크 갤러리 관리 */}
-            {journeyIdInput && Number(journeyIdInput) > 0 && (
-              <GalleryManager
-                type="landmark"
-                targetId={landmarkId}
-                journeyId={Number(journeyIdInput)}
-                landmarkId={landmarkId}
-                images={landmark?.images || []}
-                onRefresh={loadLandmarkDetail}
-                isAdmin={isAdmin}
-              />
-            )}
-          </View>
-        )}
-
-        {/* 스토리 카드 목록 */}
-        <View style={styles.storiesContainer}>
-          {isAdmin && (
+          {/* HTML: .content-section */}
+          <View style={styles.contentSection}>
+          {showAdminView && (
             <TouchableOpacity
               style={styles.createStoryBtn}
               onPress={() => setCreateModalVisible(true)}
               disabled={uploading}
             >
-              <Text style={styles.createStoryBtnText}>+ 새 스토리 추가</Text>
+              <LinearGradient
+                colors={['#667eea', '#764ba2']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.createStoryGradient}
+              >
+                <Text style={styles.createStoryText}>+ 새 스토리 추가</Text>
+              </LinearGradient>
             </TouchableOpacity>
           )}
+
           {filteredStories.length > 0 ? (
             <>
-              <Text style={styles.storiesTitle}>
-                {selectedType ? `${filteredStories.length}개의 스토리` : `전체 ${filteredStories.length}개의 스토리`}
-              </Text>
               {filteredStories.map((story) => (
                 <StoryCard
                   key={story.id}
                   story={story}
-                  isAdmin={isAdmin}
+                  isAdmin={showAdminView}
                   journeyId={journeyIdInput ? Number(journeyIdInput) : undefined}
                   landmarkId={landmarkId}
                   onUploadImage={handleUploadStoryImage}
@@ -448,9 +582,34 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
             </View>
           )}
         </View>
+        </Animated.View>
       </ScrollView>
 
-      {/* 방명록 작성 모달 */}
+      {/* HTML: .floating-actions */}
+      <View style={styles.floatingActions}>
+        <TouchableOpacity
+          style={styles.guestbookBtn}
+          onPress={() => setGuestbookModalVisible(true)}
+        >
+          <LinearGradient
+            colors={['#667eea', '#764ba2']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.guestbookGradient}
+          >
+            <Text style={styles.guestbookText}>📝 방명록 작성하기</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.viewAllBtn}
+          onPress={handleViewGuestbooks}
+        >
+          <Text style={styles.viewAllText}>📖 전체 보기</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 방명록 모달 */}
       {landmark && (
         <GuestbookCreateModal
           visible={guestbookModalVisible}
@@ -464,13 +623,12 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
           }}
           userId={userId || 1}
           onSuccess={() => {
-            console.log('[LandmarkStoryScreen] 방명록 작성 완료');
             setGuestbookModalVisible(false);
           }}
         />
       )}
 
-      {/* 바텀시트 (통계 및 메뉴) */}
+      {/* 바텀시트 */}
       <Modal
         visible={bottomSheetVisible}
         transparent
@@ -493,12 +651,10 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
                   </Text>
                 </View>
 
-                {/* 랜드마크 통계 */}
                 <View style={styles.statisticsContainer}>
                   <LandmarkStatistics landmarkId={landmark.id} />
                 </View>
 
-                {/* 메뉴 옵션 */}
                 <View style={styles.menuOptions}>
                   <TouchableOpacity
                     style={styles.menuOption}
@@ -598,22 +754,33 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams) 
                 onPress={handleCreateStory}
                 disabled={uploading}
               >
-                <Text style={styles.createModalSubmitText}>
-                  {uploading ? '생성 중…' : '스토리 생성'}
-                </Text>
+                <LinearGradient
+                  colors={['#667eea', '#764ba2']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.createModalSubmitGradient}
+                >
+                  <Text style={styles.createModalSubmitText}>
+                    {uploading ? '생성 중…' : '스토리 생성'}
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
             </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
-    </SafeLayout>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // HTML: body background
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#f5f7fa', // HTML gradient start color approximation
+  },
+  scrollView: {
+    flex: 1,
   },
   centerContainer: {
     flex: 1,
@@ -621,10 +788,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 32,
   },
+  // 깔끔한 로딩 스크린
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   loadingText: {
-    marginTop: 12,
+    marginTop: 16,
     fontSize: 14,
-    color: '#6B7280',
+    fontWeight: '400',
+    color: '#999999',
+    letterSpacing: 0.5,
   },
   errorIcon: {
     fontSize: 48,
@@ -637,174 +813,302 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: '#6366F1',
+    backgroundColor: '#667eea',
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   retryButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
   },
-  header: {
-    backgroundColor: '#fff',
-    marginBottom: 8,
+
+  // HTML: .hero-header
+  heroHeader: {
+    position: 'relative',
+    height: 420,
+    shadowColor: 'rgba(102, 126, 234, 0.3)',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 1,
+    shadowRadius: 60,
+    elevation: 10,
   },
+
+  // HTML: .hero-bg
+  heroBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+  },
+  heroPlaceholderText: {
+    fontSize: 80,
+    alignSelf: 'center',
+    marginTop: 170,
+  },
+
+  // HTML: .hero-overlay
+  heroOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+  },
+
+  // 버튼들
   backButton: {
     position: 'absolute',
-    top: 16,
+    top: 48,
     left: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
   },
   backButtonText: {
-    fontSize: 28,
-    color: '#111827',
-    fontWeight: '700',
-    marginTop: -2,
+    fontSize: 38,
+    color: '#FFFFFF',
+    fontWeight: '300',
+    marginTop: -6,
   },
   menuButton: {
     position: 'absolute',
-    top: 16,
+    top: 48,
     right: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
   },
   menuButtonText: {
     fontSize: 24,
-    color: '#111827',
+    color: '#FFFFFF',
     fontWeight: '700',
   },
-  headerImage: {
-    width: '100%',
-    height: 240,
-    backgroundColor: '#F3F4F6',
+
+  // HTML: .hero-content
+  heroContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 24,
+    paddingBottom: 40,
+    zIndex: 2,
   },
-  headerImagePlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerImagePlaceholderText: {
-    fontSize: 64,
-  },
-  headerInfo: {
-    padding: 20,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#111827',
-    flex: 1,
-  },
+
+  // HTML: .stamp-badge
   stampBadge: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginLeft: 12,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(16, 185, 129, 0.95)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 16,
+    shadowColor: 'rgba(16, 185, 129, 0.4)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 4,
   },
   stampBadgeText: {
-    color: '#fff',
-    fontSize: 12,
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '700',
   },
-  headerDescription: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#6B7280',
+
+  // HTML: .hero-title
+  heroTitle: {
+    fontSize: 42,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    marginBottom: 12,
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 20,
+    letterSpacing: -0.5,
+  },
+
+  // HTML: .hero-description
+  heroDescription: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.95)',
+    marginBottom: 8,
+    lineHeight: 25.6, // 1.6 * 16
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+
+  // HTML: .hero-distance
+  heroDistance: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontWeight: '600',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+
+  // HTML: .tabs-container
+  tabsContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 30,
+    elevation: 8,
+  },
+
+  // 관리자 패널
+  adminPanel: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 16,
+    padding: 20,
+    marginHorizontal: 20,
+    marginTop: 16,
     marginBottom: 16,
   },
-  headerDetails: {
-    flexDirection: 'row',
-    gap: 24,
-  },
-  headerDetailItem: {
-    flex: 1,
-  },
-  headerDetailLabel: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginBottom: 4,
-    fontWeight: '600',
-  },
-  headerDetailValue: {
+  adminTitle: {
     fontSize: 14,
-    color: '#111827',
-    fontWeight: '700',
+    fontWeight: '800',
+    color: '#92400E',
+    marginBottom: 12,
   },
-  storiesContainer: {
-    padding: 16,
-  },
-  adminPanel: {
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    padding: 12,
-    marginHorizontal: 16,
-    marginBottom: 8,
-  },
-  adminTitle: { fontSize: 14, fontWeight: '800', color: '#111827', marginBottom: 8 },
   adminInput: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: '#fff',
+    borderColor: '#FDE68A',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 12,
+    fontSize: 14,
+    color: '#92400E',
+  },
+  adminBtn: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 10,
     marginBottom: 8,
   },
-  adminBtn: { alignSelf: 'flex-start', backgroundColor: '#111827', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8 },
-  adminBtnText: { color: '#fff', fontWeight: '800' },
-  adminHelp: { marginTop: 6, fontSize: 12, color: '#6B7280' },
-  storiesTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 16,
+  adminBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    textAlign: 'center',
   },
+  adminHelp: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#92400E',
+  },
+
+  // HTML: .content-section
+  contentSection: {
+    paddingTop: 32,
+    paddingBottom: 100,
+  },
+
+  // 스토리 생성 버튼
+  createStoryBtn: {
+    marginHorizontal: 20,
+    marginBottom: 24,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  createStoryGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  createStoryText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  // Empty
   emptyContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: 80,
   },
   emptyIcon: {
-    fontSize: 48,
+    fontSize: 64,
     marginBottom: 16,
+    opacity: 0.4,
   },
   emptyText: {
     fontSize: 15,
     color: '#9CA3AF',
-    textAlign: 'center',
   },
-  // 바텀시트 스타일
+
+  // HTML: .floating-actions
+  floatingActions: {
+    position: 'absolute',
+    bottom: 24,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    gap: 12,
+    zIndex: 100,
+  },
+
+  // HTML: .guestbook-btn
+  guestbookBtn: {
+    flex: 1,
+    borderRadius: 30,
+    overflow: 'hidden',
+    shadowColor: 'rgba(102, 126, 234, 0.4)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 1,
+    shadowRadius: 32,
+    elevation: 8,
+  },
+  guestbookGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+  },
+  guestbookText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+
+  // HTML: .view-all-btn
+  viewAllBtn: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 30,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderWidth: 2,
+    borderColor: '#6366f1',
+    shadowColor: 'rgba(99, 102, 241, 0.2)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  viewAllText: {
+    color: '#6366f1',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+
+  // 모달들
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -871,21 +1175,8 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     marginTop: 8,
   },
-  // 스토리 생성 버튼
-  createStoryBtn: {
-    backgroundColor: '#6366F1',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-    alignItems: 'center',
-  },
-  createStoryBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  // 스토리 생성 모달
+
+  // 생성 모달
   createModal: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 24,
@@ -926,7 +1217,7 @@ const styles = StyleSheet.create({
   createModalInput: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
@@ -945,15 +1236,15 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     backgroundColor: '#F9FAFB',
     alignItems: 'center',
   },
   typeButtonActive: {
-    backgroundColor: '#6366F1',
-    borderColor: '#6366F1',
+    backgroundColor: '#667eea',
+    borderColor: '#667eea',
   },
   typeButtonText: {
     fontSize: 12,
@@ -964,12 +1255,14 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   createModalSubmit: {
-    backgroundColor: '#6366F1',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
     marginTop: 24,
     marginBottom: 20,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  createModalSubmitGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
   },
   createModalSubmitText: {
     color: '#fff',

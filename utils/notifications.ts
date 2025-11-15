@@ -1,29 +1,20 @@
 // utils/notifications.ts
 import { Platform, PermissionsAndroid } from "react-native";
-// Lazy-load Firebase messaging and app to avoid crashes when Firebase
-// is not configured (e.g., missing google-services or running in Expo Go)
-let messaging: any | null = null;
-let firebaseAppMod: any | null = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const mod = require("@react-native-firebase/messaging");
-  messaging = mod?.default ?? mod;
-} catch {}
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  firebaseAppMod = require("@react-native-firebase/app");
-} catch {}
+import firebase from "@react-native-firebase/app";
+import messaging from "@react-native-firebase/messaging";
+
+// Create messaging instance once
+const messagingInstance = messaging();
 
 function hasFirebaseDefaultApp(): boolean {
   try {
-    if (!firebaseAppMod) return false;
-    // apps(): RNFirebase returns list of initialized apps
-    const apps = typeof firebaseAppMod.apps === 'function' ? firebaseAppMod.apps() : [];
-    if (Array.isArray(apps) && apps.length > 0) return true;
-    // app(): throws if no default app
-    if (typeof firebaseAppMod.app === 'function') { firebaseAppMod.app(); return true; }
-  } catch {}
-  return false;
+    // Use modular API (v22+)
+    const apps = firebase.apps || [];
+    return Array.isArray(apps) && apps.length > 0;
+  } catch (e) {
+    if (__DEV__) console.warn('[Firebase] Error checking default app:', e);
+    return false;
+  }
 }
 // Lazy-load Notifee to avoid crashes on Expo Go or environments
 // where the native module is not installed. Use dev client/prebuilt
@@ -63,11 +54,11 @@ export async function registerForPushNotificationsAsync() {
     }
 
     // 2. Firebase 권한 요청 (iOS용)
-    if (!messaging || !hasFirebaseDefaultApp()) {
+    if (!messagingInstance || !hasFirebaseDefaultApp()) {
       if (__DEV__) console.warn("[firebase] messaging unavailable or default app not initialized");
       return null;
     }
-    const authStatus = await messaging().requestPermission();
+    const authStatus = await messagingInstance.requestPermission();
     const enabled =
       authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
       authStatus === messaging.AuthorizationStatus.PROVISIONAL;
@@ -92,7 +83,7 @@ export async function registerForPushNotificationsAsync() {
     }
 
     // 4. Firebase FCM 토큰 발급
-    const token = await messaging().getToken();
+    const token = await messagingInstance.getToken();
 
     if (__DEV__) console.log("✅ Firebase FCM Token:", token);
     return token;
@@ -141,7 +132,7 @@ export async function deactivateToken() {
     await client.delete(`/v1/notifications/fcm-token/${deviceId}`);
 
     // Firebase 토큰 삭제
-    await messaging().deleteToken();
+    await messagingInstance.deleteToken();
 
     if (__DEV__) console.log("✅ FCM 토큰 비활성화 성공");
   } catch (error: any) {
@@ -159,11 +150,11 @@ export async function deactivateToken() {
  */
 export function setupNotificationListeners() {
   // 1. 포그라운드 메시지 수신 (앱이 켜져 있을 때)
-  if (!messaging || !hasFirebaseDefaultApp()) {
+  if (!messagingInstance || !hasFirebaseDefaultApp()) {
     // Return no-op cleanup if messaging is unavailable
     return () => {};
   }
-  const unsubscribeForeground = messaging().onMessage(async (remoteMessage: any) => {
+  const unsubscribeForeground = messagingInstance.onMessage(async (remoteMessage: any) => {
     if (__DEV__) console.log("📩 포그라운드 알림 수신:", remoteMessage);
 
     // Notifee로 로컬 알림 표시
@@ -188,7 +179,7 @@ export function setupNotificationListeners() {
   });
 
   // 2. 알림 탭 이벤트 (앱이 백그라운드/종료 상태에서 알림 탭)
-  const unsubscribeNotificationOpened = messaging().onNotificationOpenedApp(
+  const unsubscribeNotificationOpened = messagingInstance.onNotificationOpenedApp(
     (remoteMessage: any) => {
       if (__DEV__) console.log("📱 알림 탭으로 앱 열림:", remoteMessage);
       // 필요한 화면으로 네비게이션
@@ -197,7 +188,7 @@ export function setupNotificationListeners() {
   );
 
   // 3. 앱이 종료된 상태에서 알림을 탭해서 열었는지 확인
-  messaging()
+  messagingInstance
     .getInitialNotification()
     .then((remoteMessage: any) => {
       if (remoteMessage) {
@@ -236,10 +227,10 @@ export function setupNotificationListeners() {
  * FCM 토큰 갱신 리스너
  */
 export function setupTokenRefreshListener() {
-  if (!messaging || !hasFirebaseDefaultApp()) {
+  if (!messagingInstance || !hasFirebaseDefaultApp()) {
     return () => {};
   }
-  return messaging().onTokenRefresh(async (newToken: string) => {
+  return messagingInstance.onTokenRefresh(async (newToken: string) => {
     if (__DEV__) console.log("🔄 FCM 토큰 갱신됨:", newToken);
     await sendTokenToServer(newToken);
   });
@@ -250,8 +241,8 @@ export function setupTokenRefreshListener() {
  * index.js 최상단에서 호출해야 함
  */
 export function setupBackgroundMessageHandler() {
-  if (!messaging || !hasFirebaseDefaultApp()) return;
-  messaging().setBackgroundMessageHandler(async (remoteMessage: any) => {
+  if (!messagingInstance || !hasFirebaseDefaultApp()) return;
+  messagingInstance.setBackgroundMessageHandler(async (remoteMessage: any) => {
     if (__DEV__) console.log("📬 백그라운드 메시지 수신:", remoteMessage);
 
     // 백그라운드에서도 Notifee로 알림 표시

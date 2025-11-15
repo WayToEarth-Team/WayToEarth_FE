@@ -6,9 +6,9 @@ import { getJourneyLandmarks } from '../utils/api/landmarks';
 import type { LandmarkSummary as JourneyLandmark } from '../types/landmark';
 import ImageCarousel from '../components/Common/ImageCarousel';
 
-type RouteParams = { route: { params?: { id?: RouteId } } ; navigation?: any };
+type RouteParams = { route?: { params?: { id?: RouteId } } ; navigation?: any };
 
-export default function RouteDetailScreen({ route, navigation }: RouteParams) {
+export default function RouteDetailScreen({ route, navigation }: RouteParams = {}) {
   const id = route?.params?.id;
   const { data, loading } = useRouteDetail(id);
   const [showLandmarks, setShowLandmarks] = useState(false);
@@ -369,8 +369,29 @@ export default function RouteDetailScreen({ route, navigation }: RouteParams) {
                   { latitude: 37.5605, longitude: 126.9753 },
                 ],
               };
+              const totalDistanceKm = parseFloat(data.distance.replace('Km', '').replace('km', ''));
+              const journeyData = {
+                journeyId: String(id),
+                journeyTitle: data.title,
+                totalDistanceKm,
+                landmarks: landmarkData.map((lm) => {
+                  const raw = Number(lm.distanceFromStart ?? 0);
+                  const looksLikeIntegerKm = raw > 0 && raw <= totalDistanceKm + 1 && Math.abs(raw - Math.round(raw)) < 1e-9;
+                  const meters = looksLikeIntegerKm ? raw * 1000 : raw;
+                  return {
+                    id: String(lm.id),
+                    name: lm.name,
+                    distance: `${(meters / 1000).toFixed(1)}km 지점,`,
+                    distanceM: meters,
+                    position: { latitude: lm.latitude, longitude: lm.longitude },
+                  };
+                }),
+                journeyRoute: routeData
+                  .sort((a, b) => a.sequence - b.sequence)
+                  .map((r) => ({ latitude: r.latitude, longitude: r.longitude })),
+              };
 
-              navigation?.navigate?.('JourneyRunningScreen', palaceJourney);
+              navigation?.navigate?.('JourneyRunningScreen', journeyData);
             }}
           >
             <Text style={styles.modalStartButtonText}>여정 계속하기</Text>
@@ -429,38 +450,42 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 60,
     left: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     backdropFilter: 'blur(10px)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    // 그림자 제거
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   backIcon: { color: '#FFFFFF', fontSize: 24, fontWeight: '700' },
+  // 아이콘 크기 축소
+  backIcon: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
   menuButton: {
     position: 'absolute',
     top: 60,
     right: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     backdropFilter: 'blur(10px)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    // 그림자 제거
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
-  menuIcon: { color: '#FFFFFF', fontSize: 24, fontWeight: '700' },
+  menuIcon: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
   headerContent: {
     position: 'absolute',
     bottom: 24,

@@ -3,6 +3,7 @@
 
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
 type Props = {
   progressPercent: number;
@@ -34,7 +35,10 @@ export default function JourneyProgressCard({
 
       <View style={styles.progressBarContainer}>
         <View style={styles.progressBarBg}>
-          <View
+          <LinearGradient
+            colors={["#10B981", "#34D399", "#6EE7B7"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
             style={[
               styles.progressBarFill,
               { width: `${Math.min(100, progressPercent)}%` },
@@ -70,7 +74,7 @@ export default function JourneyProgressCard({
                 style={styles.guestbookButton}
                 onPress={() => onPressGuestbook(nextLandmark.id!)}
               >
-                <Text style={styles.guestbookButtonText}>📝</Text>
+                <Text style={styles.guestbookButtonText}>📋</Text>
                 <Text style={styles.guestbookButtonLabel}>방명록</Text>
               </TouchableOpacity>
             )}
@@ -87,67 +91,75 @@ const styles = StyleSheet.create({
     top: 60,
     left: 16,
     right: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
     borderRadius: 16,
-    padding: 16,
+    padding: 12,
     shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 6,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 8,
   },
   title: {
-    fontSize: 16,
-    fontWeight: "800",
+    fontSize: 13,
+    fontWeight: "700",
     color: "#111827",
   },
   percent: {
-    fontSize: 20,
-    fontWeight: "900",
+    fontSize: 16,
+    fontWeight: "800",
     color: "#6366F1",
+    textShadowColor: "rgba(99, 102, 241, 0.3)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
   progressBarContainer: {
-    marginBottom: 16,
+    marginBottom: 10,
   },
   progressBarBg: {
-    height: 8,
+    height: 6,
     backgroundColor: "#E5E7EB",
-    borderRadius: 4,
+    borderRadius: 3,
     overflow: "hidden",
   },
   progressBarFill: {
     height: "100%",
-    backgroundColor: "#10B981",
-    borderRadius: 4,
+    borderRadius: 3,
+    shadowColor: "#10B981",
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 5,
   },
   stats: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 8,
   },
   statItem: {
     flex: 1,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: "#6B7280",
-    marginBottom: 4,
+    marginBottom: 3,
+    fontWeight: "500",
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: "700",
     color: "#111827",
   },
   nextLandmark: {
     borderTopWidth: 1,
     borderTopColor: "#E5E7EB",
-    paddingTop: 12,
+    paddingTop: 8,
   },
   nextLandmarkHeader: {
     flexDirection: "row",
@@ -155,34 +167,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   nextLandmarkLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: "#6B7280",
-    marginBottom: 4,
+    marginBottom: 3,
+    fontWeight: "500",
   },
   nextLandmarkName: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: "700",
     color: "#6366F1",
     marginBottom: 2,
   },
   nextLandmarkDistance: {
-    fontSize: 13,
+    fontSize: 11,
     color: "#4B5563",
   },
   guestbookButton: {
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#F3F4F6",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   guestbookButtonText: {
-    fontSize: 20,
+    fontSize: 18,
     marginBottom: 2,
   },
   guestbookButtonLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "600",
     color: "#6B7280",
   },

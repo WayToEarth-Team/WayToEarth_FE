@@ -1,5 +1,19 @@
 import { registerRootComponent } from "expo";
+import firebase from "@react-native-firebase/app"; // Firebase App 초기화 (messaging보다 먼저 import 필수)
 import messaging from "@react-native-firebase/messaging";
+
+// Firebase 명시적 초기화 확인 및 messaging 인스턴스 생성
+const messagingInstance = messaging();
+
+if (__DEV__) {
+  const apps = firebase.apps || [];
+  console.log("🔥 Firebase Apps:", apps.length);
+  if (apps.length > 0) {
+    console.log("🔥 Firebase initialized");
+  } else {
+    console.warn("⚠️ Firebase not initialized!");
+  }
+}
 // Lazy-load notifee so Expo Go / missing native module doesn't crash
 let notifee: any | null = null;
 let AndroidImportance: any | undefined;
@@ -20,7 +34,7 @@ import App from "./App";
 import { migrateLegacyTokens, logStorageBackendOnce } from "./utils/auth/tokenManager";
 
 // FCM 백그라운드 메시지 핸들러 (앱 시작 전 등록 필수)
-messaging().setBackgroundMessageHandler(async (remoteMessage) => {
+messagingInstance.setBackgroundMessageHandler(async (remoteMessage) => {
   console.log("📬 백그라운드 메시지 수신:", remoteMessage);
 
   // Notifee로 백그라운드 알림 표시

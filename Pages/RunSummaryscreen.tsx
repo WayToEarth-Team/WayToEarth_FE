@@ -19,7 +19,7 @@ import { apiComplete } from "../utils/api/running";
 import SummaryMap from "../components/Running/SummaryMap";
 import { getRunningRecordDetail } from "../utils/api/running";
 
-export default function RunSummaryScreen({ route, navigation }: any) {
+export default function RunSummaryScreen({ route, navigation }: any = { route: { params: {} } }) {
   const {
     distanceKm = 0,
     paceLabel = "--:--",
@@ -32,7 +32,7 @@ export default function RunSummaryScreen({ route, navigation }: any) {
     sessionId,
     snapshotUri,
     runId: runIdFromParams,
-  } = route.params || {};
+  } = route?.params || {} as any;
 
   const [title, setTitle] = useState("제목을 입력하세요");
   const [isEditingTitle, setIsEditingTitle] = useState(false);

@@ -401,7 +401,9 @@ export async function getCrewMembers(
     id: String(m.userId),
     nickname: String(m.userNickname ?? ""),
     role: m.isOwner || m.role === "OWNER" ? "ADMIN" : "MEMBER",
-    profileImage: m.userProfileImage ?? null,
+    profileImage: stripPresignedParams(
+      m.userProfileImage ?? m.user_profile_image_url ?? m.profile_image_url ?? null
+    ),
     lastRunningDate: m.lastRunningDate ?? null,
   })) as CrewMember[];
   const hasMore = !pageData?.last && members.length === size;

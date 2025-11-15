@@ -387,12 +387,22 @@ export default function CrewDetailScreen() {
     if (!date) return "러닝기록 없음";
     const runningDate = new Date(date);
     if (isNaN(runningDate.getTime())) return "-";
+
     const now = new Date();
     const diffMs = now.getTime() - runningDate.getTime();
+
+    // 음수인 경우 (미래 시간) - 서버/클라이언트 시간 차이
+    if (diffMs < 0) return "방금 전";
+
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return "오늘";
+
+    if (diffMinutes < 1) return "방금 전";
+    if (diffMinutes < 60) return `${diffMinutes}분 전`;
+    if (diffHours < 24) return `${diffHours}시간 전`;
     if (diffDays === 1) return "어제";
-    if (diffDays <= 7) return `${diffDays}일전`;
+    if (diffDays <= 7) return `${diffDays}일 전`;
     return runningDate.toLocaleDateString("ko-KR");
   }
 
@@ -465,14 +475,6 @@ export default function CrewDetailScreen() {
             <TouchableOpacity
               style={s.chatBtn}
               onPress={() => {
-                setAlert({
-                  open: true,
-                  kind: "message",
-                  title: "채팅 이동",
-                  message: crewId
-                    ? `크루(${crewName || ""}) 채팅으로 이동 시도`
-                    : "크루 정보를 불러오지 못했습니다.",
-                });
                 if (!crewId) {
                   setAlert({
                     open: true,

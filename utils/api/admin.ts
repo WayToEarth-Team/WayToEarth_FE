@@ -127,9 +127,11 @@ export async function deleteStoryCard(storyId: number): Promise<void> {
 export async function addLandmarkGalleryImage(
   landmarkId: number | string,
   imageUrl: string
-): Promise<void> {
+): Promise<any> {
   console.log('[API] 갤러리 이미지 추가:', { landmarkId, imageUrl });
-  await client.post(`/v1/admin/landmarks/${landmarkId}/images`, { imageUrl });
+  const response = await client.post(`/v1/admin/landmarks/${landmarkId}/images`, { imageUrl });
+  console.log('[API] 갤러리 이미지 추가 응답:', response.data);
+  return response.data?.data ?? response.data;
 }
 
 // 랜드마크 갤러리 이미지 삭제
@@ -153,9 +155,11 @@ export async function reorderLandmarkGalleryImages(
 
 // 스토리카드 갤러리 이미지 추가
 // TODO: 백엔드 API가 journeyId를 받도록 수정되면 경로 변경
-export async function addStoryGalleryImage(storyId: number | string, imageUrl: string): Promise<void> {
+export async function addStoryGalleryImage(storyId: number | string, imageUrl: string): Promise<any> {
   console.log('[API] 스토리 갤러리 이미지 추가:', { storyId, imageUrl });
-  await client.post(`/v1/admin/story-cards/${storyId}/images`, { imageUrl });
+  const response = await client.post(`/v1/admin/story-cards/${storyId}/images`, { imageUrl });
+  console.log('[API] 스토리 갤러리 이미지 추가 응답:', response.data);
+  return response.data?.data ?? response.data;
 }
 
 // 스토리카드 갤러리 이미지 삭제
