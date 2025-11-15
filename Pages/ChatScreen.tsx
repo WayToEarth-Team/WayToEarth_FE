@@ -125,6 +125,16 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
     };
   }, []);
 
+  // 키보드가 표시될 때 하단에 있으면 메시지를 부드럽게 하단으로 정렬
+  useEffect(() => {
+    if (kbVisible && atBottomRef.current) {
+      const t = setTimeout(() => {
+        try { scrollViewRef.current?.scrollToEnd({ animated: true }); } catch {}
+      }, 50);
+      return () => clearTimeout(t);
+    }
+  }, [kbVisible, keyboardHeight]);
+
   // 키보드 이벤트에는 스크롤 자동 이동을 걸지 않고, 포커스/신규 메시지에서만 처리
 
   useEffect(() => {
@@ -238,7 +248,7 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
     const targetSpacer = keyboardHeight > 0
       ? keyboardHeight + inputHeight + LIFT_WHEN_OPEN + 8
       : bottomNavHeight + inputHeight + LIFT_WHEN_CLOSED + 8; // 미포커스: 입력칸+탭바 높이만 확보
-    const duration = 280; // 더 꾸덕한 느낌으로 살짝 길게
+    const duration = 280; // 부드럽고 꾸덕한 타이밍
     const ease = Easing.out(Easing.cubic);
     const prev = prevTargetsRef.current;
     const deltaB = Math.abs(targetBottom - prev.bottom);
@@ -518,7 +528,7 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
               onSubmitEditing={handleSend}
               returnKeyType="send"
               onFocus={() => {
-                // 포커스 시 별도 스크롤/예측 애니 없이 시스템/실측 기반 애니메이션만 사용
+                // 포커스 직후에는 시스템/실측 이벤트에 의한 단일 애니만 사용해 반동 최소화
                 justFocusedRef.current = true;
                 setTimeout(() => { justFocusedRef.current = false; }, 260);
               }}
