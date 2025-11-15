@@ -245,13 +245,6 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
         </View>
       </View>
 
-      {!isConnected && !connectionError && (
-        <View style={styles.connectionStatus}>
-          <ActivityIndicator size="small" color="#667eea" />
-          <Text style={styles.connectionText}>연결 중...</Text>
-        </View>
-      )}
-
       {!isConnected && !!connectionError && (
         <View style={styles.errorContainer}>
           <Ionicons name="warning-outline" size={20} color="#ef4444" />
@@ -264,13 +257,6 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
           >
             <Ionicons name="refresh" size={16} color="#ffffff" />
           </TouchableOpacity>
-        </View>
-      )}
-
-      {isHistoryLoading && (
-        <View style={styles.historyLoadingContainer}>
-          <ActivityIndicator size="small" color="#667eea" />
-          <Text style={styles.historyLoadingText}>메시지 불러오는 중...</Text>
         </View>
       )}
 
