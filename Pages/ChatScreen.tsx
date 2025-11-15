@@ -28,6 +28,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { getMyProfile } from "../utils/api/users";
 import { formatTimeLocalHHmm } from "../utils/datetime";
 import { getCrewMembers as getCrewMembersPaged, getCrewMember as getCrewMemberById } from "../utils/api/crews";
+import { getApiBaseUrl, toWebSocketBaseUrl } from "../utils/config/api";
 
 console.log("WebSocket 확인:");
 console.log("- global.WebSocket:", !!(global as any).WebSocket);
@@ -91,7 +92,7 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
   });
 
   const websocketUrl = crewId
-    ? `wss://api.waytoearth.cloud/ws/crew/${crewId}/chat`
+    ? `${toWebSocketBaseUrl(getApiBaseUrl())}/ws/crew/${crewId}/chat`
     : null;
 
   useEffect(() => {

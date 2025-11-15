@@ -1,9 +1,12 @@
 // utils/api/client.ts
 import axios, { AxiosResponse } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getApiBaseUrl } from "./config/api";
+
+const BASE_URL = getApiBaseUrl();
 
 export const client = axios.create({
-  baseURL: "https://api.waytoearth.cloud",
+  baseURL: BASE_URL,
   timeout: 10000,
 });
 

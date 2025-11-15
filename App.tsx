@@ -62,6 +62,7 @@ import GuestbookScreen from "./Pages/GuestbookScreen";
 import LandmarkStoryScreen from "./Pages/LandmarkStoryScreen";
 import ChatScreen from "./Pages/ChatScreen";
 import ScreenFade from "./components/Layout/ScreenFade";
+import { getApiBaseUrl } from "./utils/config/api";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -75,41 +76,41 @@ function MainTabs() {
     >
       <Tab.Screen
         name="LiveRunningScreen"
-        children={() => (
+        children={(props) => (
           <ScreenFade duration={340} scaleFrom={0.988} translateYFrom={10}>
-            <LiveRunningScreen />
+            <LiveRunningScreen {...(props as any)} />
           </ScreenFade>
         )}
       />
       <Tab.Screen
         name="Feed"
-        children={() => (
+        children={(props) => (
           <ScreenFade duration={340} scaleFrom={0.988} translateYFrom={10}>
-            <Feed2 />
+            <Feed2 {...(props as any)} />
           </ScreenFade>
         )}
       />
       <Tab.Screen
         name="Record"
-        children={() => (
+        children={(props) => (
           <ScreenFade duration={340} scaleFrom={0.988} translateYFrom={10}>
-            <Record />
+            <Record {...(props as any)} />
           </ScreenFade>
         )}
       />
       <Tab.Screen
         name="Crew"
-        children={() => (
+        children={(props) => (
           <ScreenFade duration={340} scaleFrom={0.988} translateYFrom={10}>
-            <CrewScreen />
+            <CrewScreen {...(props as any)} />
           </ScreenFade>
         )}
       />
       <Tab.Screen
         name="Profile"
-        children={() => (
+        children={(props) => (
           <ScreenFade duration={340} scaleFrom={0.988} translateYFrom={10}>
-            <Profile />
+            <Profile {...(props as any)} />
           </ScreenFade>
         )}
       />
@@ -135,6 +136,10 @@ export default function App() {
         console.error("❌ WayToEarthWear module NOT FOUND!");
       }
       console.log("================================");
+      // 현재 API Base URL 로그 (dev에서 혼동 방지)
+      try {
+        console.log("API Base URL:", getApiBaseUrl());
+      } catch {}
     }
 
     // Firebase FCM 토큰 등록 (Expo 서버 거치지 않음)

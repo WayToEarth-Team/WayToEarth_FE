@@ -15,6 +15,7 @@ type Props = {
   showUserLocation?: boolean;
   showMyLocationButton?: boolean;
   onBindCenter?: (fn: (p: LatLng) => void) => void;
+  onBindForceCenter?: (fn: (p: LatLng) => void) => void;
   onBindSnapshot?: (fn: () => Promise<string | null>) => void;
   useCurrentLocationOnMount?: boolean;
   onMapReady?: () => void;
@@ -27,6 +28,7 @@ export default function MapRoute({
   showUserLocation,
   showMyLocationButton,
   onBindCenter,
+  onBindForceCenter,
   onBindSnapshot,
   useCurrentLocationOnMount = true,
   onMapReady,
@@ -183,6 +185,25 @@ export default function MapRoute({
       didInitCamera.current = true;
     });
   }, [onBindCenter]);
+
+  // 강제 센터 이동 바인딩: 사용자 제스처 무시하고 즉시 중심 이동
+  useEffect(() => {
+    if (!onBindForceCenter) return;
+    onBindForceCenter((p) => {
+      if (!mapRef.current) return;
+      try {
+        mapRef.current.animateCamera(
+          didInitCamera.current
+            ? { center: p as RNLatLng }
+            : { center: p as RNLatLng, zoom: 16 },
+          { duration: 450 }
+        );
+      } catch {}
+      didInitCamera.current = true;
+      // 강제 이동 이후 팔로우도 재개
+      followCenter.current = true;
+    });
+  }, [onBindForceCenter]);
 
   // 스냅샷 바인딩(요약용)
   useEffect(() => {

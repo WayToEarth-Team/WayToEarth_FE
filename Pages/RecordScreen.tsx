@@ -28,7 +28,11 @@ import { getMyProfile } from "../utils/api/users";
 import { client } from "../utils/api/client";
 import MapView, { Polyline } from "react-native-maps";
 
+import { useNavigation } from "@react-navigation/native";
+
 export default function RecordScreen({ navigation }: any) {
+  const navigationHook = useNavigation<any>();
+  const nav = navigation || navigationHook;
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [weekly, setWeekly] = useState<any | null>(null);
@@ -577,7 +581,7 @@ export default function RecordScreen({ navigation }: any) {
           <TouchableOpacity
             style={s.aiCard}
             onPress={() =>
-              navigation.navigate("AIFeedbackScreen", {
+              nav.navigate("AIFeedbackScreen", {
                 completedCount: records.length,
                 latestRecordId: records[0]?.id,
               })
@@ -650,7 +654,7 @@ export default function RecordScreen({ navigation }: any) {
                 key={r.id}
                 style={s.recordItem}
                 onPress={() =>
-                  navigation.navigate("RecordDetailScreen", {
+                  nav.navigate("RecordDetailScreen", {
                     recordId: r.id,
                   })
                 }

@@ -1,12 +1,15 @@
 // utils/api/client.ts
 import axios, { AxiosResponse } from "axios";
 import { getAccessToken, refreshAccessToken, ensureAccessToken } from "../auth/tokenManager";
+import { getApiBaseUrl } from "../config/api";
 import { showToast } from "../toast";
 
 // 목데이터 사용 중단: 항상 실서버 연동
 
+const BASE_URL = getApiBaseUrl();
+
 export const client = axios.create({
-  baseURL: "https://api.waytoearth.cloud",
+  baseURL: BASE_URL,
   timeout: 10000,
 });
 
@@ -14,7 +17,7 @@ export const client = axios.create({
 client.interceptors.request.use(async (config) => {
   let t = getAccessToken();
   if (!t) {
-    const baseURL = client.defaults.baseURL || "https://api.waytoearth.cloud";
+    const baseURL = client.defaults.baseURL || BASE_URL;
     t = await ensureAccessToken(baseURL);
   }
   if (t) {
@@ -55,7 +58,7 @@ client.interceptors.response.use(
     if ((status === 401 || status === 403) && !(cfg as any)._retry) {
       (cfg as any)._retry = true;
       try {
-        const baseURL = client.defaults.baseURL || "https://api.waytoearth.cloud";
+        const baseURL = client.defaults.baseURL || BASE_URL;
         const newAccess = await refreshAccessToken(baseURL);
         if (newAccess) {
           cfg.headers = {

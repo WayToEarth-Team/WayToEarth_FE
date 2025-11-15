@@ -23,20 +23,21 @@ import { client } from "../utils/api/client";
 import Markdown from "../components/Common/Markdown";
 
 type AIFeedbackScreenProps = {
-  route: {
-    params: {
+  route?: {
+    params?: {
       completedCount?: number;
       latestRecordId?: number;
     };
   };
-  navigation: any;
+  navigation?: any;
 };
 
 const AIFeedbackScreen: React.FC<AIFeedbackScreenProps> = ({
   route,
   navigation,
 }) => {
-  const { completedCount, latestRecordId } = route.params;
+  const completedCount = route?.params?.completedCount ?? 0;
+  const latestRecordId = route?.params?.latestRecordId;
   const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
@@ -141,7 +142,7 @@ const AIFeedbackScreen: React.FC<AIFeedbackScreenProps> = ({
           </TouchableOpacity>
           <TouchableOpacity
             style={s.cancelButton}
-            onPress={() => navigation.goBack()}
+            onPress={() => navigation?.goBack?.()}
           >
             <Text style={s.cancelButtonText}>돌아가기</Text>
           </TouchableOpacity>
@@ -157,7 +158,7 @@ const AIFeedbackScreen: React.FC<AIFeedbackScreenProps> = ({
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation?.goBack?.()}
           style={s.backButton}
         >
           <Ionicons name="arrow-back" size={24} color="#0F172A" />
@@ -290,7 +291,7 @@ const AIFeedbackScreen: React.FC<AIFeedbackScreenProps> = ({
       >
         <TouchableOpacity
           style={s.closeButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation?.goBack?.()}
         >
           <Text style={s.closeButtonText}>확인</Text>
         </TouchableOpacity>

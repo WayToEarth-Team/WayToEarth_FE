@@ -3,6 +3,7 @@ import { client } from "./client";
 import { getMyProfile } from "./users";
 import * as userJourneys from "./userJourneys";
 import type { LandmarkSummary } from "../../types/landmark";
+import { getJourneyLandmarks } from "./landmarks";
 
 export type RouteId = string | number;
 
@@ -120,7 +121,7 @@ export async function getRouteDetail(id: RouteId): Promise<RouteDetail> {
   // 랜드마크는 공용 유틸을 통해 로드(엔드포인트 폴백/매핑 포함)
   let lms: any[] = [];
   try {
-    const list = await (await import('./landmarks')).getJourneyLandmarks(Number(id));
+    const list = await getJourneyLandmarks(Number(id));
     lms = list as any[];
   } catch {
     lms = [];
