@@ -13,6 +13,8 @@ import {
   Alert,
   Platform,
   Keyboard,
+  Animated,
+  Easing,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ensureAccessToken, getAccessToken } from "../utils/auth/tokenManager";
@@ -42,11 +44,19 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentNickname, setCurrentNickname] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+  const atBottomRef = useRef(true);
   const { activeTab, onTabPress } = useBottomNav("crew");
   const [token, setToken] = useState<string | null>(null);
   const [kbVisible, setKbVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [inputHeight, setInputHeight] = useState(72);
+  const inputBottomAnim = useRef(new Animated.Value(0)).current;
+  const spacerHeightAnim = useRef(new Animated.Value(0)).current;
+  const ESTIMATED_ANDROID_KB = 280; // dp, 즉시 반응용 임시 높이
+  const prevTargetsRef = useRef({ bottom: 0, spacer: 0 });
+  const justFocusedRef = useRef(false);
+  const predictedRef = useRef<{ active: boolean; at: number }>({ active: false, at: 0 });
+  const USE_SYSTEM_PAN = false; // 양 플랫폼 모두 커스텀 애니메이션 사용
 
   const {
     messages,
@@ -114,6 +124,8 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
       try { show.remove(); hide.remove(); } catch {}
     };
   }, []);
+
+  // 키보드 이벤트에는 스크롤 자동 이동을 걸지 않고, 포커스/신규 메시지에서만 처리
 
   useEffect(() => {
     let alive = true;
@@ -216,13 +228,53 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
   // 입력창 절대 배치 및 스크롤 패딩 계산
   const bottomNavHeight = BOTTOM_NAV_MIN_HEIGHT + (insets.bottom || 0);
   const LIFT_WHEN_CLOSED = 12; // 기본 상태에서 더 위로 띄우기
-  const LIFT_WHEN_OPEN = 8; // 키보드 열린 상태에서 살짝 더 띄우기
-  const inputAbsoluteBottom = keyboardHeight > 0
-    ? keyboardHeight + LIFT_WHEN_OPEN
-    : bottomNavHeight + LIFT_WHEN_CLOSED;
-  const scrollBottomPad = keyboardHeight > 0
-    ? keyboardHeight + inputHeight + LIFT_WHEN_OPEN + 8
-    : inputHeight + bottomNavHeight + LIFT_WHEN_CLOSED + 8;
+  const LIFT_WHEN_OPEN = 8; // 키보드와 살짝 간격을 둬 충돌 느낌 방지
+
+  // 입력칸/여백을 부드럽게 애니메이션 (양 플랫폼 동일 커브/타이밍 적용)
+  useEffect(() => {
+    const targetBottom = keyboardHeight > 0
+      ? keyboardHeight + LIFT_WHEN_OPEN
+      : bottomNavHeight + LIFT_WHEN_CLOSED;
+    const targetSpacer = keyboardHeight > 0
+      ? keyboardHeight + inputHeight + LIFT_WHEN_OPEN + 8
+      : bottomNavHeight + inputHeight + LIFT_WHEN_CLOSED + 8; // 미포커스: 입력칸+탭바 높이만 확보
+    const duration = 280; // 더 꾸덕한 느낌으로 살짝 길게
+    const ease = Easing.out(Easing.cubic);
+    const prev = prevTargetsRef.current;
+    const deltaB = Math.abs(targetBottom - prev.bottom);
+    const deltaS = Math.abs(targetSpacer - prev.spacer);
+    const now = Date.now();
+    const predictedRecently = predictedRef.current.active && now - predictedRef.current.at < 800;
+    // 항상 기존 애니메이션 중단
+    try { inputBottomAnim.stopAnimation(); spacerHeightAnim.stopAnimation(); } catch {}
+    if (predictedRecently) {
+      // 예측 → 실측 보정: 차이가 크면 짧게 부드럽게 수렴, 작으면 즉시 고정
+      const settleDur = 120;
+      if (deltaB > 8) {
+        Animated.timing(inputBottomAnim, { toValue: targetBottom, duration: settleDur, easing: ease, useNativeDriver: false }).start();
+      } else {
+        inputBottomAnim.setValue(targetBottom);
+      }
+      if (deltaS > 8) {
+        Animated.timing(spacerHeightAnim, { toValue: targetSpacer, duration: settleDur, easing: ease, useNativeDriver: false }).start();
+      } else {
+        spacerHeightAnim.setValue(targetSpacer);
+      }
+      predictedRef.current.active = false;
+    } else {
+      if (deltaB < 10) {
+        inputBottomAnim.setValue(targetBottom);
+      } else {
+        Animated.timing(inputBottomAnim, { toValue: targetBottom, duration, easing: ease, useNativeDriver: false }).start();
+      }
+      if (deltaS < 10) {
+        spacerHeightAnim.setValue(targetSpacer);
+      } else {
+        Animated.timing(spacerHeightAnim, { toValue: targetSpacer, duration, easing: ease, useNativeDriver: false }).start();
+      }
+    }
+    prevTargetsRef.current = { bottom: targetBottom, spacer: targetSpacer };
+  }, [keyboardHeight, inputHeight, bottomNavHeight]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -314,12 +366,18 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPad }]}
+          contentContainerStyle={[styles.scrollContent]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.select({ ios: "interactive", android: "on-drag" })}
           onScroll={(e) => {
             const { contentOffset } = e.nativeEvent;
+            try {
+              const { layoutMeasurement, contentSize } = e.nativeEvent;
+              const paddingToBottom = 72; // 여유값
+              const isAtBottom = contentSize.height - layoutMeasurement.height - contentOffset.y <= paddingToBottom;
+              atBottomRef.current = isAtBottom;
+            } catch {}
             if (
               contentOffset.y <= 50 &&
               hasMore &&
@@ -329,7 +387,12 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
               loadMoreMessages();
             }
           }}
-          scrollEventThrottle={400}
+          scrollEventThrottle={16}
+          // onContentSizeChange는 사용자가 하단에 있을 때만 필요할 때 최종 보정으로 사용
+          onContentSizeChange={() => {
+            if (!atBottomRef.current) return;
+            try { scrollViewRef.current?.scrollToEnd({ animated: true }); } catch {}
+          }}
         >
           {hasMore && messages.length > 0 && (
             <View style={styles.loadMoreContainer}>
@@ -420,16 +483,19 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
               );
             })
           )}
+          {/* 하단 공간 확보: Android는 시스템 pan에 위임하여 스페이서 제거 */}
+          <Animated.View style={{ height: spacerHeightAnim }} />
         </ScrollView>
 
-        <View
+        <Animated.View
           style={[
             styles.inputContainer,
             {
+              // 절대 배치 + 애니메이션 bottom (양 플랫폼 동일)
               position: 'absolute',
               left: 0,
               right: 0,
-              bottom: inputAbsoluteBottom,
+              bottom: (inputBottomAnim as any),
               zIndex: 200,
               elevation: 8,
               paddingBottom: Platform.OS === "ios" ? 8 : 12,
@@ -451,6 +517,11 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
               editable={isConnected}
               onSubmitEditing={handleSend}
               returnKeyType="send"
+              onFocus={() => {
+                // 포커스 시 별도 스크롤/예측 애니 없이 시스템/실측 기반 애니메이션만 사용
+                justFocusedRef.current = true;
+                setTimeout(() => { justFocusedRef.current = false; }, 260);
+              }}
             />
             {message.trim().length > 0 && (
               <TouchableOpacity
@@ -465,10 +536,12 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
               <View style={styles.emptyButtonSpace} />
             )}
           </View>
-        </View>
+        </Animated.View>
       </View>
 
-      <BottomNavigation activeTab={activeTab} onTabPress={onTabPress} />
+      {!(Platform.OS === 'android' && kbVisible) && (
+        <BottomNavigation activeTab={activeTab} onTabPress={onTabPress} />
+      )}
     </SafeAreaView>
   );
 }
