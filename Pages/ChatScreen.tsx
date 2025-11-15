@@ -359,7 +359,7 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
           styles.statusBarIPhone,
           {
             paddingTop: Math.max(insets.top, 21),
-            height: Math.max(insets.top, 21) + 30,
+            height: Math.max(insets.top, 21) + 18,
           },
         ]}
       >
@@ -383,7 +383,9 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
           >
             <Ionicons name="arrow-back" size={22} color="#1e293b" />
           </TouchableOpacity>
-          <Text style={styles.chatTitle}>
+        </View>
+        <View style={styles.chatHeaderCenter} pointerEvents="none">
+          <Text style={styles.chatTitle} numberOfLines={1}>
             {crewInfo ? `${crewInfo.name}` : "크루 채팅"}
           </Text>
           {unreadCount > 0 && (
@@ -966,7 +968,7 @@ const styles = StyleSheet.create({
   chatHeader: {
     backgroundColor: "#ffffff",
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -976,7 +978,18 @@ const styles = StyleSheet.create({
   chatHeaderLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
+  },
+  chatHeaderCenter: {
+    position: 'absolute',
+    left: 56,
+    right: 56,
+    top: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
   backBtn: {
     padding: 4,
@@ -992,6 +1005,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: "#1e293b",
+    maxWidth: '70%',
   },
   unreadBadge: {
     backgroundColor: "#ef4444",
