@@ -709,9 +709,9 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   nicknameText: {
-    color: "#475569",
+    color: "#0F172A",
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "800",
     marginBottom: 4,
   },
   nicknameInline: {
@@ -722,7 +722,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   messageBackgroundBorder: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#4B5563",
     borderRadius: 14,
     borderWidth: 0,
     padding: 10,
@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   messageText: {
-    color: "#1e293b",
+    color: "#ffffff",
     fontSize: 14,
     fontWeight: "400",
     lineHeight: 20,
@@ -752,11 +752,11 @@ const styles = StyleSheet.create({
     maxWidth: "80%",
   },
   responseBackground: {
-    backgroundColor: "#667eea",
+    backgroundColor: "#1F2937",
     borderRadius: 16,
     padding: 12,
     maxWidth: "100%",
-    shadowColor: "#667eea",
+    shadowColor: "#1F2937",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
