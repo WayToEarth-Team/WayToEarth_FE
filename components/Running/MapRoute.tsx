@@ -172,12 +172,14 @@ export default function MapRoute({
     onBindCenter((p) => {
       if (!mapRef.current) return;
       if (!followCenter.current) return;
-      mapRef.current.animateCamera(
-        didInitCamera.current
-          ? { center: p as RNLatLng }
-          : { center: p as RNLatLng, zoom: 16 },
-        { duration: 300 }
-      );
+      try {
+        mapRef.current.animateCamera(
+          didInitCamera.current
+            ? { center: p as RNLatLng }
+            : { center: p as RNLatLng, zoom: 16 },
+          { duration: 650 }
+        );
+      } catch {}
       didInitCamera.current = true;
     });
   }, [onBindCenter]);

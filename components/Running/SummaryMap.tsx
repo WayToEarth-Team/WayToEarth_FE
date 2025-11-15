@@ -113,7 +113,7 @@ export default function SummaryMap({
             latitudeDelta: 0.005,
             longitudeDelta: 0.005,
           };
-          mapRef.current?.animateToRegion(r, 300);
+          mapRef.current?.animateToRegion(r, 600);
         } else {
           mapRef.current?.fitToCoordinates(cleanRoute, {
             edgePadding,
@@ -122,7 +122,7 @@ export default function SummaryMap({
         }
       }, 100);
     } else if (currentRegion) {
-      mapRef.current?.animateToRegion(currentRegion, 300);
+      mapRef.current?.animateToRegion(currentRegion, 600);
     }
   }, [ready, route, currentRegion, edgePadding]);
 

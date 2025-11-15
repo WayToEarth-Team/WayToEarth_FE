@@ -251,7 +251,7 @@ export default function JourneyMapRoute({
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           },
-          500
+          650
         );
       }
       return;
@@ -265,7 +265,7 @@ export default function JourneyMapRoute({
         latitudeDelta: 0.01,
         longitudeDelta: 0.01,
       },
-      500
+      650
     );
   };
 
@@ -321,8 +321,8 @@ export default function JourneyMapRoute({
     // 애니메이션 없이 즉시 fit (더 빠름)
     setTimeout(() => {
       mapRef.current?.fitToCoordinates(journeyRoute as RNLatLng[], {
-        edgePadding: { top: 120, right: 80, bottom: 200, left: 80 },
-        animated: false, // 애니메이션 비활성화로 속도 향상
+        edgePadding: { top: 100, right: 60, bottom: 160, left: 60 },
+        animated: true,
       });
     }, 100); // 300ms → 100ms로 단축
   }, [mapReady]);

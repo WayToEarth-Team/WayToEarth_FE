@@ -826,7 +826,7 @@ export default function JourneyRunningScreen(
 
       {/* 랜드마크 메뉴 바텀시트 */}
       <Modal
-        visible={landmarkMenuVisible}
+        visible={!countdownVisible && landmarkMenuVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setLandmarkMenuVisible(false)}
@@ -931,7 +931,8 @@ export default function JourneyRunningScreen(
         </Pressable>
       </Modal>
 
-      {/* 스탬프 바텀시트(스와이프 업) - 가장 마지막에 렌더링하여 터치 이벤트를 먼저 받도록 */}
+      {/* 스탬프 바텀시트(스와이프 업) - 카운트다운 중에는 숨김 */}
+      {!countdownVisible && (
       <StampBottomSheet
         userId={userId}
         journeyId={journeyId}
@@ -943,7 +944,7 @@ export default function JourneyRunningScreen(
           const id = res?.landmark?.id;
           if (typeof id === 'number') setCollectedSet((prev) => new Set(prev).add(id));
         }}
-      />
+      />)}
     </SafeLayout>
   );
 }
