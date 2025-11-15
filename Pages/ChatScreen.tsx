@@ -388,9 +388,9 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
             }
           }}
           scrollEventThrottle={16}
-          // onContentSizeChange는 사용자가 하단에 있을 때만 필요할 때 최종 보정으로 사용
+          // onContentSizeChange는 키보드 미표시 + 하단 유지일 때만 보정
           onContentSizeChange={() => {
-            if (!atBottomRef.current) return;
+            if (kbVisible || !atBottomRef.current) return;
             try { scrollViewRef.current?.scrollToEnd({ animated: true }); } catch {}
           }}
         >
