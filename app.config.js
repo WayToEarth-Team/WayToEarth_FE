@@ -51,6 +51,8 @@ export default {
         backgroundColor: "#ffffff",
       },
       edgeToEdgeEnabled: true,
+      // KakaoTalk-like keyboard behavior: pan content smoothly instead of overlay
+      softwareKeyboardLayoutMode: "pan",
     },
 
     web: { favicon: "./assets/favicon.png" },
