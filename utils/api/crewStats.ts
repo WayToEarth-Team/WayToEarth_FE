@@ -1,6 +1,43 @@
 import { client } from "./client";
 import type { TopCrewItemData } from "../../types/Crew";
 
+export type CrewWeeklyCompareMember = {
+  userId: number;
+  name: string;
+  thisWeek: number;
+  lastWeek: number;
+  rank: number;
+  imageUrl?: string | null;
+};
+
+export type CrewWeeklyCompareResponse =
+  | {
+      thisWeekTotal: number;
+      lastWeekTotal: number;
+      growthRate: number | null;
+      members: CrewWeeklyCompareMember[];
+    }
+  | {
+      crew: {
+        thisWeekTotal: number;
+        lastWeekTotal: number;
+        growthRate: number | null;
+      };
+      members: CrewWeeklyCompareMember[];
+    };
+
+export type CrewWeeklyDailyResponse = {
+  thisWeekTotal: number;
+  lastWeekTotal: number;
+  growthRate: number | null;
+  days: Array<{
+    date: string;
+    dow: string;
+    thisWeekDistance: number;
+    lastWeekDistance: number;
+  }>;
+};
+
 // Fetch top crew rankings by monthly total distance
 // Swagger: GET /v1/crews/statistics/rankings/distance
 // Query: month (YYYYMM, optional), limit (default 10)
@@ -27,6 +64,30 @@ export async function getTopCrewsByDistance(
     name: r.crewName,
     distance: `${formatKm(r.totalDistance)}`,
   }));
+}
+
+export async function getCrewWeeklyCompare(
+  crewId: string,
+  params?: { weekStart?: string; limit?: number }
+): Promise<CrewWeeklyCompareResponse> {
+  const { weekStart, limit = 8 } = params || {};
+  const { data } = await client.get(
+    `/v1/crews/statistics/${crewId}/weekly-compare`,
+    { params: { weekStart, limit } }
+  );
+  return (data?.data ?? data) as CrewWeeklyCompareResponse;
+}
+
+export async function getCrewWeeklyDaily(
+  crewId: string,
+  params?: { weekStart?: string }
+): Promise<CrewWeeklyDailyResponse> {
+  const { weekStart } = params || {};
+  const { data } = await client.get(
+    `/v1/crews/statistics/${crewId}/weekly-daily`,
+    { params: { weekStart } }
+  );
+  return (data?.data ?? data) as CrewWeeklyDailyResponse;
 }
 
 function formatKm(n: number) {
