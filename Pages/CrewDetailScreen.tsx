@@ -93,6 +93,7 @@ export default function CrewDetailScreen() {
     weeklyData,
     rankingData,
     totalDistance,
+    lastWeekTotal,
     percentChange,
   } = useCrewWeeklyMVP(crewId);
 
@@ -653,26 +654,33 @@ export default function CrewDetailScreen() {
               <View style={s.mvpSection}>
                 {/* MVP 카드 (컴포넌트) */}
                 <View style={s.mvpCardContainer}>
-                  <CrewMVPCard
-                    mvp={{
-                      name: mvpMember.name,
-                      distanceKm:
-                        Number(
-                          String(mvpMember.distance).replace(/[^\d.]/g, "")
-                        ) || 0,
-                      profileImage: mvpMember.profileImage || undefined,
-                      periodLabel,
-                    }}
-                  />
+                  {(() => {
+                    const weeklyTop = rankingData?.[0];
+                    const mvp = weeklyTop
+                      ? {
+                          name: weeklyTop.name,
+                          distanceKm: Number(weeklyTop.thisWeek) || 0,
+                          profileImage: weeklyTop.imageUrl || mvpMember.profileImage || undefined,
+                          periodLabel,
+                        }
+                      : {
+                          name: mvpMember.name,
+                          distanceKm: Number(String(mvpMember.distance).replace(/[^\d.]/g, "")) || 0,
+                          profileImage: mvpMember.profileImage || undefined,
+                          periodLabel,
+                        };
+                    return <CrewMVPCard mvp={mvp} />;
+                  })()}
                 </View>
                 {/* CrewRecord: 이번주 통계 + 랭킹 */}
                 <View style={s.crewRecordContainer}>
                   <CrewRecord
                     embedded
-                    title="지난주 러닝"
+                    title="이번주 러닝"
                     weeklyData={weeklyData}
                     rankingData={rankingData}
                     totalDistance={totalDistance}
+                    lastWeekTotal={lastWeekTotal}
                     percentChange={percentChange}
                   />
                 </View>
