@@ -345,6 +345,7 @@ export default function JourneyRunningScreen(
     navigation?.navigate("LandmarkStoryScreen", {
       landmarkId: parseInt(landmark.id),
       userId: userId ?? undefined,
+      distanceM: Number((landmark as any)?.distanceM ?? (landmark as any)?.distanceFromStart ?? NaN),
     });
   }, [navigation, userId]);
 
