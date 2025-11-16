@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Modal, ActivityIndicator, Animated, Easing } from 'react-native';
 import useRouteDetail from '../hooks/journey/useJourneyRouteDetail';
 import { getJourneyRoutes, type RouteId, type JourneyRoute } from '../utils/api/journeyRoutes';
 import { getJourneyLandmarks } from '../utils/api/landmarks';
 import type { LandmarkSummary as JourneyLandmark } from '../types/landmark';
 import ImageCarousel from '../components/Common/ImageCarousel';
+import { distanceKm } from '../utils/geo';
 
 type RouteParams = { route?: { params?: { id?: RouteId } } ; navigation?: any };
 
@@ -21,6 +22,53 @@ export default function RouteDetailScreen({ route, navigation }: RouteParams = {
   const fadeAnim = useMemo(() => new Animated.Value(0), []);
   const slideAnim = useMemo(() => new Animated.Value(30), []);
   const spinValue = React.useRef(new Animated.Value(0)).current;
+  const sortedRoute = useMemo(() => [...routeData].sort((a, b) => a.sequence - b.sequence), [routeData]);
+
+  const routeDistanceMeta = useMemo(() => {
+    if (sortedRoute.length === 0) return { cumulative: [] as number[], segments: [] as number[] };
+    const cumulative: number[] = [0];
+    const segments: number[] = [];
+    for (let i = 1; i < sortedRoute.length; i++) {
+      const prev = sortedRoute[i - 1];
+      const cur = sortedRoute[i];
+      const segmentM = distanceKm({ latitude: prev.latitude, longitude: prev.longitude }, { latitude: cur.latitude, longitude: cur.longitude }) * 1000;
+      const safeSeg = Number.isFinite(segmentM) ? segmentM : 0;
+      segments[i - 1] = safeSeg;
+      cumulative[i] = cumulative[i - 1] + safeSeg;
+    }
+    return { cumulative, segments };
+  }, [sortedRoute]);
+
+  const estimateDistanceFromStart = useCallback(
+    (lat: number, lon: number) => {
+      if (sortedRoute.length < 2) return 0;
+      const { cumulative, segments } = routeDistanceMeta;
+      let bestDist = Number.POSITIVE_INFINITY;
+      let bestAlong = 0;
+      for (let i = 1; i < sortedRoute.length; i++) {
+        const a = sortedRoute[i - 1];
+        const b = sortedRoute[i];
+        const vx = b.longitude - a.longitude;
+        const vy = b.latitude - a.latitude;
+        const segLenSq = vx * vx + vy * vy;
+        let t = 0;
+        if (segLenSq > 0) {
+          t = ((lon - a.longitude) * vx + (lat - a.latitude) * vy) / segLenSq;
+          t = Math.max(0, Math.min(1, t));
+        }
+        const projLat = a.latitude + vy * t;
+        const projLon = a.longitude + vx * t;
+        const distToProj = distanceKm({ latitude: lat, longitude: lon }, { latitude: projLat, longitude: projLon }) * 1000;
+        if (distToProj < bestDist) {
+          bestDist = distToProj;
+          const along = (segments[i - 1] ?? 0) * t + (cumulative[i - 1] ?? 0);
+          bestAlong = along;
+        }
+      }
+      return bestAlong;
+    },
+    [sortedRoute, routeDistanceMeta]
+  );
 
   // 여정 데이터 로드
   useEffect(() => {
@@ -204,10 +252,13 @@ export default function RouteDetailScreen({ route, navigation }: RouteParams = {
               journeyTitle: data.title,
               totalDistanceKm,
               landmarks: landmarkData.map((lm) => {
-                // 일부 환경: distanceFromStart가 '정수 km'로 내려옴(예: 2,4,6,10)
-                const raw = Number(lm.distanceFromStart ?? 0);
-                const looksLikeIntegerKm = raw > 0 && raw <= totalDistanceKm + 1 && Math.abs(raw - Math.round(raw)) < 1e-9;
-                const meters = looksLikeIntegerKm ? raw * 1000 : raw;
+                // 일부 환경: distanceFromStart가 '정수 km'로 내려옴(예: 2,4,6,10) 또는 누락될 수 있음
+                const raw = Number(lm.distanceFromStart ?? NaN);
+                const looksLikeKm = raw > 0 && raw < 1000; // km 단위로 내려오는 경우 우선 처리
+                const computed = estimateDistanceFromStart(lm.latitude, lm.longitude);
+                const meters = Number.isFinite(raw)
+                  ? (looksLikeKm ? raw * 1000 : raw)
+                  : computed;
                 return {
                   id: String(lm.id),
                   name: lm.name,
@@ -375,9 +426,12 @@ export default function RouteDetailScreen({ route, navigation }: RouteParams = {
                 journeyTitle: data.title,
                 totalDistanceKm,
                 landmarks: landmarkData.map((lm) => {
-                  const raw = Number(lm.distanceFromStart ?? 0);
-                  const looksLikeIntegerKm = raw > 0 && raw <= totalDistanceKm + 1 && Math.abs(raw - Math.round(raw)) < 1e-9;
-                  const meters = looksLikeIntegerKm ? raw * 1000 : raw;
+                  const raw = Number(lm.distanceFromStart ?? NaN);
+                  const looksLikeKm = raw > 0 && raw < 1000;
+                  const computed = estimateDistanceFromStart(lm.latitude, lm.longitude);
+                  const meters = Number.isFinite(raw)
+                    ? (looksLikeKm ? raw * 1000 : raw)
+                    : computed;
                   return {
                     id: String(lm.id),
                     name: lm.name,
