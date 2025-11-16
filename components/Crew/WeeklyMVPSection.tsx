@@ -7,7 +7,7 @@ import CrewMVPCard from "./CrewMVPCard";
 type Props = { crewId: string };
 
 export default function WeeklyMVPSection({ crewId }: Props) {
-  const { loading, error, weeklyData, rankingData, totalDistance, percentChange } = useCrewWeeklyMVP(crewId);
+  const { loading, error, weeklyData, rankingData, totalDistance, lastWeekTotal, percentChange } = useCrewWeeklyMVP(crewId);
 
   const periodLabel = useMemo(() => {
     const now = new Date();
@@ -41,7 +41,7 @@ export default function WeeklyMVPSection({ crewId }: Props) {
             <CrewMVPCard
               mvp={{
                 name: rankingData[0].name,
-                distanceKm: Number(rankingData[0].distance) || 0,
+                distanceKm: Number((rankingData as any)[0].thisWeek ?? 0) || 0,
                 profileImage: undefined, // 서버에서 이미지가 오면 연결하세요
                 periodLabel,
               }}
@@ -50,10 +50,11 @@ export default function WeeklyMVPSection({ crewId }: Props) {
           {/* CrewRecord: 주간 차트 + 랭킹 */}
           <CrewRecord
             embedded
-            title="지난주 러닝"
+            title="이번주 러닝"
             weeklyData={weeklyData}
             rankingData={rankingData}
             totalDistance={totalDistance}
+            lastWeekTotal={lastWeekTotal}
             percentChange={percentChange}
           />
         </>
