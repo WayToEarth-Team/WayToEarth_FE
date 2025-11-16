@@ -36,6 +36,7 @@ type RouteParams = {
     params?: {
       landmarkId: number;
       userId?: number;
+      distanceM?: number;
     };
   };
   navigation?: any;
@@ -47,6 +48,7 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams =
   const params = route?.params || {};
   const landmarkId = params.landmarkId;
   const userId = params.userId;
+  const distanceFromParam = params.distanceM;
 
   const [loading, setLoading] = useState(true);
   const [landmark, setLandmark] = useState<LandmarkDetail | null>(null);
@@ -474,7 +476,7 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams =
             <Text style={styles.heroTitle}>{landmark.name}</Text>
             <Text style={styles.heroDescription}>{landmark.description}</Text>
             <Text style={styles.heroDistance}>
-              {(landmark.distanceFromStart / 1000).toFixed(1)}km 지점
+              {(((distanceFromParam ?? landmark.distanceFromStart) || 0) / 1000).toFixed(1)}km 지점
             </Text>
           </Animated.View>
         </View>
