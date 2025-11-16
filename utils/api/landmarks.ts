@@ -3,6 +3,7 @@
 
 import { client } from './client';
 import type { LandmarkDetail, StoryCard, LandmarkSummary, StoryType } from '../../types/landmark';
+import { distanceKm } from '../geo';
 
 /**
  * 랜드마크 상세 조회 (스토리 포함)
@@ -18,7 +19,40 @@ export async function getLandmarkDetail(
     `/v1/landmarks/${landmarkId}`,
     { params }
   );
-  return response.data;
+  const data = response.data as any;
+
+  // distanceFromStart가 0이거나 누락된 경우, routeDistance를 활용해 보정 시도
+  if ((data?.distanceFromStart ?? 0) === 0 && typeof data?.routeDistance === 'object') {
+    try {
+      const route = Array.isArray(data.routeDistance?.points) ? data.routeDistance.points : [];
+      if (route.length >= 2) {
+        // 누적 거리 계산
+        let cumulative = 0;
+        for (let i = 1; i < route.length; i++) {
+          const prev = route[i - 1];
+          const cur = route[i];
+          const seg = distanceKm(
+            { latitude: prev.latitude, longitude: prev.longitude },
+            { latitude: cur.latitude, longitude: cur.longitude }
+          ) * 1000;
+          cumulative += Number.isFinite(seg) ? seg : 0;
+          // 현재 랜드마크 위치와 가장 가까운 포인트를 찾기 위해 거리 측정
+          const distToCur = distanceKm(
+            { latitude: data.latitude, longitude: data.longitude },
+            { latitude: cur.latitude, longitude: cur.longitude }
+          ) * 1000;
+          if (distToCur < 30) {
+            data.distanceFromStart = cumulative;
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      // 보정 실패 시 그대로 반환
+    }
+  }
+
+  return data as LandmarkDetail;
 }
 
 /**
