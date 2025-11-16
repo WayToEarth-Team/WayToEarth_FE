@@ -23,6 +23,7 @@ import {
   setupTokenRefreshListener,
 } from "./utils/notifications";
 import { WeatherProvider } from "./contexts/WeatherContext";
+import { AuthProvider } from "./contexts/AuthContext";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./utils/queryClient";
 import { setupReactQueryFocus } from "./utils/reactQueryFocus";
@@ -185,9 +186,10 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <WeatherProvider>
-        <SafeAreaProvider>
-          <NavigationContainer ref={navigationRef} onReady={handleNavReady}>
+      <AuthProvider>
+        <WeatherProvider>
+          <SafeAreaProvider>
+            <NavigationContainer ref={navigationRef} onReady={handleNavReady}>
             <Stack.Navigator
               initialRouteName={"Onboading"}
               screenOptions={{
@@ -297,9 +299,10 @@ export default function App() {
                 options={{ headerShown: false }}
               />
             </Stack.Navigator>
-          </NavigationContainer>
-        </SafeAreaProvider>
-      </WeatherProvider>
+            </NavigationContainer>
+          </SafeAreaProvider>
+        </WeatherProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

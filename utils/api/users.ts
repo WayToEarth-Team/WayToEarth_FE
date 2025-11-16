@@ -130,7 +130,7 @@ export type UserProfile = {
 export async function getMyProfile(): Promise<UserProfile> {
   const res = await client.get("/v1/users/me");
   const profile = unwrap<UserProfile>(res.data);
-  console.log('[USERS] My profile:', JSON.stringify(profile, null, 2));
+  if (__DEV__) console.log('[USERS] My profile:', JSON.stringify(profile, null, 2));
   return profile;
 }
 
