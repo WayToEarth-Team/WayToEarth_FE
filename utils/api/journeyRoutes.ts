@@ -62,14 +62,22 @@ const difficultyMap: Record<string, "쉬움" | "보통" | "어려움"> = {
   HARD: "어려움",
 };
 
+const deriveDifficultyByDistance = (totalDistanceKm: number): "쉬움" | "보통" | "어려움" => {
+  if (totalDistanceKm <= 10) return "쉬움";
+  if (totalDistanceKm <= 15) return "보통";
+  return "어려움";
+};
+
 function mapJourneyToSummary(j: Journey): RouteSummary {
+  const distanceKm = Number(j.totalDistanceKm || 0);
+  const distanceDifficulty = deriveDifficultyByDistance(distanceKm);
   return {
     id: j.id,
     title: j.title,
     description: j.description,
     distance: `${j.totalDistanceKm}Km`,
     duration: `${j.estimatedDays}일`,
-    difficulty: difficultyMap[j.difficulty] || "보통",
+    difficulty: distanceDifficulty,
     completed: 0,
     total: j.completedUserCount || 0,
     image: j.thumbnailUrl || "palace",
