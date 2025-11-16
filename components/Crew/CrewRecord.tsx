@@ -1,14 +1,16 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-type WeeklyItem = { day: string; distance: number };
+type WeeklyItem = { label: string; thisWeek: number; lastWeek: number; name?: string };
 type RankingItem = {
   rank: number;
   name: string;
-  distance: number;
+  thisWeek: number;
+  lastWeek: number;
   isUser?: boolean;
   imageUrl?: string | null;
+  userId?: number | string;
 };
 
 type Props = {
@@ -16,36 +18,49 @@ type Props = {
   weeklyData?: WeeklyItem[];
   rankingData?: RankingItem[];
   totalDistance?: number;
-  percentChange?: number;
+  lastWeekTotal?: number;
+  percentChange?: number | null;
   embedded?: boolean;
 };
 
-const DEFAULT_WEEKLY: WeeklyItem[] = [
-  { day: "01", distance: 6.5 },
-  { day: "02", distance: 8.2 },
-  { day: "03", distance: 5.8 },
-  { day: "04", distance: 7.1 },
-  { day: "05", distance: 9.3 },
-  { day: "06", distance: 6.9 },
-  { day: "07", distance: 4.95 },
-  { day: "08", distance: 0 },
-];
+const DEFAULT_WEEKLY: WeeklyItem[] = Array.from({ length: 8 }).map((_, i) => ({
+  label: String(i + 1).padStart(2, "0"),
+  thisWeek: 0,
+  lastWeek: 0,
+}));
 
-const DEFAULT_RANKING: RankingItem[] = [
-  { rank: 1, name: "Andy William", distance: 59.13, isUser: false },
-  { rank: 2, name: "You", distance: 48.75, isUser: true },
-  { rank: 3, name: "Thomas Speed", distance: 32.67, isUser: false },
-];
+const DEFAULT_RANKING: RankingItem[] = Array.from({ length: 8 }).map((_, i) => ({
+  rank: i + 1,
+  name: "-",
+  thisWeek: 0,
+  lastWeek: 0,
+  isUser: false,
+}));
 
 export default function CrewRecord({
-  title = "지난주 러닝",
+  title = "이번주 러닝",
   weeklyData = DEFAULT_WEEKLY,
   rankingData = DEFAULT_RANKING,
   totalDistance = 48.75,
+  lastWeekTotal,
   percentChange = 2.1,
   embedded = false,
 }: Props) {
-  const maxDistance = Math.max(...weeklyData.map((d) => d.distance));
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [activeIndexSide, setActiveIndexSide] = useState<"left" | "right" | null>(null);
+  const derivedLastWeekTotal = lastWeekTotal ?? weeklyData.reduce((acc, cur) => acc + (Number(cur.lastWeek) || 0), 0);
+  const derivedPercent = (() => {
+    const last = derivedLastWeekTotal;
+    const cur = totalDistance;
+    if (last === 0 && cur === 0) return 0;
+    if (last === 0) return Infinity; // 지난주 0에서 이번주 달성 -> 신규
+    return ((cur - last) / last) * 100;
+  })();
+  const displayPercent = percentChange ?? derivedPercent;
+  const maxDistance = Math.max(
+    ...weeklyData.flatMap((d) => [d.thisWeek, d.lastWeek, 0]).filter((v) => Number.isFinite(v)),
+    0
+  );
 
   const Inner = (
     <View
@@ -77,33 +92,89 @@ export default function CrewRecord({
         <Text
           style={[
             s.percentChange,
-            percentChange < 0 ? { color: "#EF4444" } : { color: "#10B981" },
+            displayPercent != null && displayPercent < 0 ? { color: "#EF4444" } : { color: "#10B981" },
           ]}
         >
-          지난주 대비 {percentChange >= 0 ? "↑" : "↓"} {Math.abs(percentChange)}
-          %
+          {displayPercent == null
+            ? "지난주 대비 계산 불가"
+            : displayPercent === Infinity
+            ? "지난주 대비 ↑ 신규"
+            : `지난주 대비 ${displayPercent >= 0 ? "↑" : "↓"} ${Math.abs(displayPercent).toFixed(1)}%`}
         </Text>
 
         {/* 막대 그래프 */}
         <View style={s.chartContainer}>
           {weeklyData.map((item, index) => {
-            const heightPercent =
-              item.distance > 0 ? (item.distance / maxDistance) * 100 : 0;
+            const barAreaHeight = 100;
+            const leftHeight = maxDistance > 0 ? Math.max((item.thisWeek / maxDistance) * barAreaHeight, 2) : 2;
+            const rightHeight = maxDistance > 0 ? Math.max((item.lastWeek / maxDistance) * barAreaHeight, 2) : 2;
+            const isActive = activeIndex === index;
+            const activeSide = isActive ? activeIndexSide : null;
+            const leftActive = isActive && activeSide === "left";
+            const rightActive = isActive && activeSide === "right";
             return (
               <View key={index} style={s.barWrapper}>
-                <View style={s.barContainer}>
+                <View style={[s.barPairWrapper, { height: barAreaHeight + 32 }]}>
+                  {isActive && (
+                    <View
+                      style={[
+                        s.valueBubble,
+                        { bottom: (activeSide === "left" ? leftHeight : activeSide === "right" ? rightHeight : Math.max(leftHeight, rightHeight)) + 8 },
+                      ]}
+                    >
+                      <Text style={s.valueBubbleText}>
+                        {leftActive
+                          ? `이번주 ${item.thisWeek.toFixed(2)} km`
+                          : rightActive
+                          ? `지난주 ${item.lastWeek.toFixed(2)} km`
+                          : `이번주 ${item.thisWeek.toFixed(2)} km / 지난주 ${item.lastWeek.toFixed(2)} km`}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={[s.barPair, { height: barAreaHeight }]}>
+                    <View
+                      style={[
+                        s.bar,
+                        s.barLeft,
+                        {
+                        height: leftHeight,
+                        backgroundColor: item.thisWeek > 0 ? "#5B7FFF" : "#E5E7EB",
+                        opacity: leftActive || !isActive ? 1 : 0.5,
+                        },
+                      ]}
+                    onTouchEnd={() => {
+                      if (activeIndex === index && activeIndexSide === "left") {
+                        setActiveIndex(null);
+                        setActiveIndexSide(null);
+                      } else {
+                        setActiveIndex(index);
+                        setActiveIndexSide("left");
+                      }
+                    }}
+                  />
                   <View
-                    style={[
-                      s.bar,
-                      {
-                        height: item.distance > 0 ? `${heightPercent}%` : 2,
-                        backgroundColor:
-                          item.distance > 0 ? "#5B7FFF" : "#E5E7EB",
-                      },
+                      style={[
+                        s.bar,
+                        s.barRight,
+                        {
+                        height: rightHeight,
+                        backgroundColor: item.lastWeek > 0 ? "#9CA3AF" : "#E5E7EB",
+                        opacity: rightActive || !isActive ? 1 : 0.5,
+                        },
                     ]}
+                    onTouchEnd={() => {
+                      if (activeIndex === index && activeIndexSide === "right") {
+                        setActiveIndex(null);
+                        setActiveIndexSide(null);
+                      } else {
+                        setActiveIndex(index);
+                        setActiveIndexSide("right");
+                      }
+                    }}
                   />
                 </View>
-                <Text style={s.dayLabel}>{item.day}</Text>
+                </View>
+                <Text style={s.dayLabel}>{item.label}</Text>
               </View>
             );
           })}
@@ -152,7 +223,7 @@ export default function CrewRecord({
               {item.name}
             </Text>
 
-            <Text style={s.rankingDistance}>{item.distance.toFixed(2)} km</Text>
+            <Text style={s.rankingDistance}>{item.thisWeek.toFixed(2)} km</Text>
           </View>
         ))}
       </View>
@@ -216,7 +287,7 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   percentChange: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#10B981",
     marginBottom: 24,
   },
@@ -234,6 +305,20 @@ const s = StyleSheet.create({
     alignItems: "center",
     marginHorizontal: 2,
   },
+  barPair: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "flex-end",
+    gap: 4,
+    width: "100%",
+    height: 100,
+  },
+  barPairWrapper: {
+    position: "relative",
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
   barContainer: {
     width: "100%",
     height: 90,
@@ -241,14 +326,45 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   bar: {
-    width: "80%",
+    width: "40%",
     borderRadius: 4,
     minHeight: 2,
+  },
+  barLeft: {
+    backgroundColor: "#5B7FFF",
+  },
+  barRight: {
+    backgroundColor: "#9CA3AF",
   },
   dayLabel: {
     fontSize: 11,
     color: "#9CA3AF",
     marginTop: 8,
+  },
+  valueLabel: {
+    fontSize: 11,
+    color: "#374151",
+    marginTop: 4,
+    textAlign: "center",
+  },
+  valueLabelTop: {
+    fontSize: 11,
+    color: "#374151",
+    marginBottom: 4,
+    textAlign: "center",
+  },
+  valueBubble: {
+    position: "absolute",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: "rgba(17,24,39,0.9)",
+    minWidth: 80,
+  },
+  valueBubbleText: {
+    fontSize: 11,
+    color: "#fff",
+    textAlign: "center",
   },
 
   // 랭킹 카드
