@@ -7,14 +7,14 @@ export default {
     slug: "waytoearth",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/icon.png",
+    icon: "./assets/images/icon.png",
     userInterfaceStyle: "light",
     newArchEnabled: false,
     scheme: "waytoearth",
     owner: "waytoearth",
     jsEngine: "hermes",
     splash: {
-      image: "./assets/splash-icon.png",
+      image: "./assets/images/WTE-AppLogo.png",
       resizeMode: "contain",
       backgroundColor: "#ffffff",
     },
@@ -22,6 +22,7 @@ export default {
     ios: {
       bundleIdentifier: "com.waytoearth", // ???�수 추�?
       supportsTablet: true,
+      googleServicesFile: "./GoogleService-Info.plist",
       config: { googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY },
       infoPlist: {
         NSPhotoLibraryUsageDescription: "WayToEarth가 사진을 업로드하기 위해 갤러리 접근 권한이 필요합니다.",
@@ -47,7 +48,7 @@ export default {
       ],
       config: { googleMaps: { apiKey: process.env.GOOGLE_MAPS_API_KEY } },
       adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon.png",
+        foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#ffffff",
       },
       edgeToEdgeEnabled: true,
@@ -55,7 +56,7 @@ export default {
       softwareKeyboardLayoutMode: "pan",
     },
 
-    web: { favicon: "./assets/favicon.png" },
+    web: { favicon: "./assets/images/favicon.png" },
 
     plugins: [
       [
@@ -65,6 +66,10 @@ export default {
             kotlinVersion: "2.0.21",
             gradlePluginVersion: "8.6.1",
             useNativeModules: true,
+            extraMavenRepos: [
+              "https://notifee.github.io/maven",
+              "https://devrepo.kakao.com/nexus/content/groups/public/",
+            ],
           },
         },
       ],
