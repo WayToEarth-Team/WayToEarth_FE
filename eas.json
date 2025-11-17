@@ -5,7 +5,7 @@
     "preview": {
       "distribution": "internal",
       "developmentClient": false,
-      "android": { "buildType": "apk" }
+      "android": { "buildType": "apk", "gradleCommand": ":app:assembleRelease" }
     },
     "production": {
       "distribution": "store",
@@ -13,8 +13,8 @@
     },
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": { "buildType": "apk", "gradleCommand": ":app:assembleDebug" }
     }
   }
 }
-
