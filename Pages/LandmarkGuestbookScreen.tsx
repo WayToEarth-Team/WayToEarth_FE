@@ -1,6 +1,7 @@
 // Pages/LandmarkGuestbookScreen.tsx
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   getGuestbooksByLandmark,
@@ -155,7 +156,10 @@ export default function LandmarkGuestbookScreen({
 
       {/* 정보 영역 */}
       <View style={styles.headerContent}>
-        <Text style={styles.headerEmoji}>🏯 {landmarkName || "랜드마크"}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Ionicons name="business-outline" size={18} color="#8b4513" />
+          <Text style={styles.headerEmojiText}>{landmarkName || "랜드마크"}</Text>
+        </View>
         <Text style={styles.headerSubtitle}>여행자들의 발자취</Text>
         <Text style={styles.headerCount}>총 {guestbooks.length}개의 기록</Text>
       </View>
@@ -175,7 +179,7 @@ export default function LandmarkGuestbookScreen({
     if (error) {
       return (
         <View style={styles.centerContainer}>
-          <Text style={styles.errorIcon}>😅</Text>
+          <Ionicons name="alert-circle-outline" size={40} color="#a0522d" style={{ marginBottom: 8 }} />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
             <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -186,7 +190,7 @@ export default function LandmarkGuestbookScreen({
 
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.emptyIcon}>📝</Text>
+        <Ionicons name="document-text-outline" size={40} color="#a0522d" style={{ marginBottom: 8 }} />
         <Text style={styles.emptyText}>
           아직 작성된 방명록이 없습니다.
         </Text>
@@ -212,11 +216,8 @@ export default function LandmarkGuestbookScreen({
     <SafeAreaView edges={["top"]} style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backButtonText}>←</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color="#8b4513" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{landmarkName || "랜드마크"} 방명록</Text>
         <View style={styles.headerSpacer} />
@@ -321,11 +322,10 @@ const styles = StyleSheet.create({
     padding: 20,
     justifyContent: "space-between",
   },
-  headerEmoji: {
+  headerEmojiText: {
     fontSize: 18,
     fontWeight: "700",
     color: "#8b4513",
-    lineHeight: 32,
   },
   headerSubtitle: {
     fontSize: 14,

@@ -11,6 +11,7 @@ import {
   PanResponder,
   TouchableWithoutFeedback,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 type Props = {
   distanceKm: number;
@@ -107,7 +108,7 @@ export default function RunStatsSidePanel({
       {/* 통계 내용 */}
       <View style={styles.content}>
         <View style={styles.statItem}>
-          <Text style={styles.statIcon}>⏱</Text>
+          <Ionicons name="time-outline" size={18} color="#111827" style={styles.statIconGap} />
           <Text style={styles.statLabel}>시간</Text>
           <Text style={styles.statValue}>{formatTime(elapsedSec)}</Text>
         </View>
@@ -115,7 +116,7 @@ export default function RunStatsSidePanel({
         <View style={styles.divider} />
 
         <View style={styles.statItem}>
-          <Text style={styles.statIcon}>📏</Text>
+          <Ionicons name="map-outline" size={18} color="#111827" style={styles.statIconGap} />
           <Text style={styles.statLabel}>거리</Text>
           <Text style={styles.statValue}>{distanceKm.toFixed(2)}km</Text>
         </View>
@@ -123,7 +124,7 @@ export default function RunStatsSidePanel({
         <View style={styles.divider} />
 
         <View style={styles.statItem}>
-          <Text style={styles.statIcon}>⚡</Text>
+          <Ionicons name="flash-outline" size={18} color="#111827" style={styles.statIconGap} />
           <Text style={styles.statLabel}>페이스</Text>
           <Text style={styles.statValue}>{paceLabel}</Text>
         </View>
@@ -131,7 +132,7 @@ export default function RunStatsSidePanel({
         <View style={styles.divider} />
 
         <View style={styles.statItem}>
-          <Text style={styles.statIcon}>🔥</Text>
+          <Ionicons name="flame-outline" size={18} color="#111827" style={styles.statIconGap} />
           <Text style={styles.statLabel}>칼로리</Text>
           <Text style={styles.statValue}>{Math.round(kcal)}</Text>
         </View>
@@ -184,10 +185,7 @@ const styles = StyleSheet.create({
   statItem: {
     alignItems: "center",
   },
-  statIcon: {
-    fontSize: 18,
-    marginBottom: 2,
-  },
+  statIconGap: { marginBottom: 2 },
   statLabel: {
     fontSize: 9,
     color: "#6B7280",

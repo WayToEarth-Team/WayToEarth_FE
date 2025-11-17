@@ -2,8 +2,9 @@
 // 여정 진행률 표시 카드
 
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Pressable } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 
 type Props = {
   progressPercent: number;
@@ -15,6 +16,7 @@ type Props = {
     id?: number;
   } | null;
   onPressGuestbook?: (landmarkId: number) => void;
+  onPressCenter?: () => void;
 };
 
 export default function JourneyProgressCard({
@@ -23,6 +25,7 @@ export default function JourneyProgressCard({
   totalDistanceKm,
   nextLandmark,
   onPressGuestbook,
+  onPressCenter,
 }: Props) {
   const remainingKm = Math.max(0, totalDistanceKm - currentDistanceKm);
 
@@ -30,7 +33,21 @@ export default function JourneyProgressCard({
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>여정 진행률</Text>
-        <Text style={styles.percent}>{progressPercent.toFixed(1)}%</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Pressable
+            onPress={onPressCenter}
+            disabled={!onPressCenter}
+            style={({ pressed }) => [
+              styles.iconBtn,
+              pressed && { opacity: 0.7 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="가상 현재 위치로 이동"
+          >
+            <Ionicons name="locate-outline" size={16} color="#111827" />
+          </Pressable>
+          <Text style={styles.percent}>{progressPercent.toFixed(1)}%</Text>
+        </View>
       </View>
 
       <View style={styles.progressBarContainer}>
@@ -50,7 +67,9 @@ export default function JourneyProgressCard({
       <View style={styles.stats}>
         <View style={styles.statItem}>
           <Text style={styles.statLabel}>완주</Text>
-          <Text style={styles.statValue}>{currentDistanceKm.toFixed(2)} km</Text>
+          <Text style={styles.statValue}>
+            {currentDistanceKm.toFixed(2)} km
+          </Text>
         </View>
 
         <View style={styles.statItem}>
@@ -66,7 +85,8 @@ export default function JourneyProgressCard({
               <Text style={styles.nextLandmarkLabel}>다음 랜드마크</Text>
               <Text style={styles.nextLandmarkName}>{nextLandmark.name}</Text>
               <Text style={styles.nextLandmarkDistance}>
-                {(nextLandmark.distanceKm - currentDistanceKm).toFixed(2)} km 남음
+                {(nextLandmark.distanceKm - currentDistanceKm).toFixed(2)} km
+                남음
               </Text>
             </View>
             {nextLandmark.id && onPressGuestbook && (
@@ -74,7 +94,12 @@ export default function JourneyProgressCard({
                 style={styles.guestbookButton}
                 onPress={() => onPressGuestbook(nextLandmark.id!)}
               >
-                <Text style={styles.guestbookButtonText}>📋</Text>
+                <Ionicons
+                  name="document-text-outline"
+                  size={18}
+                  color="#111827"
+                  style={{ marginBottom: 2 }}
+                />
                 <Text style={styles.guestbookButtonLabel}>방명록</Text>
               </TouchableOpacity>
             )}
@@ -118,6 +143,16 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(99, 102, 241, 0.3)",
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
+  },
+  iconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
   progressBarContainer: {
     marginBottom: 10,

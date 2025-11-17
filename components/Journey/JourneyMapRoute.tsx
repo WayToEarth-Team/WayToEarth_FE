@@ -4,7 +4,7 @@ import MapView, {
   Polyline,
   LatLng as RNLatLng,
 } from "react-native-maps";
-import { StyleSheet, View, Text, Pressable, Animated } from "react-native";
+import { StyleSheet, View, Text, Pressable, Animated, Image } from "react-native";
 import type { LatLng } from "../../types/types";
 import * as Location from "expo-location";
 
@@ -29,10 +29,17 @@ type Props = {
   progressPercent: number;
   // 가상 경로 인덱스 (거리 기반)
   virtualRouteIndex?: number;
+  // 현재 위치 마커에 표시할 아바타 이미지 URL (있으면 아바타로 표시)
+  currentAvatarUrl?: string;
+  // 아바타 이미지 로드 콜백(옵션)
+  onAvatarLoaded?: () => void;
+  onAvatarError?: (e?: any) => void;
   // 지도 준비 완료 콜백
   onMapReady?: () => void;
   // 스냅샷 바인딩
   onBindSnapshot?: (fn: () => Promise<string | null>) => void;
+  onBindCenter?: (fn: () => void) => void;
+  centerSignal?: number;
   // 랜드마크 마커 클릭 콜백
   onLandmarkPress?: (landmark: JourneyLandmark) => void;
 };
@@ -231,6 +238,11 @@ export default function JourneyMapRoute({
   currentLocation,
   progressPercent,
   virtualRouteIndex,
+  currentAvatarUrl,
+  onAvatarLoaded,
+  onAvatarError,
+  onBindCenter,
+  centerSignal,
   onMapReady,
   onBindSnapshot,
   onLandmarkPress,
@@ -238,6 +250,9 @@ export default function JourneyMapRoute({
   const mapRef = useRef<MapView>(null);
   const [mapReady, setMapReady] = useState(false);
   const hasFittedRef = useRef(false);
+  const [avatarTracks, setAvatarTracks] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
+  const prevAvatarUrlRef = useRef<string | undefined>(undefined);
 
   // 가상 위치(진행률 기반 마커)로 이동
   const moveToVirtualLocation = () => {
@@ -352,6 +367,30 @@ export default function JourneyMapRoute({
     setMapReady(true);
     onMapReady?.();
   };
+
+  // 외부로 센터링 함수 바인딩
+  useEffect(() => {
+    if (!onBindCenter) return;
+    onBindCenter(() => moveToVirtualLocation());
+  }, [onBindCenter, currentLocation]);
+
+  // 외부 신호로 센터 이동 트리거
+  useEffect(() => {
+    if (centerSignal == null) return;
+    moveToVirtualLocation();
+  }, [centerSignal]);
+
+  // RN Maps 마커 이미지 갱신 보장: URL이 바뀔 때 잠시 tracksViewChanges 강제 ON
+  useEffect(() => {
+    const url = currentAvatarUrl || undefined;
+    if (prevAvatarUrlRef.current === url) return;
+    prevAvatarUrlRef.current = url;
+    if (!url) return;
+    setAvatarError(false);
+    setAvatarTracks(true);
+    const t = setTimeout(() => setAvatarTracks(false), 1500);
+    return () => clearTimeout(t);
+  }, [currentAvatarUrl]);
 
   // 📍 최적화: currentLocation 객체 전체 대신 좌표 값만 의존성으로 사용
   const currentLat = currentLocation?.latitude;
@@ -501,28 +540,42 @@ export default function JourneyMapRoute({
       {/* 랜드마크 마커 (useMemo로 캐싱됨) */}
       {landmarkMarkers}
 
-      {/* 현재 위치 마커 - 모던한 펄싱 디자인 */}
+      {/* 현재 위치 마커 - 아바타(있으면) 또는 펄싱 점 */}
       {currentLocation && (
         <Marker
           coordinate={currentLocation as RNLatLng}
           title="현재 위치"
           anchor={{ x: 0.5, y: 0.5 }}
+          tracksViewChanges={currentAvatarUrl ? avatarTracks : false}
         >
-          <View style={styles.currentPosContainer}>
-            {/* 외곽 펄스 링 */}
-            <View style={styles.pulseRingOuter} />
-            <View style={styles.pulseRingInner} />
-            {/* 중심 점 */}
-            <View style={styles.currentPosDot} />
-          </View>
+          {currentAvatarUrl && !avatarError ? (
+            <View style={styles.avatarContainer}>
+              {/* 외곽 반투명 링 */}
+              <View style={styles.avatarRing} />
+              {/* 아바타 이미지 */}
+              <Image
+                key={currentAvatarUrl}
+                source={{ uri: currentAvatarUrl }}
+                style={styles.avatarImage}
+                resizeMode="cover"
+                fadeDuration={0}
+                onLoadStart={() => { setAvatarError(false); setAvatarTracks(true); }}
+                onLoad={() => { setAvatarTracks(false); try { onAvatarLoaded?.(); } catch {} }}
+                onError={(e) => { setAvatarTracks(false); setAvatarError(true); try { console.warn('[JourneyMapRoute] Avatar load error:', e?.nativeEvent); } catch {} try { onAvatarError?.(e?.nativeEvent); } catch {} }}
+              />
+            </View>
+          ) : (
+            <View style={styles.currentPosContainer}>
+              {/* 외곽 펄스 링 */}
+              <View style={styles.pulseRingOuter} />
+              <View style={styles.pulseRingInner} />
+              {/* 중심 점 */}
+              <View style={styles.currentPosDot} />
+            </View>
+          )}
         </Marker>
       )}
       </MapView>
-
-      {/* 커스텀 위치 버튼 (우측 상단) - 가상 위치로 이동 */}
-      <Pressable style={styles.gpsButton} onPress={moveToVirtualLocation}>
-        <Text style={styles.gpsIcon}>📍</Text>
-      </Pressable>
     </View>
   );
 }
@@ -530,25 +583,6 @@ export default function JourneyMapRoute({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
-  gpsButton: {
-    position: "absolute",
-    top: 60,
-    right: 16,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 6,
-  },
-  gpsIcon: {
-    fontSize: 24,
-  },
   // 🎯 모던한 핀 스타일 마커
   markerContainer: {
     alignItems: "center",
@@ -651,5 +685,34 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 0 },
     elevation: 15,
+  },
+  // 아바타 마커 스타일
+  avatarContainer: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarRing: {
+    position: 'absolute',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(59, 130, 246, 0.18)',
+    borderWidth: 2,
+    borderColor: 'rgba(59, 130, 246, 0.28)',
+  },
+  avatarImage: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 3,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
+    backgroundColor: '#e5e7eb',
   },
 });

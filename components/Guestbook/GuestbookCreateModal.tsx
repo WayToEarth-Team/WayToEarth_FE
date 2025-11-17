@@ -1,6 +1,7 @@
 // components/Guestbook/GuestbookCreateModal.tsx
 import React, { useState } from "react";
 import { View, Text, Modal, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Switch, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { PositiveAlert, NegativeAlert, MessageAlert, DestructiveConfirm, ConfirmAlert } from "../ui/AlertDialog";
 import {
@@ -139,7 +140,7 @@ export default function GuestbookCreateModal({
           <ScrollView style={styles.content}>
             {/* 랜드마크 정보 */}
             <View style={styles.landmarkInfo}>
-              <Text style={styles.landmarkIcon}>📍</Text>
+              <Ionicons name="location-outline" size={24} color="#111" style={styles.landmarkIconGap} />
               <View style={styles.landmarkDetails}>
                 <Text style={styles.landmarkName}>{landmark.name}</Text>
                 <Text style={styles.landmarkLocation}>
@@ -250,6 +251,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     marginRight: 12,
   },
+  landmarkIconGap: { marginRight: 12 },
   landmarkDetails: {
     flex: 1,
   },

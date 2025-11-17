@@ -1,7 +1,13 @@
 // components/Landmark/StampBottomSheet.tsx
 // 스탬프 수집 바텀시트 - HTML 디자인 완전 동일하게 구현
 
-import React, { useMemo, useRef, useEffect, useState, useCallback } from "react";
+import React, {
+  useMemo,
+  useRef,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 import {
   View,
   Text,
@@ -17,6 +23,7 @@ import {
   Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import type { LatLng } from "../../types/types";
 import type { JourneyId } from "../../types/journey";
 import {
@@ -29,7 +36,10 @@ import {
 import { getLandmarkDetail } from "../../utils/api/landmarks";
 import { distanceKm } from "../../utils/geo";
 import { useNavigation } from "@react-navigation/native";
-import { addStampCollectedListener, type StampCollectedPayload } from "../../utils/navEvents";
+import {
+  addStampCollectedListener,
+  type StampCollectedPayload,
+} from "../../utils/navEvents";
 
 type LandmarkLite = { id: number; name: string; distanceM?: number };
 
@@ -59,13 +69,17 @@ export default function StampBottomSheet({
   extraCollectedIds,
 }: Props) {
   const navigation = useNavigation<any>();
-  const translateY = useRef(new Animated.Value(MAX_HEIGHT - COLLAPSED_PEEK)).current;
+  const translateY = useRef(
+    new Animated.Value(MAX_HEIGHT - COLLAPSED_PEEK)
+  ).current;
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [progressId, setProgressId] = useState<string | null>(null);
   const [stamps, setStamps] = useState<StampResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [landmarkDetails, setLandmarkDetails] = useState<Map<number, any>>(new Map());
+  const [landmarkDetails, setLandmarkDetails] = useState<Map<number, any>>(
+    new Map()
+  );
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successStamp, setSuccessStamp] = useState<StampResponse | null>(null);
   const lastTap = useRef<number | null>(null);
@@ -106,7 +120,11 @@ export default function StampBottomSheet({
         });
       } catch {}
     });
-    return () => { try { sub.remove(); } catch {} };
+    return () => {
+      try {
+        sub.remove();
+      } catch {}
+    };
   }, []);
 
   // 각 랜드마크의 상세 정보 로드 (이미지, 위치 등) - 최초 1회만
@@ -127,10 +145,12 @@ export default function StampBottomSheet({
         loadedIdsRef.current.delete(lm.id);
       }
     });
-  }, [landmarks.map(l => l.id).join(','), userId]);
+  }, [landmarks.map((l) => l.id).join(","), userId]);
 
   const collectedIds = useMemo(() => {
-    const internalIds = stamps.map((s) => s.landmark?.id).filter(Boolean) as number[];
+    const internalIds = stamps
+      .map((s) => s.landmark?.id)
+      .filter(Boolean) as number[];
     const extra = Array.isArray(extraCollectedIds) ? extraCollectedIds : [];
     return new Set<number>([...internalIds, ...extra]);
   }, [stamps, extraCollectedIds]);
@@ -266,35 +286,38 @@ export default function StampBottomSheet({
     })
   ).current;
 
-  const showSuccessModal = useCallback((stamp: StampResponse) => {
-    setSuccessStamp(stamp);
-    setSuccessModalVisible(true);
+  const showSuccessModal = useCallback(
+    (stamp: StampResponse) => {
+      setSuccessStamp(stamp);
+      setSuccessModalVisible(true);
 
-    // 모달 애니메이션
-    modalScale.setValue(0);
-    modalBounce.setValue(0);
+      // 모달 애니메이션
+      modalScale.setValue(0);
+      modalBounce.setValue(0);
 
-    Animated.sequence([
-      Animated.spring(modalScale, {
-        toValue: 1,
-        useNativeDriver: true,
-        stiffness: 200,
-        damping: 15,
-      }),
       Animated.sequence([
-        Animated.timing(modalBounce, {
-          toValue: -20,
-          duration: 300,
+        Animated.spring(modalScale, {
+          toValue: 1,
           useNativeDriver: true,
+          stiffness: 200,
+          damping: 15,
         }),
-        Animated.timing(modalBounce, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
-  }, [modalScale, modalBounce]);
+        Animated.sequence([
+          Animated.timing(modalBounce, {
+            toValue: -20,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(modalBounce, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    },
+    [modalScale, modalBounce]
+  );
 
   const handleCollect = useCallback(async () => {
     if (!progressId || !nextCollectable) return;
@@ -310,10 +333,14 @@ export default function StampBottomSheet({
         setError("스탬프 수집 조건이 충족되지 않았습니다 (거리/진행률 확인)");
         return;
       }
-      const granted = await collectStampForProgress(progressId, nextCollectable.id, {
-        latitude: currentLocation.latitude,
-        longitude: currentLocation.longitude,
-      });
+      const granted = await collectStampForProgress(
+        progressId,
+        nextCollectable.id,
+        {
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+        }
+      );
       setStamps((prev) => [granted, ...prev]);
       onCollected?.(granted);
 
@@ -324,7 +351,13 @@ export default function StampBottomSheet({
     } finally {
       setLoading(false);
     }
-  }, [progressId, nextCollectable, currentLocation, onCollected, showSuccessModal]);
+  }, [
+    progressId,
+    nextCollectable,
+    currentLocation,
+    onCollected,
+    showSuccessModal,
+  ]);
 
   const closeSuccessModal = useCallback(() => {
     setSuccessModalVisible(false);
@@ -355,14 +388,26 @@ export default function StampBottomSheet({
           <View style={styles.header}>
             <Text style={styles.title}>랜드마크 스탬프</Text>
             <View style={styles.subtitleRow}>
-              <Text style={styles.subtitle}>🎯 각 위치에 도착해서 스탬프를 수집하세요</Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  flex: 1,
+                }}
+              >
+                <Ionicons name="flag-outline" size={16} color="#666" />
+                <Text style={styles.subtitle}>
+                  각 위치에 도착해서 스탬프를 수집하세요
+                </Text>
+              </View>
               <LinearGradient
                 colors={["#667eea", "#764ba2"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.badge}
               >
-                <Text style={styles.badgeText}>✨</Text>
+                <Ionicons name="star-outline" size={14} color="#fff" />
                 <Text style={styles.badgeText}>
                   {Math.max(0, Math.min(100, progressPercent)).toFixed(0)}%
                 </Text>
@@ -393,18 +438,26 @@ export default function StampBottomSheet({
               let distanceText = null;
               if (!collected && lm.distanceRemaining != null) {
                 const km = lm.distanceRemaining / 1000;
-                distanceText = km >= 1 ? `${km.toFixed(1)}km 남음` : `${Math.round(lm.distanceRemaining)}m 남음`;
+                distanceText =
+                  km >= 1
+                    ? `${km.toFixed(1)}km 남음`
+                    : `${Math.round(lm.distanceRemaining)}m 남음`;
               }
 
               return (
                 <TouchableOpacity
                   key={lm.id}
                   activeOpacity={0.85}
-                  style={[styles.stampCard, collected && styles.stampCardCollected]}
+                  style={[
+                    styles.stampCard,
+                    collected && styles.stampCardCollected,
+                  ]}
                   onPress={() => {
                     if (!collected) return;
                     try {
-                      navigation?.navigate?.("LandmarkGuestbookScreen", { landmarkId: lm.id });
+                      navigation?.navigate?.("LandmarkGuestbookScreen", {
+                        landmarkId: lm.id,
+                      });
                     } catch {}
                   }}
                 >
@@ -417,14 +470,22 @@ export default function StampBottomSheet({
                       />
                     ) : (
                       <View style={styles.stampPlaceholder}>
-                        <Text style={styles.stampEmoji}>🏛️</Text>
+                        <Ionicons
+                          name="business-outline"
+                          size={40}
+                          color="#9CA3AF"
+                        />
                       </View>
                     )}
 
                     {/* 미수집: 반투명 오버레이 (이미지는 보이되 흐리게) */}
                     {!collected && (
                       <View style={styles.stampLockedOverlay}>
-                        <Text style={styles.lockIcon}>🔒</Text>
+                        <Ionicons
+                          name="lock-closed-outline"
+                          size={32}
+                          color="#fff"
+                        />
                       </View>
                     )}
 
@@ -436,14 +497,20 @@ export default function StampBottomSheet({
                         end={{ x: 1, y: 1 }}
                         style={styles.stampCheckmark}
                       >
-                        <Text style={styles.checkmarkText}>✓</Text>
+                        <Ionicons
+                          name="checkmark-outline"
+                          size={18}
+                          color="#fff"
+                        />
                       </LinearGradient>
                     )}
 
                     {/* 거리 배지 */}
                     {distanceText && (
                       <View style={styles.stampDistanceBadge}>
-                        <Text style={styles.distanceBadgeText}>{distanceText}</Text>
+                        <Text style={styles.distanceBadgeText}>
+                          {distanceText}
+                        </Text>
                       </View>
                     )}
                   </View>
@@ -452,9 +519,22 @@ export default function StampBottomSheet({
                     <Text style={styles.stampName} numberOfLines={1}>
                       {lm.name}
                     </Text>
-                    <Text style={styles.stampLocation}>
-                      📍 {detail?.cityName || "위치"}
-                    </Text>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
+                      <Ionicons
+                        name="location-outline"
+                        size={14}
+                        color="#999"
+                      />
+                      <Text style={styles.stampLocation}>
+                        {detail?.cityName || "위치"}
+                      </Text>
+                    </View>
                   </View>
                 </TouchableOpacity>
               );
@@ -474,7 +554,9 @@ export default function StampBottomSheet({
           >
             <LinearGradient
               colors={
-                nextCollectable && !loading ? ["#667eea", "#764ba2"] : ["#E0E0E0", "#E0E0E0"]
+                nextCollectable && !loading
+                  ? ["#667eea", "#764ba2"]
+                  : ["#E0E0E0", "#E0E0E0"]
               }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -484,7 +566,7 @@ export default function StampBottomSheet({
                 <ActivityIndicator color="#fff" />
               ) : (
                 <>
-                  <Text style={styles.collectBtnIcon}>📍</Text>
+                  <Ionicons name="location-outline" size={20} color="#fff" />
                   <Text
                     style={[
                       styles.collectBtnText,
@@ -514,23 +596,28 @@ export default function StampBottomSheet({
             style={[
               styles.modalContent,
               {
-                transform: [
-                  { scale: modalScale },
-                  { translateY: modalBounce },
-                ],
+                transform: [{ scale: modalScale }, { translateY: modalBounce }],
               },
             ]}
           >
-            <Text style={styles.modalIcon}>🎉</Text>
+            <View style={{ marginBottom: 20 }}>
+              <Ionicons name="trophy-outline" size={80} color="#111827" />
+            </View>
             <Text style={styles.modalTitle}>스탬프 획득!</Text>
             <View style={styles.modalStampPreview}>
-              <Text style={styles.modalStampEmoji}>🏛️</Text>
+              <Ionicons name="business-outline" size={64} color="#6B7280" />
             </View>
             <Text style={styles.modalText}>
-              <Text style={styles.modalBold}>{successStamp?.landmark?.name}</Text> 스탬프를
-              성공적으로 수집했습니다!{"\n"}계속해서 여정을 이어가보세요.
+              <Text style={styles.modalBold}>
+                {successStamp?.landmark?.name}
+              </Text>{" "}
+              스탬프를 성공적으로 수집했습니다!{"\n"}계속해서 여정을
+              이어가보세요.
             </Text>
-            <TouchableOpacity onPress={closeSuccessModal} style={styles.modalBtn}>
+            <TouchableOpacity
+              onPress={closeSuccessModal}
+              style={styles.modalBtn}
+            >
               <LinearGradient
                 colors={["#667eea", "#764ba2"]}
                 start={{ x: 0, y: 0 }}

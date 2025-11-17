@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import type { StoryType } from '../../types/landmark';
 
 type Props = {
@@ -11,10 +12,10 @@ type Props = {
 };
 
 const TABS = [
-  { type: null, label: '전체', emoji: '📋' },
-  { type: 'HISTORY' as StoryType, label: '역사', emoji: '📘' },
-  { type: 'CULTURE' as StoryType, label: '문화', emoji: '🎭' },
-  { type: 'NATURE' as StoryType, label: '자연', emoji: '🌿' },
+  { type: null, label: '전체', icon: 'grid-outline' as const },
+  { type: 'HISTORY' as StoryType, label: '역사', icon: 'book-outline' as const },
+  { type: 'CULTURE' as StoryType, label: '문화', icon: 'color-palette-outline' as const },
+  { type: 'NATURE' as StoryType, label: '자연', icon: 'leaf-outline' as const },
 ];
 
 export default function StoryTypeTabs({ selectedType, onSelectType }: Props) {
@@ -36,15 +37,17 @@ export default function StoryTypeTabs({ selectedType, onSelectType }: Props) {
           >
             {isActive ? (
               <View style={styles.activeTab}>
-                <Text style={styles.activeTabText}>
-                  {tab.emoji} {tab.label}
-                </Text>
+                <View style={styles.rowCenter}>
+                  <Ionicons name={tab.icon} size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.activeTabText}>{tab.label}</Text>
+                </View>
               </View>
             ) : (
               <View style={styles.inactiveTab}>
-                <Text style={styles.inactiveTabText}>
-                  {tab.emoji} {tab.label}
-                </Text>
+                <View style={styles.rowCenter}>
+                  <Ionicons name={tab.icon} size={14} color="#6B7280" style={{ marginRight: 6 }} />
+                  <Text style={styles.inactiveTabText}>{tab.label}</Text>
+                </View>
               </View>
             )}
           </TouchableOpacity>

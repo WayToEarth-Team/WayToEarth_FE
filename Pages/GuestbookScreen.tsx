@@ -1,6 +1,7 @@
 // Pages/GuestbookScreen.tsx
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Image } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   getRecentGuestbooks,
@@ -130,7 +131,7 @@ export default function GuestbookScreen({ navigation }: { navigation?: any }) {
           <View style={styles.decorativeDot} />
         </View>
         <View style={styles.landmarkBadgeContent}>
-          <Text style={styles.landmarkIcon}>📍</Text>
+          <Ionicons name="location-outline" size={16} color="#8b4513" style={{ marginRight: 4 }} />
           <Text style={styles.landmarkName} numberOfLines={1}>
             {item.landmark.name}
           </Text>
@@ -151,7 +152,7 @@ export default function GuestbookScreen({ navigation }: { navigation?: any }) {
         />
       ) : (
         <View style={[styles.landmarkImage, styles.landmarkImagePlaceholder]}>
-          <Text style={styles.landmarkImageEmoji}>🏯</Text>
+          <Ionicons name="image-outline" size={64} color="#9CA3AF" />
         </View>
       )}
 
@@ -175,7 +176,10 @@ export default function GuestbookScreen({ navigation }: { navigation?: any }) {
 
       {/* 정보 영역 */}
       <View style={styles.headerContent}>
-        <Text style={styles.headerEmoji}>🌍 여행자들의 이야기</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Ionicons name="globe-outline" size={18} color="#8b4513" />
+          <Text style={styles.headerEmojiText}>여행자들의 이야기</Text>
+        </View>
         <Text style={styles.headerSubtitle}>
           다른 러너들의 여행 이야기를 확인해보세요
         </Text>
@@ -198,7 +202,7 @@ export default function GuestbookScreen({ navigation }: { navigation?: any }) {
     if (error) {
       return (
         <View style={styles.centerContainer}>
-          <Text style={styles.errorIcon}>😅</Text>
+          <Ionicons name="alert-circle-outline" size={40} color="#a0522d" style={{ marginBottom: 8 }} />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
             <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -209,7 +213,7 @@ export default function GuestbookScreen({ navigation }: { navigation?: any }) {
 
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.emptyIcon}>📝</Text>
+        <Ionicons name="document-text-outline" size={40} color="#a0522d" style={{ marginBottom: 8 }} />
         <Text style={styles.emptyText}>아직 작성된 방명록이 없습니다.</Text>
         <Text style={styles.emptySubText}>
           랜드마크를 방문하고 첫 방명록을 남겨보세요!
@@ -312,12 +316,7 @@ const styles = StyleSheet.create({
     padding: 20,
     justifyContent: "space-between",
   },
-  headerEmoji: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#8b4513",
-    lineHeight: 32,
-  },
+  headerEmojiText: { fontSize: 18, fontWeight: "700", color: "#8b4513" },
   headerSubtitle: {
     fontSize: 14,
     color: "#a0522d",
@@ -461,9 +460,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     gap: 6,
   },
-  landmarkIcon: {
-    fontSize: 16,
-  },
+  landmarkIcon: { fontSize: 16 },
   landmarkName: {
     fontSize: 14,
     fontWeight: "600",
@@ -493,9 +490,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#f4f1e8",
   },
-  landmarkImageEmoji: {
-    fontSize: 64,
-  },
+  landmarkImageEmoji: { fontSize: 64 },
   decorativeLines: {
     position: "absolute",
     right: 16,

@@ -1,7 +1,13 @@
 // Pages/JourneyRunningScreen.tsx
 // 여정 러닝 메인 화면 (실시간 추적 + 진행률)
 
-import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+} from "react";
 import * as Location from "expo-location";
 import SafeLayout from "../components/Layout/SafeLayout";
 import {
@@ -31,6 +37,7 @@ import { useJourneyRunning } from "../hooks/journey/useJourneyRunning";
 import { useBackgroundRunning } from "../hooks/journey/useBackgroundRunning";
 import { useWeather } from "../contexts/WeatherContext";
 import { useAuth } from "../contexts/AuthContext";
+import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { LatLng } from "../types/types";
 import type { JourneyId } from "../types/journey";
@@ -41,6 +48,8 @@ import type { LandmarkSummary } from "../types/guestbook";
 import type { LandmarkDetail } from "../types/landmark";
 import { getLandmarkDetail } from "../utils/api/landmarks";
 import { distanceKm } from "../utils/geo";
+import { Ionicons } from "@expo/vector-icons";
+import { ConfirmAlert } from "../components/ui/AlertDialog";
 import {
   getOrFetchProgressId,
   getProgressStamps,
@@ -83,62 +92,147 @@ export default function JourneyRunningScreen(
   const journeyRoute = params.journeyRoute || [];
 
   // 로그인된 사용자 ID
-  const { userId } = useAuth();
+  const { userId, user, refreshProfile } = useAuth();
+  // 화면 포커스 시 프로필 재조회하여 만료된 아바타 URL 갱신
+  useFocusEffect(
+    React.useCallback(() => {
+      try {
+        refreshProfile();
+      } catch {}
+    }, [refreshProfile])
+  );
+  const lastAvatarUrlRef = React.useRef<string | undefined>(undefined);
+  const [cachedAvatarUrl, setCachedAvatarUrl] = React.useState<
+    string | undefined
+  >(undefined);
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
+  const [avatarBust, setAvatarBust] = useState<number>(0);
+  // 초기 마운트 시 이전에 저장된 아바타 URL 로드
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const v = await AsyncStorage.getItem("@me_avatar_url");
+        if (v && /^https?:\/\//i.test(v)) setCachedAvatarUrl(v);
+      } catch {}
+    })();
+  }, []);
+  const currentAvatarUrl = React.useMemo(() => {
+    const raw =
+      (user as any)?.profile_image_url ||
+      (user as any)?.profileImageUrl ||
+      undefined;
+    const key =
+      (user as any)?.profile_image_key ||
+      (user as any)?.updated_at ||
+      (user as any)?.updatedAt ||
+      undefined;
+    const withVersion = raw
+      ? raw.includes("?")
+        ? raw
+        : `${raw}?v=${encodeURIComponent(String(key || "1"))}`
+      : undefined;
+    if (withVersion && /^https?:\/\//i.test(withVersion)) {
+      lastAvatarUrlRef.current = withVersion; // 유효한 URL만 캐시
+      // AsyncStorage에도 저장하여 화면 재진입시 사용
+      try {
+        AsyncStorage.setItem("@me_avatar_url", withVersion).catch(() => {});
+      } catch {}
+      return withVersion;
+    }
+    // 일시적으로 user가 null이 되거나 빈 값이면 마지막 정상 URL 유지
+    return lastAvatarUrlRef.current || cachedAvatarUrl;
+  }, [user, cachedAvatarUrl]);
+
+  // 화면 포커스마다 지도(컴포넌트) 리마운트하여 Marker/이미지 상태 초기화
+  useFocusEffect(
+    React.useCallback(() => {
+      setMapKey((k) => k + 1);
+      setAvatarBust(Date.now());
+      // 포커스 시 프로필 재조회 및 이미지 프리페치
+      try {
+        refreshProfile();
+      } catch {}
+      const u = lastAvatarUrlRef.current || cachedAvatarUrl;
+      if (u) {
+        try {
+          const sep = u.includes('?') ? '&' : '?';
+          RNImage.prefetch(`${u}${sep}t=${Date.now()}`).catch(() => {});
+        } catch {}
+      }
+    }, [cachedAvatarUrl, refreshProfile])
+  );
+
+  const focusAvatarUrl = React.useMemo(() => {
+    const u = lastAvatarUrlRef.current || cachedAvatarUrl || currentAvatarUrl;
+    if (!u) return undefined;
+    const sep = u.includes('?') ? '&' : '?';
+    return `${u}${sep}t=${avatarBust}`;
+  }, [currentAvatarUrl, cachedAvatarUrl, avatarBust]);
 
   // 랜드마크 도달 시 스탬프 수집 및 방명록 작성 모달 표시
-  const handleLandmarkReached = useCallback(async (landmark: any) => {
-    if (userId == null) return;
-    console.log("[JourneyRunning] 랜드마크 도달:", landmark.name);
+  const handleLandmarkReached = useCallback(
+    async (landmark: any) => {
+      if (userId == null) return;
+      console.log("[JourneyRunning] 랜드마크 도달:", landmark.name);
 
-    // 스탬프 수집 (자동, 서버 규칙 준수: progressId/좌표 필요)
-    try {
-      const pid = progressId || (await getOrFetchProgressId(userId, journeyId));
-      const lastPoint = (t.route?.length ? t.route[t.route.length - 1] : null) as LatLng | null;
-      const lmid = parseInt(landmark.id);
-      if (pid && lastPoint && !collectedSet.has(lmid)) {
-        const can = await checkCollection(pid, lmid);
-        if (can) {
-          await collectStampForProgress(pid, lmid, { latitude: lastPoint.latitude, longitude: lastPoint.longitude });
-          setCollectedSet((prev) => new Set(prev).add(lmid));
-          console.log("[JourneyRunning] ✅ 스탬프 수집 완료:", landmark.name);
-        } else {
-          console.log("[JourneyRunning] ℹ️ 조건 미충족으로 자동 수집 생략");
+      // 스탬프 수집 (자동, 서버 규칙 준수: progressId/좌표 필요)
+      try {
+        const pid =
+          progressId || (await getOrFetchProgressId(userId, journeyId));
+        const lastPoint = (
+          t.route?.length ? t.route[t.route.length - 1] : null
+        ) as LatLng | null;
+        const lmid = parseInt(landmark.id);
+        if (pid && lastPoint && !collectedSet.has(lmid)) {
+          const can = await checkCollection(pid, lmid);
+          if (can) {
+            await collectStampForProgress(pid, lmid, {
+              latitude: lastPoint.latitude,
+              longitude: lastPoint.longitude,
+            });
+            setCollectedSet((prev) => new Set(prev).add(lmid));
+            console.log("[JourneyRunning] ✅ 스탬프 수집 완료:", landmark.name);
+          } else {
+            console.log("[JourneyRunning] ℹ️ 조건 미충족으로 자동 수집 생략");
+          }
         }
+      } catch (error) {
+        console.error("[JourneyRunning] ❌ 스탬프 수집 실패:", error);
+        // 수집 실패해도 계속 진행 (방명록은 작성 가능)
       }
-    } catch (error) {
-      console.error("[JourneyRunning] ❌ 스탬프 수집 실패:", error);
-      // 수집 실패해도 계속 진행 (방명록은 작성 가능)
-    }
 
-    // 랜드마크를 LandmarkSummary 형식으로 변환
-    const landmarkSummary: LandmarkSummary = {
-      id: parseInt(landmark.id),
-      name: landmark.name,
-      cityName: "서울", // TODO: 실제 도시명으로 교체
-      countryCode: "KR",
-      imageUrl: "", // TODO: 실제 이미지 URL로 교체
-    };
+      // 랜드마크를 LandmarkSummary 형식으로 변환
+      const landmarkSummary: LandmarkSummary = {
+        id: parseInt(landmark.id),
+        name: landmark.name,
+        cityName: "서울", // TODO: 실제 도시명으로 교체
+        countryCode: "KR",
+        imageUrl: "", // TODO: 실제 이미지 URL로 교체
+      };
 
-    setSelectedLandmark(landmarkSummary);
-    setGuestbookModalVisible(true);
+      setSelectedLandmark(landmarkSummary);
+      setGuestbookModalVisible(true);
 
-    // 축하 알림 표시
-    Alert.alert(
-      `🎉 ${landmark.name} 도착!`,
-      "스탬프를 획득했습니다! 랜드마크에 방명록을 남겨보세요.",
-      [
-        {
-          text: "나중에",
-          style: "cancel",
-          onPress: () => {
-            setGuestbookModalVisible(false);
-            setSelectedLandmark(null);
+      // 축하 알림 표시
+      Alert.alert(
+        `🎉 ${landmark.name} 도착!`,
+        "스탬프를 획득했습니다! 랜드마크에 방명록을 남겨보세요.",
+        [
+          {
+            text: "나중에",
+            style: "cancel",
+            onPress: () => {
+              setGuestbookModalVisible(false);
+              setSelectedLandmark(null);
+            },
           },
-        },
-        { text: "방명록 작성", onPress: () => {} },
-      ]
-    );
-  }, [userId, journeyId, progressId, collectedSet]);
+          { text: "방명록 작성", onPress: () => {} },
+        ]
+      );
+    },
+    [userId, journeyId, progressId, collectedSet]
+  );
 
   const t = useJourneyRunning({
     journeyId,
@@ -155,14 +249,20 @@ export default function JourneyRunningScreen(
   const insets = useSafeAreaInsets();
   const [countdownVisible, setCountdownVisible] = useState(false);
   const [guestbookModalVisible, setGuestbookModalVisible] = useState(false);
-  const [selectedLandmark, setSelectedLandmark] = useState<LandmarkSummary | null>(null);
+  const [selectedLandmark, setSelectedLandmark] =
+    useState<LandmarkSummary | null>(null);
   const [landmarkMenuVisible, setLandmarkMenuVisible] = useState(false);
   const [menuLandmark, setMenuLandmark] = useState<any>(null);
-  const [landmarkDetail, setLandmarkDetail] = useState<LandmarkDetail | null>(null);
+  const [landmarkDetail, setLandmarkDetail] = useState<LandmarkDetail | null>(
+    null
+  );
   const [progressId, setProgressId] = useState<string | null>(null);
   const [collectedSet, setCollectedSet] = useState<Set<number>>(new Set());
   const collectingRef = useRef<Set<number>>(new Set());
-  const [celebrate, setCelebrate] = useState<{ visible: boolean; count?: number }>({ visible: false });
+  const [celebrate, setCelebrate] = useState<{
+    visible: boolean;
+    count?: number;
+  }>({ visible: false });
   const celebratedKmRef = React.useRef<Set<number>>(new Set());
   const celebratingRef = React.useRef(false);
 
@@ -171,7 +271,10 @@ export default function JourneyRunningScreen(
     if (landmarkMenuVisible && menuLandmark) {
       const fetchLandmarkDetail = async () => {
         try {
-          const detail = await getLandmarkDetail(parseInt(menuLandmark.id), userId ?? undefined);
+          const detail = await getLandmarkDetail(
+            parseInt(menuLandmark.id),
+            userId ?? undefined
+          );
           setLandmarkDetail(detail);
         } catch (err) {
           console.error("[JourneyRunning] 랜드마크 상세 로드 실패:", err);
@@ -196,30 +299,47 @@ export default function JourneyRunningScreen(
         if (pid) {
           const list = await getProgressStamps(pid);
           if (!alive) return;
-          const ids = new Set<number>(list.map((s) => s.landmark?.id).filter((v): v is number => v != null));
+          const ids = new Set<number>(
+            list
+              .map((s) => s.landmark?.id)
+              .filter((v): v is number => v != null)
+          );
           setCollectedSet(ids);
         }
       } catch {}
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [userId, journeyId]);
 
   // 날씨 정보 (이 화면에서만 위치/날씨 활성화)
-  const { weather, loading: weatherLoading, enable: enableWeather, disable: disableWeather } = useWeather();
+  const {
+    weather,
+    loading: weatherLoading,
+    enable: enableWeather,
+    disable: disableWeather,
+  } = useWeather();
   useEffect(() => {
-    try { enableWeather(); } catch {}
-    return () => { try { disableWeather(); } catch {} };
+    try {
+      enableWeather();
+    } catch {}
+    return () => {
+      try {
+        disableWeather();
+      } catch {}
+    };
   }, []);
 
   // 다음 랜드마크 계산
   // 도달한 랜드마크 ID 목록을 훅의 landmarksWithReached에서 파생
   const reachedIds = useMemo(
-    () => t.landmarksWithReached.filter(lm => lm.reached).map(lm => lm.id),
+    () => t.landmarksWithReached.filter((lm) => lm.reached).map((lm) => lm.id),
     [t.landmarksWithReached]
   );
 
   const nextLandmark = useMemo(() => {
-    const remaining = landmarks.filter(lm => !reachedIds.includes(lm.id));
+    const remaining = landmarks.filter((lm) => !reachedIds.includes(lm.id));
     return remaining[0]?.name;
   }, [landmarks, reachedIds]);
 
@@ -228,11 +348,11 @@ export default function JourneyRunningScreen(
     if (!t.isRunning) return;
 
     const session = {
-      type: 'journey' as const,
+      type: "journey" as const,
       journeyId,
       journeyTitle,
       sessionId: t.sessionId,
-      startTime: Date.now() - (t.elapsedSec * 1000),
+      startTime: Date.now() - t.elapsedSec * 1000,
       distanceKm: t.distance,
       durationSeconds: t.elapsedSec,
       isRunning: t.isRunning,
@@ -251,11 +371,11 @@ export default function JourneyRunningScreen(
   useEffect(() => {
     if (t.isRunning) {
       const session = {
-        type: 'journey' as const,
+        type: "journey" as const,
         journeyId,
         journeyTitle,
         sessionId: t.sessionId,
-        startTime: Date.now() - (t.elapsedSec * 1000),
+        startTime: Date.now() - t.elapsedSec * 1000,
         distanceKm: t.distance,
         durationSeconds: t.elapsedSec,
         isRunning: true,
@@ -299,21 +419,40 @@ export default function JourneyRunningScreen(
       try {
         const can = await checkCollection(progressId, idNum);
         if (!can) return;
-        await collectStampForProgress(progressId, idNum, { latitude: last.latitude, longitude: last.longitude });
+        await collectStampForProgress(progressId, idNum, {
+          latitude: last.latitude,
+          longitude: last.longitude,
+        });
         setCollectedSet((prev) => new Set(prev).add(idNum));
-        Alert.alert(`🎉 ${target.name} 도착!`, "스탬프를 획득했습니다! 랜드마크에 방명록을 남겨보세요.");
+        try {
+          setCelebrate({ visible: true, count: 1 });
+          setTimeout(() => setCelebrate({ visible: false }), 3200);
+        } catch {}
+        Alert.alert(
+          `🎉 ${target.name} 도착!`,
+          "스탬프를 획득했습니다! 랜드마크에 방명록을 남겨보세요."
+        );
       } catch (e) {
         // 무시: 다음 업데이트에서 재시도
       } finally {
         setTimeout(() => collectingRef.current.delete(idNum), 4000);
       }
     })();
-  }, [t.route?.length, t.isRunning, t.isPaused, progressId, landmarks, collectedSet]);
+  }, [
+    t.route?.length,
+    t.isRunning,
+    t.isPaused,
+    progressId,
+    landmarks,
+    collectedSet,
+  ]);
 
   const handleStartPress = useCallback(() => {
     console.log("[JourneyRunning] start pressed -> show countdown");
     // 카운트다운 동안 초기 위치를 예열해 정확도 확보
-    try { (t as any).prime?.(); } catch {}
+    try {
+      (t as any).prime?.();
+    } catch {}
     setCountdownVisible(true);
   }, []);
 
@@ -327,155 +466,55 @@ export default function JourneyRunningScreen(
     });
     // 탭바 숨김 즉시 반영 및 세션 플래그 저장
     try {
-      await AsyncStorage.setItem('@running_session', JSON.stringify({ isRunning: true, sessionId: t.sessionId || `journey-${Date.now()}`, startTime: Date.now() }));
+      await AsyncStorage.setItem(
+        "@running_session",
+        JSON.stringify({
+          isRunning: true,
+          sessionId: t.sessionId || `journey-${Date.now()}`,
+          startTime: Date.now(),
+        })
+      );
     } catch {}
-    try { emitRunningSession(true); } catch {}
+    try {
+      emitRunningSession(true);
+    } catch {}
     // 알림 권한 요청은 비동기로 병렬 처리
     backgroundRunning.requestNotificationPermission().catch(() => {});
   }, [t, backgroundRunning]);
 
   // 러닝 상태 변화에 따라 탭바 상태 즉시 동기화(보조 안전장치)
   useEffect(() => {
-    try { emitRunningSession(!!t.isRunning); } catch {}
+    try {
+      emitRunningSession(!!t.isRunning);
+    } catch {}
   }, [t.isRunning]);
 
   // 랜드마크 마커 클릭 핸들러 - 스토리 페이지로 이동
-  const handleLandmarkMarkerPress = useCallback((landmark: any) => {
-    console.log("[JourneyRunning] 랜드마크 마커 클릭:", landmark.name);
-    navigation?.navigate("LandmarkStoryScreen", {
-      landmarkId: parseInt(landmark.id),
-      userId: userId ?? undefined,
-      distanceM: Number((landmark as any)?.distanceM ?? (landmark as any)?.distanceFromStart ?? NaN),
-    });
-  }, [navigation, userId]);
+  const handleLandmarkMarkerPress = useCallback(
+    (landmark: any) => {
+      console.log("[JourneyRunning] 랜드마크 마커 클릭:", landmark.name);
+      navigation?.navigate("LandmarkStoryScreen", {
+        landmarkId: parseInt(landmark.id),
+        userId: userId ?? undefined,
+        distanceM: Number(
+          (landmark as any)?.distanceM ??
+            (landmark as any)?.distanceFromStart ??
+            NaN
+        ),
+      });
+    },
+    [navigation, userId]
+  );
+
+  const [confirmExit, setConfirmExit] = useState(false);
+  const [confirmSave, setConfirmSave] = useState(false);
 
   const handleComplete = useCallback(async () => {
     // 먼저 일시정지 상태로 전환
     if (!t.isPaused) {
       t.pause();
     }
-
-    // 저장 여부 확인
-    Alert.alert(
-      "러닝 종료",
-      "러닝 기록을 저장하시겠습니까?",
-      [
-        {
-          text: "취소",
-          style: "cancel",
-          onPress: () => {
-            // 다시 재개
-            if (t.isPaused) {
-              t.resume();
-            }
-          },
-        },
-        {
-          text: "저장 안 함",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // 백그라운드 서비스 중지 및 세션 정리
-              await backgroundRunning.stopForegroundService();
-              await backgroundRunning.clearSession();
-              await t.stop();
-
-              // 탭바 재표시 및 세션 플래그 제거
-              try { await AsyncStorage.removeItem('@running_session'); } catch {}
-              try { emitRunningSession(false); } catch {}
-
-              // 여정 상세 화면으로 이동
-              navigation.navigate("JourneyRouteDetail", { id: journeyId });
-            } catch (e) {
-              console.error("[JourneyRunning] 러닝 종료 실패:", e);
-            }
-          },
-        },
-        {
-          text: "저장",
-          onPress: async () => {
-            try {
-              console.log("[JourneyRunning] 완료 처리 시작:", {
-                sessionId: t.sessionId,
-                distance: t.distance,
-                elapsedSec: t.elapsedSec,
-                routeLength: (t.route?.length ?? 0),
-              });
-
-              const avgPaceSec =
-                t.distance > 0 && Number.isFinite(t.elapsedSec / t.distance)
-                  ? Math.floor(t.elapsedSec / Math.max(t.distance, 0.000001))
-                  : null;
-
-              const now = Math.floor(Date.now() / 1000);
-              const routePoints = (t.route ?? []).map((p, i) => ({
-                latitude: p.latitude,
-                longitude: p.longitude,
-                sequence: i + 1,
-                t: now, // 타임스탬프 추가
-              }));
-
-              console.log("[JourneyRunning] apiComplete 호출 직전:", {
-                sessionId: t.sessionId,
-                distanceMeters: Math.round(t.distance * 1000),
-                durationSeconds: t.elapsedSec,
-                averagePaceSeconds: avgPaceSec,
-                calories: Math.round(t.kcal),
-                routePointsCount: routePoints.length,
-                title: journeyTitle,
-              });
-
-              // 러닝 완료 API 호출
-              const { runId, data } = await apiComplete({
-                sessionId: t.sessionId as string,
-                distanceMeters: Math.round(t.distance * 1000),
-                durationSeconds: t.elapsedSec,
-                averagePaceSeconds: avgPaceSec,
-                calories: Math.round(t.kcal),
-                routePoints,
-                endedAt: Date.now(),
-                title: journeyTitle,
-              });
-
-              // Extra client-side 10m emblem award (journey runs too)
-              try {
-                if (t.distance >= 0.01) {
-                  await awardEmblemByCode('DIST_10M');
-                }
-              } catch {}
-
-              console.log("[JourneyRunning] apiComplete 응답:", { runId, data });
-
-              // 10m 엠블럼(사일런트)
-              try { if (t.distance >= 0.01) { await awardEmblemByCode('DIST_10M'); } } catch {}
-
-              // 백그라운드 서비스 중지 및 세션 정리
-              await backgroundRunning.stopForegroundService();
-              await backgroundRunning.clearSession();
-
-              // 여정 진행률 업데이트
-              await t.completeJourneyRun();
-
-              console.log("[JourneyRunning] 완료 처리 성공, 요약 화면으로 이동");
-
-              // 여정 러닝은 종료 후 여정 상세(진행률/경로 확인) 화면으로 이동
-              navigation.navigate("JourneyRouteDetail", { id: journeyId });
-
-              // 러닝 트래커 정리(백그라운드 위치 업데이트 종료 보장)
-              await t.stop();
-
-              // 탭바 재표시 및 세션 플래그 제거
-              try { await AsyncStorage.removeItem('@running_session'); } catch {}
-              try { emitRunningSession(false); } catch {}
-            } catch (e) {
-              console.error("[JourneyRunning] 여정 러닝 완료 실패:", e);
-              console.error("[JourneyRunning] 에러 상세:", JSON.stringify(e, null, 2));
-              Alert.alert("저장 실패", "네트워크 또는 서버 오류가 발생했어요.");
-            }
-          },
-        },
-      ]
-    );
+    setConfirmExit(true);
   }, [navigation, t, journeyTitle, backgroundRunning, journeyId]);
 
   const elapsedLabel = useMemo(() => {
@@ -493,21 +532,30 @@ export default function JourneyRunningScreen(
     // 🔧 수정: 각 랜드마크 사이를 거리 비율로 분할
     // 현재 진행 거리로 어느 구간에 있는지 찾기
     let currentSegmentStart = 0;
-    let currentSegmentEnd = landmarks.length > 1 ? landmarks[1].distanceM : totalDistanceKm * 1000;
+    let currentSegmentEnd =
+      landmarks.length > 1 ? landmarks[1].distanceM : totalDistanceKm * 1000;
     let segmentStartIdx = 0;
     let segmentEndIdx = 0;
     if (landmarks.length > 1) {
       const lm1 = landmarks[1] as any;
-      const hasPos = lm1 && lm1.position && typeof lm1.position.latitude === 'number' && typeof lm1.position.longitude === 'number';
+      const hasPos =
+        lm1 &&
+        lm1.position &&
+        typeof lm1.position.latitude === "number" &&
+        typeof lm1.position.longitude === "number";
       if (hasPos) {
-        segmentEndIdx = journeyRoute.findIndex(p =>
-          Math.abs(p.latitude - lm1.position.latitude) < 0.0001 &&
-          Math.abs(p.longitude - lm1.position.longitude) < 0.0001
+        segmentEndIdx = journeyRoute.findIndex(
+          (p) =>
+            Math.abs(p.latitude - lm1.position.latitude) < 0.0001 &&
+            Math.abs(p.longitude - lm1.position.longitude) < 0.0001
         );
       }
       if (!hasPos || segmentEndIdx < 0) {
         // 거리 비율로 근사 인덱스 산출
-        const ratio = Math.min(1, Math.max(0, (lm1.distanceM || 0) / (totalDistanceKm * 1000)));
+        const ratio = Math.min(
+          1,
+          Math.max(0, (lm1.distanceM || 0) / (totalDistanceKm * 1000))
+        );
         segmentEndIdx = Math.floor(ratio * (journeyRoute.length - 1));
       }
     } else {
@@ -523,14 +571,18 @@ export default function JourneyRunningScreen(
 
         // 해당 랜드마크의 경로 인덱스 산출(좌표 있으면 최근접, 없으면 비율 근사)
         const landmark = landmarks[i] as any;
-        const hasPos = landmark && landmark.position && typeof landmark.position.latitude === 'number' && typeof landmark.position.longitude === 'number';
+        const hasPos =
+          landmark &&
+          landmark.position &&
+          typeof landmark.position.latitude === "number" &&
+          typeof landmark.position.longitude === "number";
         if (hasPos) {
           let minDist = 999999;
           segmentEndIdx = journeyRoute.length - 1; // 기본값: 마지막 포인트
           journeyRoute.forEach((point, idx) => {
             const dist = Math.sqrt(
               Math.pow(point.latitude - landmark.position.latitude, 2) +
-              Math.pow(point.longitude - landmark.position.longitude, 2)
+                Math.pow(point.longitude - landmark.position.longitude, 2)
             );
             if (dist < minDist) {
               minDist = dist;
@@ -538,20 +590,27 @@ export default function JourneyRunningScreen(
             }
           });
         } else {
-          const ratio = Math.min(1, Math.max(0, (landmark?.distanceM || 0) / (totalDistanceKm * 1000)));
+          const ratio = Math.min(
+            1,
+            Math.max(0, (landmark?.distanceM || 0) / (totalDistanceKm * 1000))
+          );
           segmentEndIdx = Math.floor(ratio * (journeyRoute.length - 1));
         }
 
         if (i > 0) {
           const prevLandmark = landmarks[i - 1] as any;
-          const hasPrev = prevLandmark && prevLandmark.position && typeof prevLandmark.position.latitude === 'number' && typeof prevLandmark.position.longitude === 'number';
+          const hasPrev =
+            prevLandmark &&
+            prevLandmark.position &&
+            typeof prevLandmark.position.latitude === "number" &&
+            typeof prevLandmark.position.longitude === "number";
           if (hasPrev) {
             let minDist = 999999;
             segmentStartIdx = 0; // 기본값: 첫 포인트
             journeyRoute.forEach((point, idx) => {
               const dist = Math.sqrt(
                 Math.pow(point.latitude - prevLandmark.position.latitude, 2) +
-                Math.pow(point.longitude - prevLandmark.position.longitude, 2)
+                  Math.pow(point.longitude - prevLandmark.position.longitude, 2)
               );
               if (dist < minDist) {
                 minDist = dist;
@@ -559,8 +618,16 @@ export default function JourneyRunningScreen(
               }
             });
           } else {
-            const ratioStart = Math.min(1, Math.max(0, (prevLandmark?.distanceM || 0) / (totalDistanceKm * 1000)));
-            segmentStartIdx = Math.floor(ratioStart * (journeyRoute.length - 1));
+            const ratioStart = Math.min(
+              1,
+              Math.max(
+                0,
+                (prevLandmark?.distanceM || 0) / (totalDistanceKm * 1000)
+              )
+            );
+            segmentStartIdx = Math.floor(
+              ratioStart * (journeyRoute.length - 1)
+            );
           }
         } else {
           segmentStartIdx = 0; // 첫 번째 구간의 시작은 0
@@ -573,16 +640,18 @@ export default function JourneyRunningScreen(
     // 구간 내에서의 진행 비율 계산
     const segmentDistance = currentSegmentEnd - currentSegmentStart;
     const progressInSegment = t.progressM - currentSegmentStart;
-    const segmentRatio = segmentDistance > 0 ? progressInSegment / segmentDistance : 0;
+    const segmentRatio =
+      segmentDistance > 0 ? progressInSegment / segmentDistance : 0;
 
     // 경로 포인트 인덱스 계산
     const indexRange = segmentEndIdx - segmentStartIdx;
-    const exactIndex = segmentStartIdx + (indexRange * segmentRatio);
+    const exactIndex = segmentStartIdx + indexRange * segmentRatio;
     const beforeIndex = Math.floor(exactIndex);
     const afterIndex = Math.min(beforeIndex + 1, journeyRoute.length - 1);
     const ratio = exactIndex - beforeIndex;
 
-    const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+    const clamp = (n: number, min: number, max: number) =>
+      Math.max(min, Math.min(max, n));
     const idxA = clamp(beforeIndex, 0, journeyRoute.length - 1);
     const idxB = clamp(afterIndex, 0, journeyRoute.length - 1);
     const pointA = journeyRoute[idxA];
@@ -599,7 +668,8 @@ export default function JourneyRunningScreen(
     // 선형 보간
     const interpolated = {
       latitude: pointA.latitude + (pointB.latitude - pointA.latitude) * ratio,
-      longitude: pointA.longitude + (pointB.longitude - pointA.longitude) * ratio,
+      longitude:
+        pointA.longitude + (pointB.longitude - pointA.longitude) * ratio,
     };
 
     return {
@@ -611,13 +681,18 @@ export default function JourneyRunningScreen(
   // 가상 위치와 인덱스 분리
   const virtualLocationPoint = virtualLocation?.location || null;
   const virtualRouteIndex = virtualLocation?.routeIndex || 0;
+  const centerMapRef = useRef<() => void>(() => {});
 
   // journeyId가 없으면 안전 중단
   if (!journeyId) {
     return (
       <SafeLayout withBottomInset>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Text>여정 정보가 올바르지 않습니다. 목록에서 다시 진입해주세요.</Text>
+        <View
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
+          <Text>
+            여정 정보가 올바르지 않습니다. 목록에서 다시 진입해주세요.
+          </Text>
         </View>
       </SafeLayout>
     );
@@ -626,13 +701,28 @@ export default function JourneyRunningScreen(
   return (
     <SafeLayout withBottomInset>
       <JourneyMapRoute
+        key={`jr-map-${mapKey}`}
         journeyRoute={journeyRoute}
-        landmarks={useMemo(() => t.landmarksWithReached, [t.landmarksWithReached.map(l => `${l.id}:${l.reached?1:0}:${l.position.latitude.toFixed(6)},${l.position.longitude.toFixed(6)}`).join('|')])}
+        landmarks={useMemo(
+          () => t.landmarksWithReached,
+          [
+            t.landmarksWithReached
+              .map(
+                (l) =>
+                  `${l.id}:${l.reached ? 1 : 0}:${l.position.latitude.toFixed(
+                    6
+                  )},${l.position.longitude.toFixed(6)}`
+              )
+              .join("|"),
+          ]
+        )}
         userRoute={[]} // 여정 러닝에서는 실제 GPS 경로 표시 안 함
         currentLocation={virtualLocationPoint}
+        currentAvatarUrl={focusAvatarUrl}
         progressPercent={t.progressPercent}
         virtualRouteIndex={virtualRouteIndex}
         onLandmarkPress={handleLandmarkMarkerPress}
+        onBindCenter={(fn) => (centerMapRef.current = fn)}
       />
 
       {/* 날씨 위젯 */}
@@ -655,10 +745,10 @@ export default function JourneyRunningScreen(
 
       {/* 러닝 중이 아닐 때: 여정 진행률 카드 */}
       {!t.isRunning && !t.isPaused && t.progressReady && (
-        <JourneyProgressCard
-          progressPercent={t.progressPercent}
-          currentDistanceKm={t.progressM / 1000}
-          totalDistanceKm={totalDistanceKm}
+          <JourneyProgressCard
+            progressPercent={t.progressPercent}
+            currentDistanceKm={t.progressM / 1000}
+            totalDistanceKm={totalDistanceKm}
           nextLandmark={
             t.nextLandmark
               ? {
@@ -669,7 +759,9 @@ export default function JourneyRunningScreen(
               : null
           }
           onPressGuestbook={(landmarkId) => {
-            const landmark = landmarks.find((lm) => parseInt(lm.id) === landmarkId);
+            const landmark = landmarks.find(
+              (lm) => parseInt(lm.id) === landmarkId
+            );
             if (landmark) {
               navigation?.navigate("LandmarkGuestbookScreen", {
                 landmarkId,
@@ -677,12 +769,81 @@ export default function JourneyRunningScreen(
               });
             }
           }}
+          onPressCenter={() => { try { centerMapRef.current?.(); } catch {} }}
         />
       )}
 
       {/* 러닝 중일 때: 사이드 패널(통계) + 간소화된 진행률 */}
       {(t.isRunning || t.isPaused) && (
         <>
+          {/* 종료 확인 커스텀 팝업들 */}
+          <ConfirmAlert
+            visible={confirmExit}
+            title="여정 러닝 종료"
+            message="러닝을 종료하시겠습니까?"
+            onClose={() => setConfirmExit(false)}
+            onCancel={() => {
+              setConfirmExit(false);
+              if (t.isPaused) t.resume();
+            }}
+            onConfirm={() => {
+              setConfirmExit(false);
+              setConfirmSave(true);
+            }}
+            confirmText="종료"
+          />
+          <ConfirmAlert
+            visible={confirmSave}
+            title="기록 저장"
+            message="러닝 기록을 저장하시겠습니까?"
+            onClose={() => setConfirmSave(false)}
+            onCancel={async () => {
+              setConfirmSave(false);
+              try {
+                await backgroundRunning.stopForegroundService();
+                await backgroundRunning.clearSession();
+                await t.stop();
+                try { await AsyncStorage.removeItem('@running_session'); } catch {}
+                try { emitRunningSession(false); } catch {}
+                navigation.navigate('JourneyRouteDetail', { id: journeyId });
+              } catch (e) {
+                console.error('[JourneyRunning] 종료 실패:', e);
+              }
+            }}
+            onConfirm={async () => {
+              setConfirmSave(false);
+              try {
+                const avgPaceSec = t.distance > 0 && Number.isFinite(t.elapsedSec / t.distance)
+                  ? Math.floor(t.elapsedSec / Math.max(t.distance, 0.000001))
+                  : null;
+                const now = Math.floor(Date.now() / 1000);
+                const routePoints = (t.route ?? []).map((p, i) => ({ latitude: p.latitude, longitude: p.longitude, sequence: i + 1, t: now }));
+                await apiComplete({
+                  sessionId: t.sessionId as string,
+                  distanceMeters: Math.round(t.distance * 1000),
+                  durationSeconds: t.elapsedSec,
+                  averagePaceSeconds: avgPaceSec,
+                  calories: Math.round(t.kcal),
+                  routePoints,
+                  endedAt: Date.now(),
+                  title: journeyTitle,
+                });
+                try { if (t.distance >= 0.01) await awardEmblemByCode('DIST_10M'); } catch {}
+                await backgroundRunning.stopForegroundService();
+                await backgroundRunning.clearSession();
+                await t.completeJourneyRun();
+                navigation.navigate('JourneyRouteDetail', { id: journeyId });
+                await t.stop();
+                try { await AsyncStorage.removeItem('@running_session'); } catch {}
+                try { emitRunningSession(false); } catch {}
+              } catch (e) {
+                console.error('[JourneyRunning] 저장 종료 실패:', e);
+                Alert.alert('저장 실패', '네트워크 또는 서버 오류가 발생했어요.');
+              }
+            }}
+            confirmText="저장"
+            cancelText="저장 안 함"
+          />
           {/* 오른쪽 사이드 패널 (여정 러닝 전용) */}
           <RunStatsSidePanel
             distanceKm={t.distance}
@@ -695,9 +856,19 @@ export default function JourneyRunningScreen(
           <View style={styles.compactProgressCard}>
             <View style={styles.compactHeader}>
               <Text style={styles.compactTitle}>여정 진행</Text>
-              <Text style={styles.compactPercent}>
-                {t.progressPercent.toFixed(1)}%
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Pressable
+                  onPress={() => { try { centerMapRef.current?.(); } catch {} }}
+                  style={({ pressed }) => [styles.iconBtnSmall, pressed && { opacity: 0.7 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="가상 현재 위치로 이동"
+                >
+                  <Ionicons name="locate-outline" size={14} color="#111827" />
+                </Pressable>
+                <Text style={styles.compactPercent}>
+                  {t.progressPercent.toFixed(1)}%
+                </Text>
+              </View>
             </View>
             <View style={styles.compactProgressBar}>
               <LinearGradient
@@ -714,7 +885,8 @@ export default function JourneyRunningScreen(
               <Text style={styles.compactNextLandmark}>
                 다음: {t.nextLandmark.name} (
                 {(() => {
-                  const remaining = (t.nextLandmark.distanceM - t.progressM) / 1000;
+                  const remaining =
+                    (t.nextLandmark.distanceM - t.progressM) / 1000;
                   return remaining.toFixed(1);
                 })()}{" "}
                 km)
@@ -733,7 +905,9 @@ export default function JourneyRunningScreen(
           {/* 일시정지 텍스트 */}
           <View pointerEvents="none" style={styles.pauseTextContainer}>
             <Text style={styles.pauseTitle}>일시정지</Text>
-            <Text style={styles.pauseDesc}>재생 ▶ 을 누르면 다시 시작됩니다.</Text>
+            <Text style={styles.pauseDesc}>
+              재생 ▶ 을 누르면 다시 시작됩니다.
+            </Text>
             <Text style={styles.pauseDesc}>
               종료하려면 ■ 버튼을 2초간 길게 누르세요.
             </Text>
@@ -795,9 +969,7 @@ export default function JourneyRunningScreen(
       />
 
       {/* Emblem Celebration */}
-      {celebrate.visible && (
-        <EmblemCelebration count={celebrate.count} />
-      )}
+      {celebrate.visible && <EmblemCelebration count={celebrate.count} />}
 
       {/* 방명록 작성 모달 */}
       {selectedLandmark && (
@@ -841,10 +1013,18 @@ export default function JourneyRunningScreen(
                     carouselImages.push(landmarkDetail.imageUrl);
                   }
 
-                  if (landmarkDetail?.images && Array.isArray(landmarkDetail.images)) {
+                  if (
+                    landmarkDetail?.images &&
+                    Array.isArray(landmarkDetail.images)
+                  ) {
                     const galleryUrls = landmarkDetail.images
-                      .map((img: any) => typeof img === 'string' ? img : img?.imageUrl)
-                      .filter((url): url is string => url !== null && url !== undefined && url.trim() !== '');
+                      .map((img: any) =>
+                        typeof img === "string" ? img : img?.imageUrl
+                      )
+                      .filter(
+                        (url): url is string =>
+                          url !== null && url !== undefined && url.trim() !== ""
+                      );
                     carouselImages.push(...galleryUrls);
                   }
 
@@ -869,9 +1049,7 @@ export default function JourneyRunningScreen(
 
                 {/* 랜드마크 통계 */}
                 <View style={styles.statisticsContainer}>
-                  <LandmarkStatistics
-                    landmarkId={parseInt(menuLandmark.id)}
-                  />
+                  <LandmarkStatistics landmarkId={parseInt(menuLandmark.id)} />
                 </View>
 
                 {/* 메뉴 옵션 */}
@@ -891,7 +1069,12 @@ export default function JourneyRunningScreen(
                       setGuestbookModalVisible(true);
                     }}
                   >
-                    <Text style={styles.menuOptionIcon}>✍️</Text>
+                    <Ionicons
+                      name="create-outline"
+                      size={20}
+                      color="#111827"
+                      style={{ marginRight: 8 }}
+                    />
                     <Text style={styles.menuOptionText}>방명록 작성</Text>
                   </TouchableOpacity>
 
@@ -905,7 +1088,12 @@ export default function JourneyRunningScreen(
                       });
                     }}
                   >
-                    <Text style={styles.menuOptionIcon}>📖</Text>
+                    <Ionicons
+                      name="book-outline"
+                      size={20}
+                      color="#111827"
+                      style={{ marginRight: 8 }}
+                    />
                     <Text style={styles.menuOptionText}>방명록 보기</Text>
                   </TouchableOpacity>
 
@@ -928,12 +1116,21 @@ export default function JourneyRunningScreen(
           userId={userId}
           journeyId={journeyId}
           progressPercent={t.progressPercent}
-          landmarks={landmarks.map(l => ({ id: parseInt(l.id), name: l.name, distanceM: l.distanceM }))}
+          landmarks={landmarks.map((l) => ({
+            id: parseInt(l.id),
+            name: l.name,
+            distanceM: l.distanceM,
+          }))}
           currentLocation={t.route?.length ? t.route[t.route.length - 1] : null}
           currentProgressM={t.progressM}
           onCollected={(res: StampResponse) => {
             const id = res?.landmark?.id;
-            if (typeof id === 'number') setCollectedSet((prev) => new Set(prev).add(id));
+            if (typeof id === "number")
+              setCollectedSet((prev) => new Set(prev).add(id));
+            try {
+              setCelebrate({ visible: true, count: 1 });
+              setTimeout(() => setCelebrate({ visible: false }), 3200);
+            } catch {}
           }}
         />
       )}
@@ -1065,6 +1262,16 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 0 },
     elevation: 5,
+  },
+  iconBtnSmall: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   compactNextLandmark: {
     fontSize: 10,

@@ -23,14 +23,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       const token = await ensureAccessToken();
       if (!token) {
-        setUser(null);
+        // 토큰이 일시적으로 없을 때는 기존 사용자 상태를 보존하고 종료
+        // (백그라운드/포그라운드 전환 직후 등)
         return;
       }
       const me = await getMyProfile();
       setUser(me);
     } catch (e) {
-      // On failure, keep user null
-      setUser(null);
+      // 실패 시 기존 사용자 상태를 보존 (일시적 네트워크/리프레시 오류 대비)
     } finally {
       setLoading(false);
       setInitialized(true);
@@ -45,9 +45,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Re-load profile when access/refresh tokens change
       loadProfile();
     });
-    return () => {
-      try { off(); } catch {}
-    };
+    // 앱 포그라운드 복귀 시 재조회하여 최신 상태 유지
+    const onFocus = () => loadProfile();
+    try { 
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { AppState } = require('react-native');
+      const sub = AppState.addEventListener('change', (s: string) => {
+        if (s === 'active') onFocus();
+      });
+      return () => { try { off(); } catch {}; try { sub.remove(); } catch {} };
+    } catch {
+      return () => { try { off(); } catch {} };
+    }
   }, [loadProfile]);
 
   const refreshProfile = useCallback(async () => {
@@ -81,4 +90,3 @@ export function useAuth(): AuthContextValue {
   if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
   return ctx;
 }
-
