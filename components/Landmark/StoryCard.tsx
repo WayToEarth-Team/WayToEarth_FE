@@ -143,26 +143,16 @@ export default function StoryCard({
         }
       ]}
     >
-      {/* 상단 그라디언트 라인 (hover 효과는 웹 전용이므로 제외) */}
-      <LinearGradient
-        colors={typeGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.topLine}
-      />
+      {/* 상단 라인 */}
+      <View style={styles.topLine} />
 
       {/* 카드 내용 */}
       <View style={styles.cardContent}>
         {/* 헤더 */}
         <View style={styles.storyHeader}>
-          <LinearGradient
-            colors={typeGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.typeBadge}
-          >
+          <View style={styles.typeBadge}>
             <Text style={styles.typeBadgeText}>{typeLabel.toUpperCase()}</Text>
-          </LinearGradient>
+          </View>
         </View>
 
         <Text style={styles.storyTitle}>{story.title}</Text>
@@ -186,16 +176,10 @@ export default function StoryCard({
               case 'intro':
                 return (
                   <View key={index} style={styles.introSection}>
-                    <LinearGradient
-                      colors={['#f8f9fa', '#e9ecef']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.introGradient}
-                    >
+                    <View style={styles.introGradient}>
                       <View style={styles.introLeftBorder} />
-                      <Text style={styles.introQuote}>"</Text>
                       <Text style={styles.introText}>{section.text}</Text>
-                    </LinearGradient>
+                    </View>
                   </View>
                 );
 
@@ -210,45 +194,23 @@ export default function StoryCard({
                 return (
                   <View key={index} style={styles.timelineSection}>
                     <View style={styles.sectionTitleContainer}>
-                      <LinearGradient
-                        colors={typeGradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 0, y: 1 }}
-                        style={styles.sectionTitleBar}
-                      />
+                      <View style={styles.sectionTitleBar} />
                       <Text style={styles.sectionTitle}>주요 역사</Text>
                     </View>
                     {section.items.map((item, idx) => (
                       <View key={idx} style={styles.timelineItem}>
                         {/* 점과 라인 */}
                         <View style={styles.timelineLeftColumn}>
-                          <View style={styles.timelineDotOuter}>
-                            <LinearGradient
-                              colors={typeGradient}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 1 }}
-                              style={styles.timelineDot}
-                            />
-                          </View>
+                          <View style={styles.timelineDotOuter} />
                           {idx < section.items.length - 1 && (
-                            <LinearGradient
-                              colors={[`rgba(102, 126, 234, 0.3)`, 'transparent']}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 0, y: 1 }}
-                              style={styles.timelineLine}
-                            />
+                            <View style={styles.timelineLine} />
                           )}
                         </View>
                         {/* 내용 */}
                         <View style={styles.timelineRightColumn}>
-                          <LinearGradient
-                            colors={typeGradient}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.timelineYearBadge}
-                          >
+                          <View style={styles.timelineYearBadge}>
                             <Text style={styles.timelineYear}>{item.year}</Text>
-                          </LinearGradient>
+                          </View>
                           <Text style={styles.timelineEvent}>{item.event}</Text>
                         </View>
                       </View>
@@ -259,20 +221,14 @@ export default function StoryCard({
               case 'tips':
                 return (
                   <View key={index} style={styles.tipsSection}>
-                    <LinearGradient
-                      colors={['#fff7ed', '#fed7aa']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.tipsGradient}
-                    >
-                      <Text style={styles.tipsWatermark}>💡</Text>
+                    <View style={styles.tipsGradient}>
                       <View style={styles.tipsHeader}>
                         <Text style={styles.tipsIcon}>💡</Text>
                         <Text style={styles.tipsTitle}>알고 계셨나요?</Text>
                       </View>
                       {section.items.map((tip, idx) => (
-                        <View 
-                          key={idx} 
+                        <View
+                          key={idx}
                           style={[
                             styles.tipItem,
                             idx < section.items.length - 1 && styles.tipItemBorder
@@ -282,7 +238,7 @@ export default function StoryCard({
                           <Text style={styles.tipText}>{tip}</Text>
                         </View>
                       ))}
-                    </LinearGradient>
+                    </View>
                   </View>
                 );
 
@@ -336,59 +292,31 @@ export default function StoryCard({
           <>
             {(parsedContent as StoryContentLegacy).intro && (
               <View style={styles.introSection}>
-                <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.introGradient}
-                >
+                <View style={styles.introGradient}>
                   <View style={styles.introLeftBorder} />
-                  <Text style={styles.introQuote}>"</Text>
                   <Text style={styles.introText}>{(parsedContent as StoryContentLegacy).intro}</Text>
-                </LinearGradient>
+                </View>
               </View>
             )}
 
             {(parsedContent as StoryContentLegacy).timeline && (parsedContent as StoryContentLegacy).timeline!.length > 0 && (
               <View style={styles.timelineSection}>
                 <View style={styles.sectionTitleContainer}>
-                  <LinearGradient
-                    colors={typeGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 0, y: 1 }}
-                    style={styles.sectionTitleBar}
-                  />
+                  <View style={styles.sectionTitleBar} />
                   <Text style={styles.sectionTitle}>타임라인</Text>
                 </View>
                 {(parsedContent as StoryContentLegacy).timeline!.map((item, index) => (
                   <View key={index} style={styles.timelineItem}>
                     <View style={styles.timelineLeftColumn}>
-                      <View style={styles.timelineDotOuter}>
-                        <LinearGradient
-                          colors={typeGradient}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                          style={styles.timelineDot}
-                        />
-                      </View>
+                      <View style={styles.timelineDotOuter} />
                       {index < (parsedContent as StoryContentLegacy).timeline!.length - 1 && (
-                        <LinearGradient
-                          colors={[`rgba(102, 126, 234, 0.3)`, 'transparent']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 0, y: 1 }}
-                          style={styles.timelineLine}
-                        />
+                        <View style={styles.timelineLine} />
                       )}
                     </View>
                     <View style={styles.timelineRightColumn}>
-                      <LinearGradient
-                        colors={typeGradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.timelineYearBadge}
-                      >
+                      <View style={styles.timelineYearBadge}>
                         <Text style={styles.timelineYear}>{item.year}</Text>
-                      </LinearGradient>
+                      </View>
                       <Text style={styles.timelineEvent}>{item.event}</Text>
                     </View>
                   </View>
@@ -398,20 +326,14 @@ export default function StoryCard({
 
             {(parsedContent as StoryContentLegacy).tips && (parsedContent as StoryContentLegacy).tips!.length > 0 && (
               <View style={styles.tipsSection}>
-                <LinearGradient
-                  colors={['#fff7ed', '#fed7aa']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.tipsGradient}
-                >
-                  <Text style={styles.tipsWatermark}>💡</Text>
+                <View style={styles.tipsGradient}>
                   <View style={styles.tipsHeader}>
                     <Text style={styles.tipsIcon}>💡</Text>
                     <Text style={styles.tipsTitle}>알고 계셨나요?</Text>
                   </View>
                   {(parsedContent as StoryContentLegacy).tips!.map((tip, index) => (
-                    <View 
-                      key={index} 
+                    <View
+                      key={index}
                       style={[
                         styles.tipItem,
                         index < (parsedContent as StoryContentLegacy).tips!.length - 1 && styles.tipItemBorder
@@ -421,7 +343,7 @@ export default function StoryCard({
                       <Text style={styles.tipText}>{tip}</Text>
                     </View>
                   ))}
-                </LinearGradient>
+                </View>
               </View>
             )}
 
@@ -472,289 +394,290 @@ export default function StoryCard({
 }
 
 const styles = StyleSheet.create({
-  // HTML: .story-card
+  // 깔끔한 무채색 스토리 카드
   storyCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    marginBottom: 32,
-    marginHorizontal: 20,
+    borderRadius: 16,
+    marginBottom: 20,
+    marginHorizontal: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 32,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.04)',
+    borderColor: '#E5E7EB',
     overflow: 'hidden',
   },
 
-  // 상단 그라디언트 라인
+  // 상단 라인
   topLine: {
-    height: 0, // 초기에는 안보임
+    height: 2,
     width: '100%',
+    backgroundColor: '#E5E7EB',
   },
 
-  // HTML: padding: 32px
+  // 카드 내용
   cardContent: {
-    padding: 32,
+    padding: 24,
   },
 
-  // HTML: .story-header
+  // 헤더
   storyHeader: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
 
-  // HTML: .type-badge
+  // 강조된 타입 뱃지
   typeBadge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 6,
+    backgroundColor: '#111827',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowRadius: 4,
+    elevation: 2,
   },
 
   typeBadgeText: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
 
-  // HTML: .story-title
+  // 모던한 제목
   storyTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#111827',
-    lineHeight: 36.4, // 1.3 * 28
-    letterSpacing: -0.5,
-    marginBottom: 4,
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#1F2937',
+    lineHeight: 35,
+    letterSpacing: -0.3,
+    marginBottom: 8,
+    marginTop: 12,
   },
 
   // 관리자 버튼
   adminButtons: {
-    marginTop: 16,
-    marginBottom: 16,
+    marginTop: 12,
+    marginBottom: 12,
   },
   adminBtnDelete: {
     backgroundColor: '#EF4444',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
     alignSelf: 'flex-start',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   adminBtnText: {
     color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 12,
+    fontWeight: '700',
+    fontSize: 11,
   },
 
-  // HTML: .intro-section
+  // 깔끔한 intro 섹션
   introSection: {
-    marginBottom: 32,
-    borderRadius: 16,
+    marginBottom: 20,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   introGradient: {
-    padding: 24,
-    paddingLeft: 28, // +4px for border
+    padding: 18,
+    paddingLeft: 22,
     position: 'relative',
+    backgroundColor: '#F9FAFB',
   },
   introLeftBorder: {
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
-    width: 4,
-    backgroundColor: '#6366f1',
+    width: 3,
+    backgroundColor: '#374151',
   },
   introQuote: {
-    position: 'absolute',
-    top: -10,
-    left: 10,
-    fontSize: 80,
-    color: 'rgba(99, 102, 241, 0.1)',
-    fontFamily: 'Georgia',
-    fontWeight: '700',
+    display: 'none',
   },
   introText: {
-    fontSize: 16,
-    lineHeight: 28.8, // 1.8 * 16
-    color: '#4b5563',
+    fontSize: 15,
+    lineHeight: 24,
+    color: '#4B5563',
+    fontWeight: '400',
   },
 
-  // HTML: .text-section
+  // 텍스트 섹션
   textSection: {
-    marginBottom: 28,
+    marginBottom: 20,
   },
   textContent: {
-    fontSize: 16,
-    lineHeight: 30.4, // 1.9 * 16
+    fontSize: 15,
+    lineHeight: 26,
     color: '#374151',
+    fontWeight: '400',
   },
 
-  // HTML: .timeline-section
+  // 깔끔한 타임라인 섹션
   timelineSection: {
-    marginVertical: 40,
-    paddingLeft: 20,
+    marginVertical: 24,
+    paddingLeft: 4,
   },
 
-  // HTML: .section-title
+  // 섹션 타이틀
   sectionTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 24,
+    gap: 10,
+    marginBottom: 20,
   },
   sectionTitleBar: {
-    width: 4,
-    height: 24,
+    width: 3,
+    height: 18,
     borderRadius: 2,
+    backgroundColor: '#374151',
   },
   sectionTitle: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#111827',
+    letterSpacing: -0.3,
   },
 
-  // HTML: .timeline-item
+  // 타임라인 아이템
   timelineItem: {
     flexDirection: 'row',
-    paddingBottom: 32,
+    paddingBottom: 20,
   },
 
   // 타임라인 왼쪽 (점 + 라인)
   timelineLeftColumn: {
-    width: 40,
+    width: 28,
     alignItems: 'center',
-    paddingTop: 8,
+    paddingTop: 4,
   },
   timelineDotOuter: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: 'rgba(102, 126, 234, 0.2)', // box-shadow 대체
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#6B7280',
     alignItems: 'center',
     justifyContent: 'center',
   },
   timelineDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 0,
+    height: 0,
   },
   timelineLine: {
-    width: 2,
+    width: 1.5,
     flex: 1,
-    marginTop: 8,
+    marginTop: 4,
+    backgroundColor: '#D1D5DB',
   },
 
   // 타임라인 오른쪽 (내용)
   timelineRightColumn: {
     flex: 1,
-    paddingLeft: 0,
+    paddingLeft: 12,
   },
   timelineYearBadge: {
     alignSelf: 'flex-start',
     paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    borderRadius: 4,
     marginBottom: 8,
-    shadowColor: 'rgba(102, 126, 234, 0.3)',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: '#374151',
   },
   timelineYear: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
   timelineEvent: {
-    fontSize: 15,
-    lineHeight: 25.5, // 1.7 * 15
-    color: '#4b5563',
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#4B5563',
+    fontWeight: '400',
   },
 
-  // HTML: .tips-section
+  // 깔끔한 Tips 섹션
   tipsSection: {
-    marginVertical: 32,
-    borderRadius: 20,
+    marginVertical: 20,
+    borderRadius: 8,
     overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#fdba74',
-    shadowColor: 'rgba(251, 146, 60, 0.15)',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 1,
-    shadowRadius: 24,
-    elevation: 6,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   tipsGradient: {
-    padding: 28,
+    padding: 18,
     position: 'relative',
+    backgroundColor: 'transparent',
   },
   tipsWatermark: {
-    position: 'absolute',
-    top: -20,
-    right: -20,
-    fontSize: 120,
-    opacity: 0.1,
-    transform: [{ rotate: '15deg' }],
+    display: 'none',
   },
   tipsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
+    gap: 8,
+    marginBottom: 14,
   },
   tipsIcon: {
-    fontSize: 28,
+    fontSize: 18,
   },
   tipsTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#9a3412',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#374151',
+    letterSpacing: -0.2,
   },
   tipItem: {
     flexDirection: 'row',
-    paddingVertical: 12,
-    gap: 12,
+    paddingVertical: 9,
+    gap: 10,
   },
   tipItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(154, 52, 18, 0.2)',
-    borderStyle: 'dashed',
+    borderBottomColor: '#E5E7EB',
   },
   tipBullet: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#f97316',
-    marginTop: 8,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#6B7280',
+    marginTop: 7,
   },
   tipText: {
     flex: 1,
-    fontSize: 15,
-    lineHeight: 25.5, // 1.7 * 15
-    color: '#7c2d12',
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#4B5563',
+    fontWeight: '400',
   },
 
   // 단일 이미지
   singleImageSection: {
-    marginVertical: 24,
+    marginVertical: 20,
   },
   singleImage: {
     width: '100%',
     height: 200,
-    borderRadius: 16,
+    borderRadius: 12,
     backgroundColor: '#F3F4F6',
   },
   imageCaption: {
     marginTop: 8,
-    fontSize: 13,
+    fontSize: 12,
     color: '#6B7280',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -762,10 +685,11 @@ const styles = StyleSheet.create({
 
   // 관리자 갤러리
   adminGallerySection: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    backgroundColor: '#FAFAFA',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+    borderTopColor: '#F0F0F0',
+    marginTop: 8,
   },
 });
