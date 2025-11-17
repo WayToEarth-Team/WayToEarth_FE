@@ -42,7 +42,7 @@ try {
   // 프로젝트의 assets 폴더에 Earth.png가 있어야 합니다.
   // 없으면 아래 폴백(Ionicons)이 사용됩니다.
   // @ts-ignore
-  EARTH_IMG = require("../assets/Earth.png");
+  EARTH_IMG = require("../assets/images/Earth.png");
 } catch (e) {
   EARTH_IMG = null;
 }

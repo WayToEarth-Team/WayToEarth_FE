@@ -74,10 +74,31 @@ export default function CrewScreen() {
     if (loaded && !didFade) {
       const easeIn = Easing.bezier(0.2, 0.8, 0.2, 1);
       Animated.parallel([
-        Animated.timing(contentOpacity, { toValue: 1, duration: 360, easing: easeIn, useNativeDriver: true }),
-        Animated.timing(contentTransY, { toValue: 0, duration: 360, easing: easeIn, useNativeDriver: true }),
-        Animated.timing(contentScale, { toValue: 1, duration: 360, easing: easeIn, useNativeDriver: true }),
-        Animated.timing(listAnim, { toValue: 1, duration: 420, delay: 120, easing: easeIn, useNativeDriver: true }),
+        Animated.timing(contentOpacity, {
+          toValue: 1,
+          duration: 360,
+          easing: easeIn,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentTransY, {
+          toValue: 0,
+          duration: 360,
+          easing: easeIn,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentScale, {
+          toValue: 1,
+          duration: 360,
+          easing: easeIn,
+          useNativeDriver: true,
+        }),
+        Animated.timing(listAnim, {
+          toValue: 1,
+          duration: 420,
+          delay: 120,
+          easing: easeIn,
+          useNativeDriver: true,
+        }),
       ]).start(() => setDidFade(true));
     }
   }, [topCrews?.length, didFade]);
@@ -110,142 +131,157 @@ export default function CrewScreen() {
             <View style={s.rankingPlaceholder} />
           )}
           {topCrews && topCrews.length > 0 && (
-            <Animated.View style={{ opacity: contentOpacity, transform: [{ translateY: contentTransY }, { scale: contentScale }] }}>
+            <Animated.View
+              style={{
+                opacity: contentOpacity,
+                transform: [
+                  { translateY: contentTransY },
+                  { scale: contentScale },
+                ],
+              }}
+            >
               <LinearGradient
                 colors={["#F8FAFC", "#FFFFFF"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={s.rankingSection}
               >
-            {/* 헤더 */}
-            <View style={s.rankingHeader}>
-              <View style={s.rankingTitleWrap}>
-                <Ionicons name="trophy" size={28} color="#F59E0B" />
-                <Text style={s.rankingTitle}>이달의 TOP 크루</Text>
-              </View>
-              <TouchableOpacity
-                style={s.viewAllBtn}
-                onPress={() => navigation.navigate("CrewRanking")}
-              >
-                <Text style={s.viewAllText}>전체보기</Text>
-                <Ionicons name="chevron-forward" size={16} color="#6366F1" />
-              </TouchableOpacity>
-            </View>
-
-            {/* TOP 포디움: 항목 2개일 때 동일 크기/정렬 */}
-            {topCrews.length === 2 ? (
-              <View style={s.podiumContainer}>
-                {[0, 1].map((idx) => (
-                  <View key={topCrews[idx].id} style={s.podiumItem}>
-                    <TopCrewItem
-                      rank={String(idx + 1)}
-                      name={topCrews[idx].name}
-                      distance={topCrews[idx].distance}
-                      image={
-                        topCrews[idx].imageUrl
-                          ? { uri: topCrews[idx].imageUrl as string }
-                          : undefined
-                      }
-                      size="md"
-                    />
+                {/* 헤더 */}
+                <View style={s.rankingHeader}>
+                  <View style={s.rankingTitleWrap}>
+                    <Ionicons name="trophy" size={28} color="#F59E0B" />
+                    <Text style={s.rankingTitle}>이달의 TOP 크루</Text>
                   </View>
-                ))}
-              </View>
-            ) : (
-              <View style={s.podiumContainer}>
-                {/* 2위 */}
-                {topCrews[1] && (
-                  <View style={s.podiumItem}>
-                    <TopCrewItem
-                      rank="2"
-                      name={topCrews[1].name}
-                      distance={topCrews[1].distance}
-                      image={
-                        topCrews[1].imageUrl
-                          ? { uri: topCrews[1].imageUrl }
-                          : undefined
-                      }
-                      size="md"
-                    />
-                  </View>
-                )}
-
-                {/* 1위 - 중앙, 더 크게 */}
-                {topCrews[0] && (
-                  <View style={[s.podiumItem, s.podiumFirst]}>
-                    <TopCrewItem
-                      rank="1"
-                      name={topCrews[0].name}
-                      distance={topCrews[0].distance}
-                      image={
-                        topCrews[0].imageUrl
-                          ? { uri: topCrews[0].imageUrl }
-                          : undefined
-                      }
-                      size="lg"
-                    />
-                  </View>
-                )}
-
-                {/* 3위 */}
-                {topCrews[2] && (
-                  <View style={s.podiumItem}>
-                    <TopCrewItem
-                      rank="3"
-                      name={topCrews[2].name}
-                      distance={topCrews[2].distance}
-                      image={
-                        topCrews[2].imageUrl
-                          ? { uri: topCrews[2].imageUrl }
-                          : undefined
-                      }
-                      size="sm"
-                    />
-                  </View>
-                )}
-              </View>
-            )}
-
-            {/* 4~10위 리스트 */}
-            {topCrews.length > 3 && (
-              <View style={s.rankingList}>
-                {topCrews.slice(3, 10).map((crew, idx) => (
-                  <Animated.View
-                    key={crew.id}
-                    style={[
-                      s.rankingListItem,
-                      {
-                        opacity: listAnim,
-                        transform: [
-                          {
-                            translateY: listAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [10 + idx * 2, 0],
-                            }),
-                          },
-                        ],
-                      },
-                    ]}
+                  <TouchableOpacity
+                    style={s.viewAllBtn}
+                    onPress={() => navigation.navigate("CrewRanking")}
                   >
-                    <View style={s.rankingLeft}>
-                      <View style={s.rankNumberBadge}>
-                        <Text style={s.rankNumberText}>{idx + 4}</Text>
+                    <Text style={s.viewAllText}>전체보기</Text>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={16}
+                      color="#6366F1"
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* TOP 포디움: 항목 2개일 때 동일 크기/정렬 */}
+                {topCrews.length === 2 ? (
+                  <View style={s.podiumContainer}>
+                    {[0, 1].map((idx) => (
+                      <View key={topCrews[idx].id} style={s.podiumItem}>
+                        <TopCrewItem
+                          rank={String(idx + 1)}
+                          name={topCrews[idx].name}
+                          distance={topCrews[idx].distance}
+                          image={
+                            topCrews[idx].imageUrl
+                              ? { uri: topCrews[idx].imageUrl as string }
+                              : undefined
+                          }
+                          size="md"
+                        />
                       </View>
-                      <Text style={s.rankingCrewName} numberOfLines={1}>
-                        {crew.name}
-                      </Text>
-                    </View>
-                    <View style={s.rankingRight}>
-                      <Text style={s.rankingDistance}>
-                        {String(crew.distance || "0km").replace(/[^\d.]/g, "")}
-                      </Text>
-                      <Text style={s.rankingUnit}>km</Text>
-                    </View>
-                  </Animated.View>
-                ))}
-              </View>
-            )}
-          </LinearGradient>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={s.podiumContainer}>
+                    {/* 2위 */}
+                    {topCrews[1] && (
+                      <View style={s.podiumItem}>
+                        <TopCrewItem
+                          rank="2"
+                          name={topCrews[1].name}
+                          distance={topCrews[1].distance}
+                          image={
+                            topCrews[1].imageUrl
+                              ? { uri: topCrews[1].imageUrl }
+                              : undefined
+                          }
+                          size="md"
+                        />
+                      </View>
+                    )}
+
+                    {/* 1위 - 중앙, 더 크게 */}
+                    {topCrews[0] && (
+                      <View style={[s.podiumItem, s.podiumFirst]}>
+                        <TopCrewItem
+                          rank="1"
+                          name={topCrews[0].name}
+                          distance={topCrews[0].distance}
+                          image={
+                            topCrews[0].imageUrl
+                              ? { uri: topCrews[0].imageUrl }
+                              : undefined
+                          }
+                          size="lg"
+                        />
+                      </View>
+                    )}
+
+                    {/* 3위 */}
+                    {topCrews[2] && (
+                      <View style={s.podiumItem}>
+                        <TopCrewItem
+                          rank="3"
+                          name={topCrews[2].name}
+                          distance={topCrews[2].distance}
+                          image={
+                            topCrews[2].imageUrl
+                              ? { uri: topCrews[2].imageUrl }
+                              : undefined
+                          }
+                          size="sm"
+                        />
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {/* 4~10위 리스트 */}
+                {topCrews.length > 3 && (
+                  <View style={s.rankingList}>
+                    {topCrews.slice(3, 10).map((crew, idx) => (
+                      <Animated.View
+                        key={crew.id}
+                        style={[
+                          s.rankingListItem,
+                          {
+                            opacity: listAnim,
+                            transform: [
+                              {
+                                translateY: listAnim.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [10 + idx * 2, 0],
+                                }),
+                              },
+                            ],
+                          },
+                        ]}
+                      >
+                        <View style={s.rankingLeft}>
+                          <View style={s.rankNumberBadge}>
+                            <Text style={s.rankNumberText}>{idx + 4}</Text>
+                          </View>
+                          <Text style={s.rankingCrewName} numberOfLines={1}>
+                            {crew.name}
+                          </Text>
+                        </View>
+                        <View style={s.rankingRight}>
+                          <Text style={s.rankingDistance}>
+                            {String(crew.distance || "0km").replace(
+                              /[^\d.]/g,
+                              ""
+                            )}
+                          </Text>
+                          <Text style={s.rankingUnit}>km</Text>
+                        </View>
+                      </Animated.View>
+                    ))}
+                  </View>
+                )}
+              </LinearGradient>
             </Animated.View>
           )}
         </View>
@@ -534,8 +570,13 @@ export default function CrewScreen() {
 const s = StyleSheet.create({
   safeContainer: { flex: 1, backgroundColor: "#F9FAFB" },
 
-  rankTransition: { position: 'relative' },
-  rankingPlaceholder: { paddingTop: 40, paddingBottom: 16, paddingHorizontal: 20, minHeight: 140 },
+  rankTransition: { position: "relative" },
+  rankingPlaceholder: {
+    paddingTop: 40,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    minHeight: 140,
+  },
   // 🏆 랭킹 섹션
   rankingSection: {
     paddingTop: 40, // StatusBar 공간
@@ -547,10 +588,23 @@ const s = StyleSheet.create({
     paddingBottom: 16,
     paddingHorizontal: 20,
   },
-  skelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  skelBox: { backgroundColor: '#E5E7EB', borderRadius: 8 },
-  skelPodium: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
-  skelCard: { backgroundColor: '#E5E7EB', width: '30%', height: 100, borderRadius: 12 },
+  skelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  skelBox: { backgroundColor: "#E5E7EB", borderRadius: 8 },
+  skelPodium: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 12,
+  },
+  skelCard: {
+    backgroundColor: "#E5E7EB",
+    width: "30%",
+    height: 100,
+    borderRadius: 12,
+  },
   rankingHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
