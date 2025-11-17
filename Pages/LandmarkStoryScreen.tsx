@@ -19,6 +19,7 @@ import {
   Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import StoryCard from '../components/Landmark/StoryCard';
 import StoryTypeTabs from '../components/Landmark/StoryTypeTabs';
 import GuestbookCreateModal from '../components/Guestbook/GuestbookCreateModal';
@@ -383,7 +384,7 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams =
     return (
       <View style={styles.container}>
         <View style={styles.centerContainer}>
-          <Text style={styles.errorIcon}>⚠️</Text>
+          <Ionicons name="alert-circle-outline" size={40} color="#a0522d" style={{ marginBottom: 8 }} />
           <Text style={styles.errorText}>{error || '랜드마크를 찾을 수 없습니다.'}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={loadLandmarkDetail}>
             <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -430,7 +431,7 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams =
               end={{ x: 1, y: 1 }}
               style={styles.heroBg}
             >
-              <Text style={styles.heroPlaceholderText}>🏛️</Text>
+              <Ionicons name="business-outline" size={80} color="#FFFFFF" style={{ alignSelf: 'center', marginTop: 170 }} />
             </LinearGradient>
           )}
 
@@ -443,19 +444,13 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams =
           />
 
           {/* 뒤로가기 버튼 */}
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backButtonText}>‹</Text>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
 
           {/* 메뉴 버튼 */}
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => setBottomSheetVisible(true)}
-          >
-            <Text style={styles.menuButtonText}>⋯</Text>
+          <TouchableOpacity style={styles.menuButton} onPress={() => setBottomSheetVisible(true)}>
+            <Ionicons name="ellipsis-horizontal" size={22} color="#FFFFFF" />
           </TouchableOpacity>
 
           {/* HTML: .hero-content */}
@@ -470,7 +465,10 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams =
           >
             {landmark.hasStamp && (
               <View style={styles.stampBadge}>
-                <Text style={styles.stampBadgeText}>✓ 스탬프 획득</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.stampBadgeText}>스탬프 획득</Text>
+                </View>
               </View>
             )}
             <Text style={styles.heroTitle}>{landmark.name}</Text>
@@ -679,7 +677,7 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams =
                     style={styles.menuOption}
                     onPress={handleOpenGuestbook}
                   >
-                    <Text style={styles.menuOptionIcon}>✍️</Text>
+                    <Ionicons name="create-outline" size={20} color="#111827" style={{ marginRight: 8 }} />
                     <Text style={styles.menuOptionText}>방명록 작성</Text>
                   </TouchableOpacity>
 
@@ -687,7 +685,7 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams =
                     style={styles.menuOption}
                     onPress={handleViewGuestbooks}
                   >
-                    <Text style={styles.menuOptionIcon}>📖</Text>
+                    <Ionicons name="book-outline" size={20} color="#111827" style={{ marginRight: 8 }} />
                     <Text style={styles.menuOptionText}>방명록 보기</Text>
                   </TouchableOpacity>
 
@@ -719,7 +717,7 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams =
             <View style={styles.createModalHeader}>
               <Text style={styles.createModalTitle}>새 스토리 추가</Text>
               <TouchableOpacity onPress={() => setCreateModalVisible(false)}>
-                <Text style={styles.createModalClose}>✕</Text>
+                <Ionicons name="close" size={22} color="#111827" />
               </TouchableOpacity>
             </View>
 
@@ -744,14 +742,21 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams =
                     ]}
                     onPress={() => setNewStoryType(type)}
                   >
-                    <Text
-                      style={[
-                        styles.typeButtonText,
-                        newStoryType === type && styles.typeButtonTextActive,
-                      ]}
-                    >
-                      {type === 'HISTORY' ? '📘 역사' : type === 'CULTURE' ? '🎭 문화' : '🌿 자연'}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons
+                        name={type === 'HISTORY' ? 'book-outline' : type === 'CULTURE' ? 'color-palette-outline' : 'leaf-outline'}
+                        size={16}
+                        color={newStoryType === type ? '#FFFFFF' : '#6B7280'}
+                      />
+                      <Text
+                        style={[
+                          styles.typeButtonText,
+                          newStoryType === type && styles.typeButtonTextActive,
+                        ]}
+                      >
+                        {type === 'HISTORY' ? '역사' : type === 'CULTURE' ? '문화' : '자연'}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 ))}
               </View>
