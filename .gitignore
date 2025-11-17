@@ -62,3 +62,5 @@ study/*
 !study/.gitkeep
 !study/docs/
 !study/docs/**
+GoogleService-Info.plist
+*.apk,

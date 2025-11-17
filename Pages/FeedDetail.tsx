@@ -95,7 +95,7 @@ export default function FeedDetail({ route, navigation }: any = { route: { param
               source={
                 profileUrl
                   ? { uri: profileUrl }
-                  : require("../assets/ix-user-profile0.png")
+                  : require("../assets/images/ix-user-profile0.png")
               }
               style={styles.profileIcon}
             />
