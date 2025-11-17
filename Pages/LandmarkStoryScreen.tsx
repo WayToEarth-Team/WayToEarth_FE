@@ -504,6 +504,28 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams =
             transform: [{ translateY: contentSlideAnim }]
           }}
         >
+          {/* 관리자 뷰 전환 버튼 */}
+          {isAdmin && (
+            <View style={styles.viewToggleContainer}>
+              <TouchableOpacity
+                style={[styles.viewToggleBtn, !forceUserView && styles.viewToggleBtnActive]}
+                onPress={() => setForceUserView(false)}
+              >
+                <Text style={[styles.viewToggleText, !forceUserView && styles.viewToggleTextActive]}>
+                  관리자
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.viewToggleBtn, forceUserView && styles.viewToggleBtnActive]}
+                onPress={() => setForceUserView(true)}
+              >
+                <Text style={[styles.viewToggleText, forceUserView && styles.viewToggleTextActive]}>
+                  사용자
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* 관리자 패널 */}
           {showAdminView && (
             <View style={styles.adminPanel}>
@@ -587,27 +609,22 @@ export default function LandmarkStoryScreen({ route, navigation }: RouteParams =
         </Animated.View>
       </ScrollView>
 
-      {/* HTML: .floating-actions */}
+      {/* 방명록 버튼 */}
       <View style={styles.floatingActions}>
         <TouchableOpacity
           style={styles.guestbookBtn}
           onPress={() => setGuestbookModalVisible(true)}
+          activeOpacity={0.8}
         >
-          <LinearGradient
-            colors={['#667eea', '#764ba2']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.guestbookGradient}
-          >
-            <Text style={styles.guestbookText}>📝 방명록 작성하기</Text>
-          </LinearGradient>
+          <Text style={styles.guestbookText}>방명록 작성</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.viewAllBtn}
           onPress={handleViewGuestbooks}
+          activeOpacity={0.8}
         >
-          <Text style={styles.viewAllText}>📖 전체 보기</Text>
+          <Text style={styles.viewAllText}>전체 보기</Text>
         </TouchableOpacity>
       </View>
 
@@ -972,6 +989,43 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
 
+  // 뷰 전환 토글
+  viewToggleContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 12,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    padding: 3,
+    gap: 4,
+  },
+  viewToggleBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  viewToggleBtnActive: {
+    backgroundColor: '#111827',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  viewToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  viewToggleTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+
   // 관리자 패널
   adminPanel: {
     backgroundColor: '#FEF3C7',
@@ -980,7 +1034,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginHorizontal: 20,
-    marginTop: 16,
+    marginTop: 0,
     marginBottom: 16,
   },
   adminTitle: {
@@ -1057,57 +1111,58 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
 
-  // HTML: .floating-actions
+  // 깔끔한 방명록 버튼
   floatingActions: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 20,
     left: 20,
     right: 20,
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     zIndex: 100,
   },
 
-  // HTML: .guestbook-btn
+  // 방명록 작성 버튼
   guestbookBtn: {
     flex: 1,
-    borderRadius: 30,
-    overflow: 'hidden',
-    shadowColor: 'rgba(102, 126, 234, 0.4)',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 1,
-    shadowRadius: 32,
-    elevation: 8,
-  },
-  guestbookGradient: {
-    paddingVertical: 16,
-    paddingHorizontal: 32,
+    backgroundColor: '#111827',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   guestbookText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
 
-  // HTML: .view-all-btn
+  // 전체 보기 버튼
   viewAllBtn: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 30,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderWidth: 2,
-    borderColor: '#6366f1',
-    shadowColor: 'rgba(99, 102, 241, 0.2)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 16,
-    elevation: 4,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   viewAllText: {
-    color: '#6366f1',
-    fontSize: 16,
-    fontWeight: '800',
+    color: '#374151',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
 
   // 모달들
