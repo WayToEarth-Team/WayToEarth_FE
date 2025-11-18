@@ -497,11 +497,17 @@ export default function JourneyRunningScreen(
     setCountdownVisible(false);
 
     if (watchMode) {
-      // 워치 모드: 워치 세션 시작
+      // 워치 모드: 워치 세션 시작 + 러닝 상태 시작
       try {
         console.log("[JourneyRunning] Starting watch session (JOURNEY)");
         const sessionId = await startRunOrchestrated("JOURNEY", { journeyId: Number(journeyId) });
         console.log("[JourneyRunning] Watch session started:", sessionId);
+
+        // 여정 러닝 상태도 시작 (워치 데이터를 useJourneyRunning에서 사용)
+        requestAnimationFrame(() => {
+          console.log("[JourneyRunning] calling t.startJourneyRun() (watch mode)");
+          t.startJourneyRun();
+        });
 
         // 탭바 숨김 즉시 반영 및 세션 플래그 저장
         try {
