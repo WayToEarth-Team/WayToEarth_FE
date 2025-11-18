@@ -151,6 +151,19 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
+    // Google Play Services Wearable (필수!)
+    implementation("com.google.android.gms:play-services-wearable:18.1.0")
+
+    // Kotlin coroutines (WayToEarthWearModule에서 사용)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+
+    // Gson (JSON 파싱)
+    implementation("com.google.code.gson:gson:2.10.1")
+
+    // LocalBroadcastManager (WearMessageListenerService에서 사용)
+    implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
+
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";
     def isWebpAnimatedEnabled = (findProperty('expo.webp.animated') ?: "") == "true";
