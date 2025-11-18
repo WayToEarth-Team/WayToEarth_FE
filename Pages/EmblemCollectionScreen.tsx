@@ -103,7 +103,7 @@ const EmblemCollectionScreen: React.FC<{ navigation?: any }> = ({
         {a.description}
       </Text>
       <Text style={[s.cardDate, !a.owned && s.lockedText]}>
-        {a.earned_at ? new Date(a.earned_at).toLocaleDateString("ko-KR") : "🔒"}
+        {a.owned ? (a.earned_at ? new Date(a.earned_at).toLocaleDateString("ko-KR") : "획득 완료") : "🔒"}
       </Text>
     </View>
   );
