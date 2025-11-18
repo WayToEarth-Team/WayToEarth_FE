@@ -49,7 +49,7 @@ import type { LandmarkDetail } from "../types/landmark";
 import { getLandmarkDetail } from "../utils/api/landmarks";
 import { distanceKm } from "../utils/geo";
 import { Ionicons } from "@expo/vector-icons";
-import { ConfirmAlert } from "../components/ui/AlertDialog";
+import { ConfirmAlert, MessageAlert } from "../components/ui/AlertDialog";
 import {
   getOrFetchProgressId,
   getProgressStamps,
@@ -59,6 +59,12 @@ import {
 } from "../utils/api/stamps";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { emitRunningSession } from "../utils/navEvents";
+import {
+  initWatchSync,
+  startRunOrchestrated,
+  isWatchAvailable,
+} from "../src/modules/watchSync";
+import { useWatchConnection } from "../src/hooks/useWatchConnection";
 
 type RouteParams = {
   route: {
@@ -93,6 +99,18 @@ export default function JourneyRunningScreen(
 
   // 로그인된 사용자 ID
   const { userId, user, refreshProfile } = useAuth();
+
+  // 워치 연결 상태
+  const watchStatus = useWatchConnection();
+
+  // 워치 모드 상태
+  const [watchMode, setWatchMode] = useState(false);
+  const [alert, setAlert] = useState<{
+    open: boolean;
+    title?: string;
+    message?: string;
+  }>({ open: false });
+
   // 화면 포커스 시 프로필 재조회하여 만료된 아바타 URL 갱신
   useFocusEffect(
     React.useCallback(() => {
@@ -313,6 +331,14 @@ export default function JourneyRunningScreen(
     };
   }, [userId, journeyId]);
 
+  // 워치 동기화 초기화
+  useEffect(() => {
+    if (isWatchAvailable()) {
+      console.log("[JourneyRunning] Initializing watch sync");
+      initWatchSync();
+    }
+  }, []);
+
   // 날씨 정보 (이 화면에서만 위치/날씨 활성화)
   const {
     weather,
@@ -449,38 +475,93 @@ export default function JourneyRunningScreen(
 
   const handleStartPress = useCallback(() => {
     console.log("[JourneyRunning] start pressed -> show countdown");
-    // 카운트다운 동안 초기 위치를 예열해 정확도 확보
-    try {
-      (t as any).prime?.();
-    } catch {}
+
+    // 워치 연결 확인
+    if (watchStatus.isConnected) {
+      console.log("[JourneyRunning] Watch connected, using watch mode");
+      setWatchMode(true);
+    } else {
+      console.log("[JourneyRunning] Watch not connected, using phone-only mode");
+      setWatchMode(false);
+      // 폰 모드에서만 GPS 가열
+      try {
+        (t as any).prime?.();
+      } catch {}
+    }
+
     setCountdownVisible(true);
-  }, []);
+  }, [watchStatus.isConnected]);
 
   const handleCountdownDone = useCallback(async () => {
-    console.log("[JourneyRunning] countdown done");
+    console.log("[JourneyRunning] countdown done, watchMode:", watchMode);
     setCountdownVisible(false);
-    // 즉시 시작 시도 (권한은 내부에서 처리)
-    requestAnimationFrame(() => {
-      console.log("[JourneyRunning] calling t.startJourneyRun()");
-      t.startJourneyRun();
-    });
-    // 탭바 숨김 즉시 반영 및 세션 플래그 저장
-    try {
-      await AsyncStorage.setItem(
-        "@running_session",
-        JSON.stringify({
-          isRunning: true,
-          sessionId: t.sessionId || `journey-${Date.now()}`,
-          startTime: Date.now(),
-        })
-      );
-    } catch {}
-    try {
-      emitRunningSession(true);
-    } catch {}
+
+    if (watchMode) {
+      // 워치 모드: 워치 세션 시작
+      try {
+        console.log("[JourneyRunning] Starting watch session (JOURNEY)");
+        const sessionId = await startRunOrchestrated("JOURNEY", { journeyId: Number(journeyId) });
+        console.log("[JourneyRunning] Watch session started:", sessionId);
+
+        // 탭바 숨김 즉시 반영 및 세션 플래그 저장
+        try {
+          await AsyncStorage.setItem(
+            "@running_session",
+            JSON.stringify({
+              isRunning: true,
+              sessionId,
+              startTime: Date.now(),
+            })
+          );
+        } catch {}
+        try {
+          emitRunningSession(true);
+        } catch {}
+
+        // 워치 연동 팝업 표시
+        setAlert({
+          open: true,
+          title: "워치 연동",
+          message: "워치와 연동되어 여정 러닝을 시작합니다",
+        });
+      } catch (error) {
+        console.error("[JourneyRunning] Watch start failed, fallback to phone mode:", error);
+        // 워치 시작 실패 시 폰 모드로 전환
+        setWatchMode(false);
+        requestAnimationFrame(() => {
+          t.startJourneyRun();
+        });
+        setAlert({
+          open: true,
+          title: "워치 연동 실패",
+          message: "폰 모드로 여정 러닝을 시작합니다",
+        });
+      }
+    } else {
+      // 폰 전용 모드: 기존 로직
+      requestAnimationFrame(() => {
+        console.log("[JourneyRunning] calling t.startJourneyRun() (phone mode)");
+        t.startJourneyRun();
+      });
+      // 탭바 숨김 즉시 반영 및 세션 플래그 저장
+      try {
+        await AsyncStorage.setItem(
+          "@running_session",
+          JSON.stringify({
+            isRunning: true,
+            sessionId: t.sessionId || `journey-${Date.now()}`,
+            startTime: Date.now(),
+          })
+        );
+      } catch {}
+      try {
+        emitRunningSession(true);
+      } catch {}
+    }
+
     // 알림 권한 요청은 비동기로 병렬 처리
     backgroundRunning.requestNotificationPermission().catch(() => {});
-  }, [t, backgroundRunning]);
+  }, [watchMode, t, backgroundRunning, journeyId]);
 
   // 러닝 상태 변화에 따라 탭바 상태 즉시 동기화(보조 안전장치)
   useEffect(() => {
@@ -970,6 +1051,14 @@ export default function JourneyRunningScreen(
 
       {/* Emblem Celebration */}
       {celebrate.visible && <EmblemCelebration count={celebrate.count} />}
+
+      {/* 워치 연동 팝업 */}
+      <MessageAlert
+        visible={alert.open}
+        title={alert.title}
+        message={alert.message}
+        onClose={() => setAlert({ open: false })}
+      />
 
       {/* 방명록 작성 모달 */}
       {selectedLandmark && (
