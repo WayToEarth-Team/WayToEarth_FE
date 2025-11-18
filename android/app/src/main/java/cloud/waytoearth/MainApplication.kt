@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.res.Configuration
 
 import com.facebook.react.PackageList
+import cloud.waytoearth.wear.WayToEarthWearPackage
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactNativeHost
 import com.facebook.react.ReactPackage
@@ -24,7 +25,9 @@ class MainApplication : Application(), ReactApplication {
           override fun getPackages(): List<ReactPackage> {
             val packages = PackageList(this).packages
             // Packages that cannot be autolinked yet can be added manually here, for example:
-            // packages.add(MyReactNativePackage())
+            // Add in-app ReactPackage (not autolinked) for watch integration
+            packages.add(WayToEarthWearPackage())
+            android.util.Log.d("MainApplication", "📦 WayToEarthWearPackage added. Total packages: ${packages.size}")
             return packages
           }
 
