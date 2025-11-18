@@ -63,8 +63,11 @@ import {
   initWatchSync,
   startRunOrchestrated,
   isWatchAvailable,
+  subscribeRealtimeUpdates,
+  type RealtimeRunningData,
 } from "../src/modules/watchSync";
 import { useWatchConnection } from "../src/hooks/useWatchConnection";
+import { useWatchRunning } from "../src/hooks/useWatchRunning";
 
 type RouteParams = {
   route: {
@@ -105,6 +108,9 @@ export default function JourneyRunningScreen(
 
   // 워치 모드 상태
   const [watchMode, setWatchMode] = useState(false);
+  const [watchRunning, setWatchRunning] = useState(false);
+  const [watchData, setWatchData] = useState<RealtimeRunningData | null>(null);
+  const [watchCompleteData, setWatchCompleteData] = useState<any>(null);
   const [alert, setAlert] = useState<{
     open: boolean;
     title?: string;
@@ -339,6 +345,109 @@ export default function JourneyRunningScreen(
     }
   }, []);
 
+  // 워치 모드일 때 실시간 데이터 구독
+  useEffect(() => {
+    if (!watchMode) return;
+
+    console.log("[JourneyRunning] Subscribing to watch updates");
+
+    // 실시간 데이터 구독
+    const unsubscribeUpdates = subscribeRealtimeUpdates((data) => {
+      console.log("[JourneyRunning] Watch data received:", data);
+      setWatchData(data);
+
+      // 첫 데이터 수신 시 러닝 시작으로 간주
+      if (!watchRunning) {
+        setWatchRunning(true);
+
+        // AsyncStorage에 러닝 세션 저장 (탭 바 숨김용)
+        try {
+          AsyncStorage.setItem(
+            "@running_session",
+            JSON.stringify({
+              isRunning: true,
+              sessionId: data.sessionId,
+              startTime: Date.now(),
+            })
+          ).catch(() => {});
+        } catch {}
+
+        // 즉시 탭바 숨김 반영
+        try {
+          emitRunningSession(true);
+        } catch {}
+      }
+    });
+
+    // wearStarted 이벤트 리스너 추가
+    const { NativeModules, NativeEventEmitter } = require("react-native");
+    const { WayToEarthWear } = NativeModules;
+    const emitter = new NativeEventEmitter(WayToEarthWear);
+
+    const startedSub = emitter.addListener("wearStarted", (payload: string) => {
+      console.log("[JourneyRunning] Watch session started:", payload);
+      setWatchRunning(true);
+    });
+
+    // wearRunningComplete 이벤트 리스너 추가 (워치에서 종료 버튼 누름)
+    const completeSub = emitter.addListener(
+      "wearRunningComplete",
+      async (payload: string) => {
+        console.log("[JourneyRunning] Watch session completed:", payload);
+
+        try {
+          // payload 파싱
+          const completeData = JSON.parse(payload);
+          console.log("[JourneyRunning] Parsed complete data:", completeData);
+
+          // 완료 데이터 저장
+          setWatchCompleteData(completeData);
+
+          // 워치 러닝 종료
+          setWatchRunning(false);
+
+          // AsyncStorage 세션 정보 제거
+          try { await AsyncStorage.removeItem("@running_session"); } catch {}
+
+          // 저장 확인 다이얼로그 표시
+          setConfirmSave(true);
+        } catch (e) {
+          console.error("[JourneyRunning] Failed to parse complete data:", e);
+        }
+      }
+    );
+
+    // wearRunIdReceived 이벤트 리스너 추가 (서버에서 runId 수신)
+    const runIdSub = emitter.addListener(
+      "wearRunIdReceived",
+      (payload: string) => {
+        console.log("[JourneyRunning] Watch runId received:", payload);
+
+        try {
+          const data = JSON.parse(payload);
+          console.log("[JourneyRunning] Parsed runId data:", data);
+
+          // watchCompleteData 업데이트
+          setWatchCompleteData((prev) => {
+            if (prev && prev.sessionId === data.sessionId) {
+              return { ...prev, runId: data.runId };
+            }
+            return prev;
+          });
+        } catch (e) {
+          console.error("[JourneyRunning] Failed to parse runId data:", e);
+        }
+      }
+    );
+
+    return () => {
+      unsubscribeUpdates();
+      startedSub.remove();
+      completeSub.remove();
+      runIdSub.remove();
+    };
+  }, [watchMode, watchRunning]);
+
   // 날씨 정보 (이 화면에서만 위치/날씨 활성화)
   const {
     weather,
@@ -503,6 +612,9 @@ export default function JourneyRunningScreen(
         const sessionId = await startRunOrchestrated("JOURNEY", { journeyId: Number(journeyId) });
         console.log("[JourneyRunning] Watch session started:", sessionId);
 
+        // ✅ 워치 러닝 상태 시작 (UI 표시용)
+        setWatchRunning(true);
+
         // 여정 러닝 상태도 시작 (워치 데이터를 useJourneyRunning에서 사용)
         requestAnimationFrame(() => {
           console.log("[JourneyRunning] calling t.startJourneyRun() (watch mode)");
@@ -534,6 +646,7 @@ export default function JourneyRunningScreen(
         console.error("[JourneyRunning] Watch start failed, fallback to phone mode:", error);
         // 워치 시작 실패 시 폰 모드로 전환
         setWatchMode(false);
+        setWatchRunning(false);
         requestAnimationFrame(() => {
           t.startJourneyRun();
         });
@@ -571,10 +684,11 @@ export default function JourneyRunningScreen(
 
   // 러닝 상태 변화에 따라 탭바 상태 즉시 동기화(보조 안전장치)
   useEffect(() => {
+    const running = t.isRunning || watchRunning;
     try {
-      emitRunningSession(!!t.isRunning);
+      emitRunningSession(!!running);
     } catch {}
-  }, [t.isRunning]);
+  }, [t.isRunning, watchRunning]);
 
   // 랜드마크 마커 클릭 핸들러 - 스토리 페이지로 이동
   const handleLandmarkMarkerPress = useCallback(
@@ -889,9 +1003,18 @@ export default function JourneyRunningScreen(
               try {
                 await backgroundRunning.stopForegroundService();
                 await backgroundRunning.clearSession();
-                await t.stop();
+                if (!watchMode) {
+                  await t.stop();
+                }
                 try { await AsyncStorage.removeItem('@running_session'); } catch {}
                 try { emitRunningSession(false); } catch {}
+
+                // 워치 모드 리셋
+                setWatchMode(false);
+                setWatchRunning(false);
+                setWatchData(null);
+                setWatchCompleteData(null);
+
                 navigation.navigate('JourneyRouteDetail', { id: journeyId });
               } catch (e) {
                 console.error('[JourneyRunning] 종료 실패:', e);
@@ -900,29 +1023,68 @@ export default function JourneyRunningScreen(
             onConfirm={async () => {
               setConfirmSave(false);
               try {
-                const avgPaceSec = t.distance > 0 && Number.isFinite(t.elapsedSec / t.distance)
-                  ? Math.floor(t.elapsedSec / Math.max(t.distance, 0.000001))
-                  : null;
-                const now = Math.floor(Date.now() / 1000);
-                const routePoints = (t.route ?? []).map((p, i) => ({ latitude: p.latitude, longitude: p.longitude, sequence: i + 1, t: now }));
-                await apiComplete({
-                  sessionId: t.sessionId as string,
-                  distanceMeters: Math.round(t.distance * 1000),
-                  durationSeconds: t.elapsedSec,
-                  averagePaceSeconds: avgPaceSec,
-                  calories: Math.round(t.kcal),
-                  routePoints,
-                  endedAt: Date.now(),
-                  title: journeyTitle,
-                });
-                try { if (t.distance >= 0.01) await awardEmblemByCode('DIST_10M'); } catch {}
-                await backgroundRunning.stopForegroundService();
-                await backgroundRunning.clearSession();
-                await t.completeJourneyRun();
-                navigation.navigate('JourneyRouteDetail', { id: journeyId });
-                await t.stop();
-                try { await AsyncStorage.removeItem('@running_session'); } catch {}
-                try { emitRunningSession(false); } catch {}
+                // 워치 모드인지 폰 모드인지 확인
+                if (watchMode && watchCompleteData) {
+                  // 워치 모드: watchCompleteData 사용 (watchSync.ts에서 이미 서버에 complete 전송됨)
+                  const distanceMeters =
+                    watchCompleteData.totalDistanceMeters ||
+                    watchCompleteData.distanceMeters ||
+                    0;
+                  const distanceKm = distanceMeters / 1000;
+
+                  // 워치 모드: 여정 진행률 업데이트
+                  const deltaM = distanceMeters;
+                  console.log("[JourneyRunning] 💾 워치 완료: 진행률 저장", {
+                    deltaM,
+                    distanceKm: (deltaM / 1000).toFixed(2),
+                  });
+
+                  try {
+                    await t.completeJourneyRun(); // 여정 진행률 저장
+                  } catch (e) {
+                    console.error('[JourneyRunning] 여정 진행률 저장 실패:', e);
+                  }
+
+                  await backgroundRunning.stopForegroundService();
+                  await backgroundRunning.clearSession();
+
+                  // 워치 모드 리셋
+                  setWatchMode(false);
+                  setWatchRunning(false);
+                  setWatchData(null);
+                  setWatchCompleteData(null);
+
+                  try { await AsyncStorage.removeItem('@running_session'); } catch {}
+                  try { emitRunningSession(false); } catch {}
+
+                  navigation.navigate('JourneyRouteDetail', { id: journeyId });
+                } else {
+                  // 폰 모드: 기존 로직
+                  const avgPaceSec = t.distance > 0 && Number.isFinite(t.elapsedSec / t.distance)
+                    ? Math.floor(t.elapsedSec / Math.max(t.distance, 0.000001))
+                    : null;
+                  const now = Math.floor(Date.now() / 1000);
+                  const routePoints = (t.route ?? []).map((p, i) => ({ latitude: p.latitude, longitude: p.longitude, sequence: i + 1, t: now }));
+                  await apiComplete({
+                    sessionId: t.sessionId as string,
+                    distanceMeters: Math.round(t.distance * 1000),
+                    durationSeconds: t.elapsedSec,
+                    averagePaceSeconds: avgPaceSec,
+                    calories: Math.round(t.kcal),
+                    routePoints,
+                    endedAt: Date.now(),
+                    title: journeyTitle,
+                  });
+                  try { if (t.distance >= 0.01) await awardEmblemByCode('DIST_10M'); } catch {}
+                  await backgroundRunning.stopForegroundService();
+                  await backgroundRunning.clearSession();
+                  await t.completeJourneyRun();
+                  await t.stop();
+                  try { await AsyncStorage.removeItem('@running_session'); } catch {}
+                  try { emitRunningSession(false); } catch {}
+
+                  navigation.navigate('JourneyRouteDetail', { id: journeyId });
+                }
               } catch (e) {
                 console.error('[JourneyRunning] 저장 종료 실패:', e);
                 Alert.alert('저장 실패', '네트워크 또는 서버 오류가 발생했어요.');
@@ -1033,8 +1195,8 @@ export default function JourneyRunningScreen(
         </View>
       )}
 
-      {/* 러닝 제어 버튼 (러닝 중) - 위치 조정 */}
-      {t.isRunning && (
+      {/* 러닝 제어 버튼 (러닝 중) - 워치 모드가 아닐 때만 표시 */}
+      {t.isRunning && !watchMode && (
         <View style={styles.playControlsContainer}>
           <RunPlayControls
             isRunning={t.isRunning}
@@ -1045,6 +1207,15 @@ export default function JourneyRunningScreen(
             onStopTap={() => Alert.alert("종료하려면 길게 누르세요")}
             onStopLong={handleComplete}
           />
+        </View>
+      )}
+
+      {/* 워치 제어 중 메시지 */}
+      {watchRunning && watchMode && (
+        <View style={styles.watchControlContainer}>
+          <Text style={styles.watchControlText}>
+            ⌚ 워치에서 제어 중
+          </Text>
         </View>
       )}
 
@@ -1438,5 +1609,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
     marginTop: 8,
+  },
+  watchControlContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 110, // 스탬프 바텀시트 위
+    alignItems: "center",
+  },
+  watchControlText: {
+    fontSize: 14,
+    color: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(255,255,255,0.9)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
 });
