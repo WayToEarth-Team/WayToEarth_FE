@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLiveRunTracker } from "../useLiveRunTracker";
+import { useWatchRunning } from "../../src/hooks/useWatchRunning";
 import type { LatLng } from "../../types/types";
 import type { JourneyId, Landmark } from "../../types/journey";
 import * as userJourneysApi from "../../utils/api/userJourneys";
@@ -34,6 +35,7 @@ export function useJourneyRunning({
   onLandmarkReached,
 }: UseJourneyRunningProps) {
   const runTracker = useLiveRunTracker("JOURNEY"); // 여정 러닝은 JOURNEY 타입
+  const watchData = useWatchRunning(); // 워치 러닝 데이터 (있으면 우선 사용)
 
   const [progressM, setProgressM] = useState(0);
   const [progressPercent, setProgressPercent] = useState(0);
@@ -108,13 +110,16 @@ export function useJourneyRunning({
   useEffect(() => {
     console.log("[useJourneyRunning] 거리 업데이트 체크:", {
       isRunning: runTracker.isRunning,
-      distance: runTracker.distance,
+      phoneDistance: runTracker.distance,
+      watchDistance: watchData?.distanceMeters,
       route: runTracker.route.length,
     });
 
     if (!runTracker.isRunning) return;
 
-    const currentTotalM = initialProgressM.current + runTracker.distance * 1000;
+    // 🔧 워치 데이터가 있으면 워치 거리 우선 사용, 없으면 폰 GPS 사용
+    const currentRunningDistanceM = watchData?.distanceMeters ?? (runTracker.distance * 1000);
+    const currentTotalM = initialProgressM.current + currentRunningDistanceM;
     setProgressM(currentTotalM);
     setProgressPercent(
       totalDistanceM > 0 ? Math.min(100, (currentTotalM / totalDistanceM) * 100) : 0
@@ -122,7 +127,9 @@ export function useJourneyRunning({
 
     console.log("[useJourneyRunning] 진행률 업데이트:", {
       initialProgressM: initialProgressM.current,
-      runTrackerDistance: runTracker.distance,
+      phoneDistance: runTracker.distance,
+      watchDistanceM: watchData?.distanceMeters,
+      currentRunningDistanceM,
       currentTotalM,
       totalDistanceM,
       progressPercent: ((currentTotalM / totalDistanceM) * 100).toFixed(4),
@@ -143,6 +150,7 @@ export function useJourneyRunning({
   }, [
     runTracker.isRunning,
     runTracker.distance,
+    watchData?.distanceMeters, // 워치 거리 변경 감지
     landmarks,
     totalDistanceM,
     reachedLandmarks,
@@ -206,7 +214,8 @@ export function useJourneyRunning({
     if (!runTracker.isRunning && !runTracker.isPaused) return;
 
     try {
-      const deltaM = runTracker.distance * 1000;
+      // 🔧 워치 데이터가 있으면 워치 거리 사용, 없으면 폰 GPS 사용
+      const deltaM = watchData?.distanceMeters ?? (runTracker.distance * 1000);
 
       console.log("[useJourneyRunning] 💾 진행률 저장 시작:", {
         userId,
@@ -214,6 +223,7 @@ export function useJourneyRunning({
         이번러닝거리: `${(deltaM / 1000).toFixed(2)}km`,
         기존진행: `${(initialProgressM.current / 1000).toFixed(2)}km`,
         새진행: `${((initialProgressM.current + deltaM) / 1000).toFixed(2)}km`,
+        source: watchData ? 'watch' : 'phone',
       });
 
       // 서버에 진행률 업데이트
@@ -244,6 +254,7 @@ export function useJourneyRunning({
     progressM,
     landmarks,
     runTracker,
+    watchData,
   ]);
 
   // 랜드마크에 reached 속성 추가
@@ -342,6 +353,10 @@ export function useJourneyRunning({
 
     // 상태
     progressReady,
+
+    // 워치 데이터 (있으면 제공)
+    watchData,
+    usingWatch: !!watchData, // 워치 사용 여부
 
     // 🧪 테스트용
     addTestDistance,
