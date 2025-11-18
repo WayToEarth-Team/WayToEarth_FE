@@ -431,6 +431,10 @@ export default function LiveRunningScreen({
         console.log("[LiveRunning] Starting watch session");
         const sessionId = await startRunOrchestrated("SINGLE");
         console.log("[LiveRunning] Watch session started:", sessionId);
+
+        // ✅ 워치 러닝 상태 시작 (UI 표시용)
+        setWatchRunning(true);
+
         // 워치 모드 시작과 동시에 탭바 숨김 즉시 반영
         try {
           await AsyncStorage.setItem(
