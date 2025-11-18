@@ -53,7 +53,21 @@ export function initWatchSync() {
 
   subs.push(
     emitter.addListener('wearStarted', (s: string) => {
-      try { debugLog('[WEAR EVT] started:', s); } catch {}
+      (async () => {
+        try {
+          debugLog('[WEAR EVT] started:', s);
+          const p = JSON.parseSafe(s);
+          const sessionId = p?.sessionId ? String(p.sessionId) : `watch-${Date.now()}`;
+          const runningType: RunningType = (p?.runningType || p?.type || 'SINGLE') as any;
+          const journeyId = Number.isFinite(Number(p?.journeyId)) ? Number(p.journeyId) : undefined;
+          if (currentSessionId && currentSessionId === sessionId) return;
+          currentSessionId = sessionId;
+          await apiStart({ sessionId, runningType: runningType || 'SINGLE', journeyId });
+          debugLog('[API OK] running/start from wearStarted -> sessionId=', sessionId);
+        } catch (e: any) {
+          debugLog('[EVT ERR] wearStarted:', e?.message);
+        }
+      })();
     }),
     emitter.addListener('wearStopped', (s: string) => {
       try { debugLog('[WEAR EVT] stopped:', s); } catch {}
@@ -81,8 +95,9 @@ export function initWatchSync() {
         const sessionId: string = p.sessionId;
         const distanceMeters: number = Number(p.distanceMeters) || 0;
         const durationSeconds: number = Number(p.durationSeconds) || 0;
-        const averagePaceSeconds: number | null = isFinite(Number(p.averagePaceSeconds)) ? Number(p.averagePaceSeconds) : (distanceMeters>0? Math.round(durationSeconds / (distanceMeters/1000)): null);
-        const calories = isFinite(Number(p.calories)) ? Number(p.calories) : caloriesKcal(distanceMeters/1000, durationSeconds);
+        const averagePaceSeconds: number | null = isFinite(Number(p.averagePaceSeconds)) ? Number(p.averagePaceSeconds) : null;
+        // 싱글러닝과 동일하게 워치가 보낸 칼로리만 사용하고 없으면 0으로 유지
+        const calories = isFinite(Number(p.calories)) ? Number(p.calories) : 0;
         const heartRate = isFinite(Number(p.heartRate)) ? Number(p.heartRate) : undefined;
         const paceSeconds = isFinite(Number(p.paceSeconds)) ? Number(p.paceSeconds) : undefined;
         const cp = p.currentPoint || {};
@@ -152,8 +167,8 @@ export function initWatchSync() {
         // Transform to apiComplete payload
         const distanceMeters = Number(run.totalDistanceMeters || run.distanceMeters || 0) || 0;
         const durationSeconds = Number(run.durationSeconds || 0) || 0;
-        const averagePaceSeconds = isFinite(Number(run.averagePaceSeconds)) ? Number(run.averagePaceSeconds) : (distanceMeters>0? Math.round(durationSeconds/(distanceMeters/1000)): null);
-        const calories = Number(run.calories || 0) || 0;
+        const averagePaceSeconds = isFinite(Number(run.averagePaceSeconds)) ? Number(run.averagePaceSeconds) : null;
+        const calories = isFinite(Number(run.calories)) ? Number(run.calories) : 0;
         const averageHeartRate = isFinite(Number(run.averageHeartRate)) ? Number(run.averageHeartRate) : null;
         const maxHeartRate = isFinite(Number(run.maxHeartRate)) ? Number(run.maxHeartRate) : null;
         const routePointsRaw: any[] = Array.isArray(run.routePoints) ? run.routePoints : [];
