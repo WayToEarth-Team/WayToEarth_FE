@@ -20,6 +20,7 @@ import {
   TouchableOpacity,
   ScrollView,
   AppState,
+  Image as RNImage,
 } from "react-native";
 import JourneyMapRoute from "../components/Journey/JourneyMapRoute";
 import JourneyProgressCard from "../components/Journey/JourneyProgressCard";
@@ -41,7 +42,8 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { LatLng } from "../types/types";
 import type { JourneyId } from "../types/journey";
-import { apiComplete } from "../utils/api/running";
+import { apiComplete, checkPaceCoach } from "../utils/api/running";
+import { updateUserSettings } from "../utils/api/users";
 import EmblemCelebration from "../components/Effects/EmblemCelebration";
 import { awardEmblemByCode } from "../utils/api/emblems";
 import type { LandmarkSummary } from "../types/guestbook";
@@ -290,6 +292,85 @@ export default function JourneyRunningScreen(
   const celebratedKmRef = React.useRef<Set<number>>(new Set());
   const celebratingRef = React.useRef(false);
 
+  // 페이스 코치 관련 상태
+  const [isPaceCoachEnabled, setIsPaceCoachEnabled] = useState(
+    user?.is_pace_coach_enabled ?? false
+  );
+  const [lastCheckedBucket, setLastCheckedBucket] = useState(0);
+  const [paceAlertVisible, setPaceAlertVisible] = useState(false);
+  const [paceAlertMessage, setPaceAlertMessage] = useState("");
+
+  // 사용자 프로필 변경 시 isPaceCoachEnabled 동기화
+  useEffect(() => {
+    if (user?.is_pace_coach_enabled !== undefined) {
+      setIsPaceCoachEnabled(user.is_pace_coach_enabled);
+    }
+  }, [user?.is_pace_coach_enabled]);
+
+  // 페이스 코치 토글 핸들러
+  const handlePaceCoachToggle = useCallback(async () => {
+    const newValue = !isPaceCoachEnabled;
+    setIsPaceCoachEnabled(newValue);
+    try {
+      await updateUserSettings({ is_pace_coach_enabled: newValue });
+      await refreshProfile();
+    } catch (error) {
+      console.error('[PaceCoach] 설정 업데이트 실패:', error);
+      setIsPaceCoachEnabled(!newValue);
+    }
+  }, [isPaceCoachEnabled, refreshProfile]);
+
+  // 페이스 코치 체크 함수
+  const PACE_CHECK_INTERVAL_KM = 0.005; // 5m 단위 테스트용
+
+  const checkPaceCoachIfNeeded = useCallback(async (currentBucket: number, distanceKm: number) => {
+    if (!isPaceCoachEnabled || currentBucket <= lastCheckedBucket || distanceKm <= 0) {
+      return;
+    }
+
+    // 현재 페이스 계산 (초/km)
+    const currentPaceSeconds = displayElapsedSec > 0 && displayDistance > 0
+      ? Math.floor(displayElapsedSec / displayDistance)
+      : 0;
+
+    if (currentPaceSeconds <= 0) return;
+
+    try {
+      const response = await checkPaceCoach({
+        session_id: t.sessionId || `journey-${Date.now()}`,
+        current_km: Number(distanceKm.toFixed(3)),
+        current_pace_seconds: currentPaceSeconds,
+      });
+
+      setLastCheckedBucket(currentBucket);
+
+      // 알림이 필요한 경우 팝업 표시
+      if (response.should_alert && response.alert_message) {
+        setPaceAlertMessage(response.alert_message);
+        setPaceAlertVisible(true);
+
+        // 3초 후 자동으로 닫기
+        setTimeout(() => {
+          setPaceAlertVisible(false);
+        }, 3000);
+      }
+    } catch (error) {
+      console.error('[PaceCoach] 체크 실패:', error);
+      // 에러는 조용히 처리 (러닝 방해 안 되게)
+    }
+  }, [isPaceCoachEnabled, lastCheckedBucket, displayElapsedSec, displayDistance, t.sessionId]);
+
+  // km 통과 감지 (러닝 중일 때만)
+  useEffect(() => {
+    if (!t.isRunning || t.isPaused || !isPaceCoachEnabled) return;
+
+    const currentBucket = Math.floor(displayDistance / PACE_CHECK_INTERVAL_KM);
+
+    if (currentBucket > lastCheckedBucket && currentBucket > 0) {
+      checkPaceCoachIfNeeded(currentBucket, displayDistance);
+    }
+  }, [displayDistance, t.isRunning, t.isPaused, isPaceCoachEnabled, checkPaceCoachIfNeeded, lastCheckedBucket, PACE_CHECK_INTERVAL_KM]);
+
   // 랜드마크 메뉴가 열릴 때 상세 정보 로드
   useEffect(() => {
     if (landmarkMenuVisible && menuLandmark) {
@@ -406,6 +487,15 @@ export default function JourneyRunningScreen(
           // 워치 러닝 종료
           setWatchRunning(false);
 
+          // 🔧 폰 러닝 트래커도 중지 (혹시 실행 중이었다면)
+          try {
+            if (t.isRunning) {
+              await t.stop();
+            }
+          } catch (e) {
+            console.error("[JourneyRunning] Failed to stop phone tracker:", e);
+          }
+
           // AsyncStorage 세션 정보 제거
           try { await AsyncStorage.removeItem("@running_session"); } catch {}
 
@@ -480,17 +570,18 @@ export default function JourneyRunningScreen(
 
   // 러닝 세션 상태 업데이트
   useEffect(() => {
-    if (!t.isRunning) return;
+    const isRunningNow = t.isRunning || watchRunning;
+    if (!isRunningNow) return;
 
     const session = {
       type: "journey" as const,
       journeyId,
       journeyTitle,
       sessionId: t.sessionId,
-      startTime: Date.now() - t.elapsedSec * 1000,
-      distanceKm: t.distance,
-      durationSeconds: t.elapsedSec,
-      isRunning: t.isRunning,
+      startTime: Date.now() - displayElapsedSec * 1000,
+      distanceKm: displayDistance,
+      durationSeconds: displayElapsedSec,
+      isRunning: isRunningNow,
       isPaused: t.isPaused,
       reachedLandmarks: reachedIds,
     };
@@ -500,26 +591,27 @@ export default function JourneyRunningScreen(
 
     // 세션 상태 저장 (백그라운드 복원용)
     backgroundRunning.saveSession(session);
-  }, [t.isRunning, t.distance, t.elapsedSec, t.isPaused, nextLandmark]);
+  }, [t.isRunning, watchRunning, displayDistance, displayElapsedSec, t.isPaused, nextLandmark]);
 
   // 러닝 시작 시 Foreground Service 시작
   useEffect(() => {
-    if (t.isRunning) {
+    const isRunningNow = t.isRunning || watchRunning;
+    if (isRunningNow) {
       const session = {
         type: "journey" as const,
         journeyId,
         journeyTitle,
         sessionId: t.sessionId,
-        startTime: Date.now() - t.elapsedSec * 1000,
-        distanceKm: t.distance,
-        durationSeconds: t.elapsedSec,
+        startTime: Date.now() - displayElapsedSec * 1000,
+        distanceKm: displayDistance,
+        durationSeconds: displayElapsedSec,
         isRunning: true,
         isPaused: t.isPaused,
         reachedLandmarks: reachedIds,
       };
       backgroundRunning.startForegroundService(session);
     }
-  }, [t.isRunning]);
+  }, [t.isRunning, watchRunning]);
 
   // 컴포넌트 언마운트 시 세션 정리 (완료/취소 시)
   useEffect(() => {
@@ -605,8 +697,11 @@ export default function JourneyRunningScreen(
     console.log("[JourneyRunning] countdown done, watchMode:", watchMode);
     setCountdownVisible(false);
 
+    // 페이스 코치 체크 초기화
+    setLastCheckedKm(0);
+
     if (watchMode) {
-      // 워치 모드: 워치 세션 시작 + 러닝 상태 시작
+      // 워치 모드: 워치 세션만 시작 (폰 GPS는 시작하지 않음)
       try {
         console.log("[JourneyRunning] Starting watch session (JOURNEY)");
         const sessionId = await startRunOrchestrated("JOURNEY", { journeyId: Number(journeyId) });
@@ -615,9 +710,10 @@ export default function JourneyRunningScreen(
         // ✅ 워치 러닝 상태 시작 (UI 표시용)
         setWatchRunning(true);
 
-        // 여정 러닝 상태도 시작 (워치 데이터를 useJourneyRunning에서 사용)
+        // 🔧 워치 모드에서도 폰 GPS 시작 (지도 마커 표시용)
+        // 거리/시간은 워치 데이터 우선 사용 (displayDistance, displayElapsedSec)
         requestAnimationFrame(() => {
-          console.log("[JourneyRunning] calling t.startJourneyRun() (watch mode)");
+          console.log("[JourneyRunning] calling t.startJourneyRun() (watch mode - GPS for map marker)");
           t.startJourneyRun();
         });
 
@@ -718,11 +814,42 @@ export default function JourneyRunningScreen(
     setConfirmExit(true);
   }, [navigation, t, journeyTitle, backgroundRunning, journeyId]);
 
+  // 🔧 워치 모드일 때는 워치 데이터 우선 사용
+  const displayDistance = useMemo(() => {
+    if (watchMode && watchData?.distanceMeters != null) {
+      return watchData.distanceMeters / 1000; // 미터를 km로 변환
+    }
+    return t.distance;
+  }, [watchMode, watchData?.distanceMeters, t.distance]);
+
+  const displayElapsedSec = useMemo(() => {
+    if (watchMode && watchData?.durationSeconds != null) {
+      return watchData.durationSeconds;
+    }
+    return t.elapsedSec;
+  }, [watchMode, watchData?.durationSeconds, t.elapsedSec]);
+
+  const displayPace = useMemo(() => {
+    if (watchMode && watchData?.averagePaceSeconds != null) {
+      const paceMin = Math.floor(watchData.averagePaceSeconds / 60);
+      const paceSec = Math.floor(watchData.averagePaceSeconds % 60);
+      return `${paceMin}'${String(paceSec).padStart(2, "0")}"`;
+    }
+    return t.paceLabel;
+  }, [watchMode, watchData?.averagePaceSeconds, t.paceLabel]);
+
+  const displayKcal = useMemo(() => {
+    if (watchMode && watchData?.calories != null) {
+      return watchData.calories;
+    }
+    return t.kcal;
+  }, [watchMode, watchData?.calories, t.kcal]);
+
   const elapsedLabel = useMemo(() => {
-    const m = Math.floor(t.elapsedSec / 60);
-    const s = String(t.elapsedSec % 60).padStart(2, "0");
+    const m = Math.floor(displayElapsedSec / 60);
+    const s = String(displayElapsedSec % 60).padStart(2, "0");
     return `${m}:${s}`;
-  }, [t.elapsedSec]);
+  }, [displayElapsedSec]);
 
   // 진행률에 따른 여정 경로 상의 가상 위치 계산 (거리 기반으로 수정)
   const virtualLocation = useMemo(() => {
@@ -945,7 +1072,7 @@ export default function JourneyRunningScreen(
       </View>
 
       {/* 러닝 중이 아닐 때: 여정 진행률 카드 */}
-      {!t.isRunning && !t.isPaused && t.progressReady && (
+      {!t.isRunning && !t.isPaused && !watchRunning && t.progressReady && (
           <JourneyProgressCard
             progressPercent={t.progressPercent}
             currentDistanceKm={t.progressM / 1000}
@@ -974,27 +1101,24 @@ export default function JourneyRunningScreen(
         />
       )}
 
-      {/* 러닝 중일 때: 사이드 패널(통계) + 간소화된 진행률 */}
-      {(t.isRunning || t.isPaused) && (
-        <>
-          {/* 종료 확인 커스텀 팝업들 */}
-          <ConfirmAlert
-            visible={confirmExit}
-            title="여정 러닝 종료"
-            message="러닝을 종료하시겠습니까?"
-            onClose={() => setConfirmExit(false)}
-            onCancel={() => {
-              setConfirmExit(false);
-              if (t.isPaused) t.resume();
-            }}
-            onConfirm={() => {
-              setConfirmExit(false);
-              setConfirmSave(true);
-            }}
-            confirmText="종료"
-          />
-          <ConfirmAlert
-            visible={confirmSave}
+      {/* 종료 확인 & 저장 팝업 (조건부 렌더링 밖에 배치) */}
+      <ConfirmAlert
+        visible={confirmExit}
+        title="여정 러닝 종료"
+        message="러닝을 종료하시겠습니까?"
+        onClose={() => setConfirmExit(false)}
+        onCancel={() => {
+          setConfirmExit(false);
+          if (t.isPaused) t.resume();
+        }}
+        onConfirm={() => {
+          setConfirmExit(false);
+          setConfirmSave(true);
+        }}
+        confirmText="종료"
+      />
+      <ConfirmAlert
+        visible={confirmSave}
             title="기록 저장"
             message="러닝 기록을 저장하시겠습니까?"
             onClose={() => setConfirmSave(false)}
@@ -1093,12 +1217,16 @@ export default function JourneyRunningScreen(
             confirmText="저장"
             cancelText="저장 안 함"
           />
+
+      {/* 러닝 중일 때: 사이드 패널(통계) + 간소화된 진행률 */}
+      {(t.isRunning || t.isPaused || watchRunning) && (
+        <>
           {/* 오른쪽 사이드 패널 (여정 러닝 전용) */}
           <RunStatsSidePanel
-            distanceKm={t.distance}
-            paceLabel={t.paceLabel}
-            kcal={t.kcal}
-            elapsedSec={t.elapsedSec}
+            distanceKm={displayDistance}
+            paceLabel={displayPace}
+            kcal={displayKcal}
+            elapsedSec={displayElapsedSec}
           />
 
           {/* 간소화된 진행률 표시 */}
@@ -1165,33 +1293,53 @@ export default function JourneyRunningScreen(
       )}
 
       {/* 시작 버튼 (러닝 전) */}
-      {!t.isRunning && !t.isPaused && (
+      {!t.isRunning && !t.isPaused && !watchRunning && (
         <View
           style={[
             styles.startButtonContainer,
             { bottom: Math.max(insets.bottom, 12) + 100 }, // 스탬프 바텀시트(90px) 위
           ]}
         >
-          <Pressable
-            onPress={handleStartPress}
-            disabled={!t.isReady || t.isInitializing}
-            style={styles.startButtonWrapper}
-          >
-            <View
-              style={[
-                styles.startButton,
-                (!t.isReady || t.isInitializing) && styles.startButtonDisabled,
+          <View style={styles.startButtonRow}>
+            {/* AI 페이스 코치 토글 버튼 */}
+            <Pressable
+              onPress={handlePaceCoachToggle}
+              style={({ pressed }) => [
+                styles.paceCoachToggle,
+                isPaceCoachEnabled && styles.paceCoachToggleActive,
+                pressed && styles.paceCoachTogglePressed,
               ]}
             >
-              <Text style={styles.startButtonText}>
-                {!t.isReady
-                  ? "준비중..."
-                  : t.isInitializing
-                  ? "시작중..."
-                  : "여정 시작"}
-              </Text>
-            </View>
-          </Pressable>
+              <View style={{ position: 'relative' }}>
+                <Text style={{ fontSize: 24 }}>🎯</Text>
+                {!isPaceCoachEnabled && (
+                  <View style={styles.disabledSlash} />
+                )}
+              </View>
+            </Pressable>
+
+            {/* 시작 버튼 */}
+            <Pressable
+              onPress={handleStartPress}
+              disabled={!t.isReady || t.isInitializing}
+              style={styles.startButtonWrapper}
+            >
+              <View
+                style={[
+                  styles.startButton,
+                  (!t.isReady || t.isInitializing) && styles.startButtonDisabled,
+                ]}
+              >
+                <Text style={styles.startButtonText}>
+                  {!t.isReady
+                    ? "준비중..."
+                    : t.isInitializing
+                    ? "시작중..."
+                    : "여정 시작"}
+                </Text>
+              </View>
+            </Pressable>
+          </View>
         </View>
       )}
 
@@ -1210,12 +1358,25 @@ export default function JourneyRunningScreen(
         </View>
       )}
 
-      {/* 워치 제어 중 메시지 */}
+      {/* 워치 제어 중 메시지 + 디버그 정보 */}
       {watchRunning && watchMode && (
         <View style={styles.watchControlContainer}>
           <Text style={styles.watchControlText}>
             ⌚ 워치에서 제어 중
           </Text>
+          {__DEV__ && t.watchData && (
+            <View style={{ backgroundColor: 'rgba(0,0,0,0.7)', padding: 8, borderRadius: 8, marginTop: 8 }}>
+              <Text style={{ color: '#fff', fontSize: 11 }}>
+                🐛 워치 데이터: {(t.watchData.distanceMeters / 1000).toFixed(3)}km
+              </Text>
+              <Text style={{ color: '#fff', fontSize: 11 }}>
+                시간: {Math.floor(t.watchData.durationSeconds / 60)}:{String(t.watchData.durationSeconds % 60).padStart(2, '0')}
+              </Text>
+              <Text style={{ color: '#fff', fontSize: 11 }}>
+                칼로리: {t.watchData.calories || 0}
+              </Text>
+            </View>
+          )}
         </View>
       )}
 
@@ -1236,6 +1397,19 @@ export default function JourneyRunningScreen(
         message={alert.message}
         onClose={() => setAlert({ open: false })}
       />
+
+      {/* 페이스 코치 알림 팝업 */}
+      {paceAlertVisible && (
+        <View style={styles.paceAlertOverlay} pointerEvents="none">
+          <View style={styles.paceAlertBox}>
+            <View style={styles.paceAlertIcon}>
+              <Ionicons name="speedometer" size={24} color="#F59E0B" />
+            </View>
+            <Text style={styles.paceAlertTitle}>페이스 알림</Text>
+            <Text style={styles.paceAlertMessage}>{paceAlertMessage}</Text>
+          </View>
+        </View>
+      )}
 
       {/* 방명록 작성 모달 */}
       {selectedLandmark && (
@@ -1624,5 +1798,90 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+  },
+  // 페이스 코치 관련 스타일
+  startButtonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  paceCoachToggle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: "rgba(107, 114, 128, 0.2)",
+  },
+  paceCoachToggleActive: {
+    backgroundColor: "#10B981",
+    borderColor: "#059669",
+  },
+  paceCoachTogglePressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.95 }],
+  },
+  disabledSlash: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 32,
+    height: 2,
+    backgroundColor: '#EF4444',
+    transform: [{ translateX: -16 }, { translateY: -1 }, { rotate: '-45deg' }],
+    borderRadius: 1,
+  },
+  paceAlertOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    paddingTop: 80,
+    zIndex: 999,
+  },
+  paceAlertBox: {
+    backgroundColor: "rgba(255, 255, 255, 0.98)",
+    borderRadius: 20,
+    padding: 20,
+    paddingVertical: 16,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+    borderWidth: 2,
+    borderColor: "#F59E0B",
+    maxWidth: "85%",
+  },
+  paceAlertIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#FEF3C7",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  paceAlertTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#111827",
+    marginBottom: 6,
+  },
+  paceAlertMessage: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#F59E0B",
+    textAlign: "center",
+    lineHeight: 20,
   },
 });
