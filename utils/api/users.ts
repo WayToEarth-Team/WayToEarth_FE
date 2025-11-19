@@ -125,6 +125,7 @@ export type UserProfile = {
   created_at?: string;
   profile_image_key?: string | null;
   role?: string | null; // 'USER' | 'ADMIN'
+  is_pace_coach_enabled?: boolean; // AI 페이스 코치 활성화 여부
 };
 
 export async function getMyProfile(): Promise<UserProfile> {
@@ -160,4 +161,28 @@ export async function deleteMyAccount(): Promise<void> {
   console.log('[USERS] Deleting account...');
   await client.delete("/v1/users/me");
   console.log('[USERS] Account deleted successfully');
+}
+
+// Update user settings
+export async function updateUserSettings(settings: {
+  is_pace_coach_enabled?: boolean;
+}): Promise<void> {
+  console.log('[USERS] Updating settings...', settings);
+  // 일부 백엔드가 PATCH를 지원하지 않는 경우가 있어 PUT 우선, 실패 시 PATCH로 재시도
+  try {
+    const { data } = await client.put("/v1/users/me", settings);
+    console.log('[USERS] Settings updated via PUT /me:', data);
+    return;
+  } catch (err: any) {
+    const status = err?.response?.status;
+    if (status && status !== 405 && status !== 404) throw err;
+    try {
+      const { data } = await client.patch("/v1/users/me", settings);
+      console.log('[USERS] Settings updated via PATCH /me:', data);
+      return;
+    } catch (err2) {
+      console.error('[USERS] Settings update failed via PUT/PATCH /me:', err2);
+      throw err2;
+    }
+  }
 }
