@@ -19,7 +19,15 @@ import {
   Easing,
   AppState,
   TouchableOpacity,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from "react-native";
+
+// Android에서 LayoutAnimation 활성화
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import {
   PositiveAlert,
   NegativeAlert,
@@ -39,8 +47,10 @@ import { emitRunningSession } from "../utils/navEvents";
 import { useWeather } from "../contexts/WeatherContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { apiComplete } from "../utils/api/running"; // ✅ 추가
+import { apiComplete, checkPaceCoach } from "../utils/api/running"; // ✅ 추가
+import { updateUserSettings } from "../utils/api/users";
 import { awardEmblemByCode } from "../utils/api/emblems";
+import { useAuth } from "../contexts/AuthContext";
 import {
   initWatchSync,
   subscribeRealtimeUpdates,
@@ -49,6 +59,7 @@ import {
   type RealtimeRunningData,
 } from "../src/modules/watchSync";
 import { useWatchConnection } from "../src/hooks/useWatchConnection";
+import { showToast } from "../utils/toast";
 
 export default function LiveRunningScreen({
   navigation,
@@ -63,6 +74,17 @@ export default function LiveRunningScreen({
 
   // 백그라운드 러닝 훅
   const backgroundRunning = useBackgroundRunning();
+
+  // 사용자 정보/페이스 코치 설정
+  const { user, refreshProfile } = useAuth();
+  const [isPaceCoachEnabled, setIsPaceCoachEnabled] = useState(
+    user?.is_pace_coach_enabled ?? false
+  );
+  const [lastCheckedBucket, setLastCheckedBucket] = useState(0); // 페이스 체크 간격 버킷
+  const [paceCoachMessage, setPaceCoachMessage] = useState<string | null>(null);
+
+  // 테스트/조정 가능: km 단위 간격 (0.005km = 5m)
+  const PACE_CHECK_INTERVAL_KM = 0.005;
 
   // 워치 연결 상태
   const watchStatus = useWatchConnection();
@@ -107,6 +129,115 @@ export default function LiveRunningScreen({
     Array<{ latitude: number; longitude: number }>
   >([]);
 
+  // 위치명 상태 (예: "효자동")
+  const [locationName, setLocationName] = useState<string>("");
+  // 날씨 팝업 상태
+  const [weatherExpanded, setWeatherExpanded] = useState(false);
+
+  // 날씨 애니메이션
+  const weatherAnimOpacity = useRef(new Animated.Value(0)).current;
+
+  const toggleWeather = () => {
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(
+        300,
+        LayoutAnimation.Types.easeInEaseOut,
+        LayoutAnimation.Properties.opacity
+      )
+    );
+    setWeatherExpanded(!weatherExpanded);
+
+    Animated.timing(weatherAnimOpacity, {
+      toValue: weatherExpanded ? 0 : 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  // 사용자 프로필 변경 시 페이스 코치 설정 동기화
+  useEffect(() => {
+    if (user?.is_pace_coach_enabled !== undefined) {
+      setIsPaceCoachEnabled(!!user.is_pace_coach_enabled);
+    }
+  }, [user?.is_pace_coach_enabled]);
+
+  // 페이스 코치 토글
+  const handlePaceCoachToggle = useCallback(async () => {
+    const next = !isPaceCoachEnabled;
+    setIsPaceCoachEnabled(next);
+    try {
+      await updateUserSettings({ is_pace_coach_enabled: next });
+      await refreshProfile();
+    } catch (e) {
+      console.error('[PaceCoach] 설정 업데이트 실패:', e);
+      setIsPaceCoachEnabled(!next);
+    }
+  }, [isPaceCoachEnabled, refreshProfile]);
+
+  // km/시간/페이스 계산 값 (워치 데이터 우선)
+  const displayDistanceKm = useMemo(() => {
+    if (watchMode && watchData?.distanceMeters != null) {
+      return watchData.distanceMeters / 1000;
+    }
+    return t.distance;
+  }, [watchMode, watchData?.distanceMeters, t.distance]);
+
+  const displayElapsedSec = useMemo(() => {
+    if (watchMode && watchData?.durationSeconds != null) {
+      return watchData.durationSeconds;
+    }
+    return t.elapsedSec;
+  }, [watchMode, watchData?.durationSeconds, t.elapsedSec]);
+
+  const checkPaceCoachIfNeeded = useCallback(async (currentBucket: number, distanceKm: number) => {
+    if (!isPaceCoachEnabled) return;
+    if (currentBucket <= lastCheckedBucket || distanceKm <= 0) return;
+
+    let currentPaceSeconds: number | null = null;
+    if (watchMode && watchData) {
+      if (Number.isFinite(watchData.paceSeconds)) currentPaceSeconds = Number(watchData.paceSeconds);
+      else if (Number.isFinite(watchData.averagePaceSeconds)) currentPaceSeconds = Number(watchData.averagePaceSeconds);
+    } else if (displayElapsedSec > 0 && displayDistanceKm > 0) {
+      currentPaceSeconds = Math.floor(displayElapsedSec / Math.max(displayDistanceKm, 0.000001));
+    }
+
+    if (!currentPaceSeconds || currentPaceSeconds <= 0) return;
+
+    try {
+      const sessionId =
+        (watchMode && watchData?.sessionId)
+          ? watchData.sessionId
+          : t.sessionId || `run-${Date.now()}`;
+
+      const res = await checkPaceCoach({
+        session_id: sessionId,
+        current_km: Number(distanceKm.toFixed(3)),
+        current_pace_seconds: currentPaceSeconds,
+      });
+
+      setLastCheckedBucket(currentBucket);
+
+      if (res?.should_alert && res.alert_message) {
+        setPaceCoachMessage(res.alert_message);
+        showToast(res.alert_message);
+        setTimeout(() => setPaceCoachMessage(null), 3000);
+      }
+    } catch (err) {
+      console.error('[PaceCoach] 체크 실패:', err);
+    }
+  }, [isPaceCoachEnabled, lastCheckedBucket, watchMode, watchData, t.sessionId, displayElapsedSec, displayDistanceKm]);
+
+  useEffect(() => {
+    const running = watchMode ? watchRunning : t.isRunning;
+    const paused = watchMode ? false : t.isPaused;
+    if (!running || paused || !isPaceCoachEnabled) return;
+
+    const currentBucket = Math.floor(displayDistanceKm / PACE_CHECK_INTERVAL_KM);
+    if (currentBucket > lastCheckedBucket && currentBucket > 0) {
+      checkPaceCoachIfNeeded(currentBucket, displayDistanceKm);
+    }
+  }, [watchMode, watchRunning, t.isRunning, t.isPaused, isPaceCoachEnabled, displayDistanceKm, lastCheckedBucket, checkPaceCoachIfNeeded, PACE_CHECK_INTERVAL_KM]);
+
   // 날씨 정보 (이 화면에서만 위치/날씨 활성화)
   const {
     weather,
@@ -123,6 +254,36 @@ export default function LiveRunningScreen({
         disableWeather();
       } catch {}
     };
+  }, []);
+
+  // 위치명 가져오기 (reverse geocoding)
+  useEffect(() => {
+    const fetchLocationName = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
+        const geocode = await Location.reverseGeocodeAsync({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+
+        if (geocode && geocode.length > 0) {
+          const addr = geocode[0];
+          // 동 > 구 > 시 순서로 표시
+          const name = addr.district || addr.subregion || addr.city || addr.region || "";
+          setLocationName(name);
+        }
+      } catch (err) {
+        console.warn("[LiveRunning] Failed to fetch location name:", err);
+      }
+    };
+
+    fetchLocationName();
   }, []);
 
   // 다른 탭에서 돌아올 때만 지도 리프레시 (배터리 절약)
@@ -403,6 +564,10 @@ export default function LiveRunningScreen({
 
   const handleRunningStart = useCallback(() => {
     console.log("[LiveRunning] start pressed -> checking watch connection");
+
+    // 새 러닝마다 페이스 코치 상태 초기화
+    setLastCheckedBucket(0);
+    setPaceCoachMessage(null);
 
     // 워치 연결 확인 후 모드 결정
     if (watchStatus.isConnected && isWatchAvailable()) {
@@ -871,6 +1036,13 @@ export default function LiveRunningScreen({
         confirmText="저장"
         cancelText="저장 안 함"
       />
+
+      {paceCoachMessage && (
+        <View style={styles.paceCoachBanner}>
+          <Text style={styles.paceCoachBannerTitle}>페이스 알림</Text>
+          <Text style={styles.paceCoachBannerText}>{paceCoachMessage}</Text>
+        </View>
+      )}
       <MapRoute
         key={mapKey}
         route={watchMode && watchRunning ? watchRoutePoints : t.route}
@@ -991,63 +1163,100 @@ export default function LiveRunningScreen({
         }}
       />
 
-      {/* 상단 탭 컨트롤 - 러닝 중이 아닐 때만 표시 */}
+      {/* 상단 위치 + 날씨 - 러닝 중이 아닐 때만 표시 */}
       {!t.isRunning && !watchRunning && (
-        <View
-          style={{
-            position: "absolute",
-            top: Math.max(insets.top, 12) + 12,
-            left: 20,
-            right: 20,
-            zIndex: 10,
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <View style={styles.segmentControl}>
+        <>
+          {/* 상단 중앙: 위치명 + 온도 + 날씨 아이콘 (확장/축소 애니메이션) */}
+          {(locationName || weather?.temperature !== undefined) && (
             <TouchableOpacity
-              style={[
-                styles.segmentButton,
-                activeTab === "running" && styles.segmentButtonActive,
-              ]}
-              onPress={() => setActiveTab("running")}
+              onPress={toggleWeather}
+              style={styles.topWeatherContainer}
+              activeOpacity={0.7}
             >
-              <Text
-                style={[
-                  styles.segmentText,
-                  activeTab === "running" && styles.segmentTextActive,
-                ]}
-              >
-                러닝
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.segmentButton,
-                activeTab === "journey" && styles.segmentButtonActive,
-              ]}
-              onPress={() => setActiveTab("journey")}
-            >
-              <Text
-                style={[
-                  styles.segmentText,
-                  activeTab === "journey" && styles.segmentTextActive,
-                ]}
-              >
-                여정 러닝
-              </Text>
-            </TouchableOpacity>
-          </View>
+              <View style={styles.topWeatherContent}>
+                {/* 기본 표시: 위치 + 온도 + 이모지 (확장 시 숨김) */}
+                {!weatherExpanded && (
+                  <Animated.View
+                    style={[
+                      styles.topWeatherCompact,
+                      { opacity: weatherExpanded ? 0 : 1 }
+                    ]}
+                  >
+                    <Text style={styles.topWeatherText}>
+                      {locationName || ""}
+                      {locationName && weather?.temperature !== undefined ? " " : ""}
+                      {weather?.temperature !== undefined ? `${Math.round(weather.temperature)}°` : ""}
+                    </Text>
+                    {weather?.emoji && (
+                      <Text style={styles.topWeatherEmoji}>{weather.emoji}</Text>
+                    )}
+                  </Animated.View>
+                )}
 
-          <WeatherWidget
-            emoji={weather?.emoji}
-            condition={weather?.condition}
-            temperature={weather?.temperature}
-            recommendation={weather?.recommendation}
-            loading={weatherLoading}
-          />
-        </View>
+                {/* 확장 시 표시: 추천 메시지 (기본 상태에서 숨김) */}
+                {weatherExpanded && weather?.recommendation && (
+                  <Animated.View
+                    style={[
+                      styles.topWeatherExpanded,
+                      { opacity: weatherAnimOpacity }
+                    ]}
+                  >
+                    <Text style={styles.weatherRecommendationText}>
+                      {weather.recommendation}
+                    </Text>
+                  </Animated.View>
+                )}
+              </View>
+            </TouchableOpacity>
+          )}
+
+          {/* 탭 */}
+          <View
+            style={{
+              position: "absolute",
+              top: Math.max(insets.top, 12) + 50,
+              left: 20,
+              zIndex: 10,
+            }}
+          >
+            <View style={styles.segmentControl}>
+              <TouchableOpacity
+                style={styles.segmentButton}
+                onPress={() => setActiveTab("running")}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.segmentText,
+                    activeTab === "running" && styles.segmentTextActive,
+                  ]}
+                >
+                  러닝
+                </Text>
+                {activeTab === "running" && (
+                  <View style={styles.segmentUnderline} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.segmentButton}
+                onPress={() => setActiveTab("journey")}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.segmentText,
+                    activeTab === "journey" && styles.segmentTextActive,
+                  ]}
+                >
+                  여정 러닝
+                </Text>
+                {activeTab === "journey" && (
+                  <View style={styles.segmentUnderline} />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </>
       )}
 
       {(t.isRunning || t.isPaused || watchRunning) && (
@@ -1099,77 +1308,106 @@ export default function LiveRunningScreen({
       )}
 
       {!t.isRunning && !watchRunning && (
-        <View
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: bottomSafe + 90,
-            alignItems: "center",
-          }}
-        >
+        <>
+          {/* AI 페이스 코치 버튼 (시작 버튼 왼쪽) */}
           <TouchableOpacity
-            onPress={() => {
-              if (activeTab === "running") {
-                handleRunningStart();
-              } else {
-                // Tab Navigator에서 Root Stack으로 이동
-                if (navigationRef.isReady()) {
-                  navigationRef.navigate("JourneyRouteList" as never);
-                } else {
-                  // fallback: parent navigation 사용
-                  const parentNav = navigation.getParent?.();
-                  if (parentNav) {
-                    parentNav.navigate("JourneyRouteList");
-                  } else {
-                    navigation.navigate("JourneyRouteList");
-                  }
-                }
+            onPress={handlePaceCoachToggle}
+            style={[
+              styles.startPaceCoachButton,
+              {
+                position: "absolute",
+                left: "50%",
+                bottom: bottomSafe + 136, // 시작 텍스트와 같은 높이
+                marginLeft: -105, // 더 왼쪽으로 간격
               }
-            }}
-            disabled={
-              activeTab === "running" && (!t.isReady || t.isInitializing)
-            }
+            ]}
+            activeOpacity={0.7}
+          >
+            <View style={{ position: 'relative' }}>
+              <Ionicons
+                name={isPaceCoachEnabled ? "speedometer" : "speedometer-outline"}
+                size={22}
+                color="#111827"
+              />
+              {!isPaceCoachEnabled && (
+                <View style={styles.startDisabledSlash} />
+              )}
+            </View>
+          </TouchableOpacity>
+
+          {/* 시작 버튼 (중앙) */}
+          <View
             style={{
-              width: 80,
-              height: 80,
-              borderRadius: 40,
-              backgroundColor:
-                activeTab === "running" && (!t.isReady || t.isInitializing)
-                  ? "rgba(0, 0, 0, 0.3)"
-                  : "rgba(0, 0, 0, 0.85)",
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: bottomSafe + 130,
               alignItems: "center",
-              justifyContent: "center",
-              shadowColor: "#000",
-              shadowOpacity: 0.3,
-              shadowRadius: 30,
-              shadowOffset: { width: 0, height: 10 },
-              elevation: 15,
-              borderWidth: 1,
-              borderColor: "rgba(255, 255, 255, 0.2)",
             }}
           >
-            <Text
+            <TouchableOpacity
+              onPress={() => {
+                if (activeTab === "running") {
+                  handleRunningStart();
+                } else {
+                  // Tab Navigator에서 Root Stack으로 이동
+                  if (navigationRef.isReady()) {
+                    navigationRef.navigate("JourneyRouteList" as never);
+                  } else {
+                    // fallback: parent navigation 사용
+                    const parentNav = navigation.getParent?.();
+                    if (parentNav) {
+                      parentNav.navigate("JourneyRouteList");
+                    } else {
+                      navigation.navigate("JourneyRouteList");
+                    }
+                  }
+                }
+              }}
+              disabled={
+                activeTab === "running" && (!t.isReady || t.isInitializing)
+              }
               style={{
-                fontSize: 15,
-                fontWeight: "800",
-                color:
+                width: 85,
+                height: 85,
+                borderRadius: 42.5,
+                backgroundColor:
                   activeTab === "running" && (!t.isReady || t.isInitializing)
-                    ? "rgba(255, 255, 255, 0.5)"
-                    : "#FFFFFF",
-                textAlign: "center",
+                    ? "rgba(0, 0, 0, 0.3)"
+                    : "rgba(0, 0, 0, 0.85)",
+                alignItems: "center",
+                justifyContent: "center",
+                shadowColor: "#000",
+                shadowOpacity: 0.3,
+                shadowRadius: 30,
+                shadowOffset: { width: 0, height: 10 },
+                elevation: 15,
+                borderWidth: 1,
+                borderColor: "rgba(255, 255, 255, 0.2)",
               }}
             >
-              {activeTab === "running"
-                ? !t.isReady
-                  ? "준비중"
-                  : t.isInitializing
-                  ? "시작중"
-                  : "시작"
-                : "여정"}
-            </Text>
-          </TouchableOpacity>
-        </View>
+              <Text
+                style={{
+                  fontSize: 15,
+                  fontWeight: "800",
+                  color:
+                    activeTab === "running" && (!t.isReady || t.isInitializing)
+                      ? "rgba(255, 255, 255, 0.5)"
+                      : "#FFFFFF",
+                  textAlign: "center",
+                }}
+              >
+                {activeTab === "running"
+                  ? !t.isReady
+                    ? "준비중"
+                    : t.isInitializing
+                    ? "시작중"
+                    : "시작"
+                  : "여정"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </>
       )}
 
       {(t.isRunning || watchRunning) && !watchMode && (
@@ -1233,31 +1471,127 @@ export default function LiveRunningScreen({
 const styles = StyleSheet.create({
   segmentControl: {
     flexDirection: "row",
-    backgroundColor: "rgba(0, 0, 0, 0.85)",
-    borderRadius: 24,
-    padding: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
+    gap: 4,
   },
   segmentButton: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
-  },
-  segmentButtonActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    position: 'relative',
   },
   segmentText: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: "600",
-    color: "rgba(255, 255, 255, 0.6)",
+    color: "rgba(17, 24, 39, 0.5)",
   },
   segmentTextActive: {
-    color: "#FFFFFF",
+    color: "#111827",
+    fontWeight: "800",
+  },
+  segmentUnderline: {
+    position: 'absolute',
+    bottom: 4,
+    left: 16,
+    right: 16,
+    height: 3,
+    backgroundColor: "#111827",
+    borderRadius: 1.5,
+  },
+  startPaceCoachButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.08)",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 5,
+  },
+  startDisabledSlash: {
+    position: 'absolute',
+    top: 11,
+    left: 11,
+    width: 29,
+    height: 2.5,
+    backgroundColor: '#111827',
+    transform: [{ translateX: -14.5 }, { translateY: -1.25 }, { rotate: '-45deg' }],
+    borderRadius: 1.5,
+  },
+  disabledSlash: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 28,
+    height: 2,
+    backgroundColor: '#EF4444',
+    transform: [{ translateX: -14 }, { translateY: -1 }, { rotate: '-45deg' }],
+    borderRadius: 1,
+  },
+  topWeatherContainer: {
+    position: "absolute",
+    top: 35,
+    left: 20,
+    right: 20,
+    alignItems: "center",
+    zIndex: 20,
+  },
+  topWeatherContent: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  topWeatherCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    justifyContent: "center",
+  },
+  topWeatherText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  topWeatherEmoji: {
+    fontSize: 18,
+  },
+  topWeatherExpanded: {
+    paddingVertical: 4,
+  },
+  weatherRecommendationText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#6B7280",
+    lineHeight: 16,
+    textAlign: "center",
+  },
+  paceCoachBanner: {
+    position: "absolute",
+    top: 12,
+    left: 16,
+    right: 16,
+    padding: 12,
+    backgroundColor: "#FFF7ED",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FDBA74",
+    zIndex: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
+  },
+  paceCoachBannerTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#C2410C",
+    marginBottom: 4,
+  },
+  paceCoachBannerText: {
+    fontSize: 12,
+    color: "#7C2D12",
   },
 });
