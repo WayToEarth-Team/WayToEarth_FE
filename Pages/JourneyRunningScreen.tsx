@@ -698,7 +698,7 @@ export default function JourneyRunningScreen(
     setCountdownVisible(false);
 
     // 페이스 코치 체크 초기화
-    setLastCheckedKm(0);
+    setLastCheckedBucket(0);
 
     if (watchMode) {
       // 워치 모드: 워치 세션만 시작 (폰 GPS는 시작하지 않음)
@@ -1300,46 +1300,26 @@ export default function JourneyRunningScreen(
             { bottom: Math.max(insets.bottom, 12) + 100 }, // 스탬프 바텀시트(90px) 위
           ]}
         >
-          <View style={styles.startButtonRow}>
-            {/* AI 페이스 코치 토글 버튼 */}
-            <Pressable
-              onPress={handlePaceCoachToggle}
-              style={({ pressed }) => [
-                styles.paceCoachToggle,
-                isPaceCoachEnabled && styles.paceCoachToggleActive,
-                pressed && styles.paceCoachTogglePressed,
+          <Pressable
+            onPress={handleStartPress}
+            disabled={!t.isReady || t.isInitializing}
+            style={styles.startButtonWrapper}
+          >
+            <View
+              style={[
+                styles.startButton,
+                (!t.isReady || t.isInitializing) && styles.startButtonDisabled,
               ]}
             >
-              <View style={{ position: 'relative' }}>
-                <Text style={{ fontSize: 24 }}>🎯</Text>
-                {!isPaceCoachEnabled && (
-                  <View style={styles.disabledSlash} />
-                )}
-              </View>
-            </Pressable>
-
-            {/* 시작 버튼 */}
-            <Pressable
-              onPress={handleStartPress}
-              disabled={!t.isReady || t.isInitializing}
-              style={styles.startButtonWrapper}
-            >
-              <View
-                style={[
-                  styles.startButton,
-                  (!t.isReady || t.isInitializing) && styles.startButtonDisabled,
-                ]}
-              >
-                <Text style={styles.startButtonText}>
-                  {!t.isReady
-                    ? "준비중..."
-                    : t.isInitializing
-                    ? "시작중..."
-                    : "여정 시작"}
-                </Text>
-              </View>
-            </Pressable>
-          </View>
+              <Text style={styles.startButtonText}>
+                {!t.isReady
+                  ? "준비중..."
+                  : t.isInitializing
+                  ? "시작중..."
+                  : "여정 시작"}
+              </Text>
+            </View>
+          </Pressable>
         </View>
       )}
 
