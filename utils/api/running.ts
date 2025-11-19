@@ -270,3 +270,39 @@ export async function getRunningRecordDetail(
       ),
   } as RunningRecordDetail;
 }
+
+// ---------- Pace Coach API ----------
+
+export type PaceCoachCheckRequest = {
+  session_id: string;
+  current_km: number;
+  current_pace_seconds: number;
+};
+
+export type PaceCoachCheckResponse = {
+  coach_enabled: boolean;
+  is_available?: boolean;
+  should_alert?: boolean;
+  alert_message?: string;
+  reference_pace_seconds?: number;
+  reference_pace_formatted?: string;
+  current_pace_seconds?: number;
+  current_pace_formatted?: string;
+  difference_seconds?: number;
+  minimum_records_required?: number;
+  current_records?: number;
+  message?: string;
+};
+
+export async function checkPaceCoach(
+  request: PaceCoachCheckRequest
+): Promise<PaceCoachCheckResponse> {
+  console.log("[API] 페이스 코치 체크 요청:", request);
+  const { data } = await client.post("/v1/running/pace-coach/check", request);
+  console.log("[API] 페이스 코치 체크 응답:", data);
+
+  // 서버 응답이 { data: { ... } } 래퍼일 수 있으므로 안전하게 언래핑
+  const d: any = data && typeof data === "object" && "data" in data ? (data as any).data : data;
+
+  return d as PaceCoachCheckResponse;
+}
