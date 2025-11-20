@@ -5,6 +5,18 @@
     "types": [
       "nativewind/types"
     ],
+    "baseUrl": ".",
+    "paths": {
+      "@app/*": ["src/app/*"],
+      "@features/*": ["src/features/*"],
+      "@shared/*": ["src/shared/*"],
+      "@utils/*": ["utils/*"],
+      "@types/*": ["types/*"],
+      "@assets/*": ["assets/*"],
+      "@hooks/*": ["hooks/*"],
+      "@contexts/*": ["contexts/*"],
+      "@navigation/*": ["navigation/*"]
+    },
     "skipLibCheck": true,
     "typeRoots": [
       "./types",
