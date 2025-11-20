@@ -1,4 +1,4 @@
-import { client } from "./client";
+import { client } from "@utils/api/client";
 
 export async function getCurrentWeather(lat: number, lon: number) {
   const response = await client.get("/v1/weather/current", {

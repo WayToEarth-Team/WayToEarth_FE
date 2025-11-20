@@ -3,9 +3,9 @@
 
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { useWatchConnection } from '../hooks/useWatchConnection';
-import { WatchConnectionBadge } from '../components/WatchConnectionBadge';
-import { startRunOrchestrated } from '../modules/watchSync';
+import { useWatchConnection } from '@features/running/hooks/useWatchConnection';
+import { WatchConnectionBadge } from '@features/running/components/WatchConnectionBadge';
+import { startRunOrchestrated } from '@features/running/lib/watchSync';
 
 export function RunningStartScreen() {
   const watchStatus = useWatchConnection();

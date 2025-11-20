@@ -1,13 +1,13 @@
 // hooks/useKakaoLogin.ts
 import { useCallback } from "react";
 import { Alert, Platform, NativeModules } from "react-native";
-import { kakaoLoginWithSDK } from "../utils/api/auth";
-import { setTokens } from "../utils/auth/tokenManager";
+import { kakaoLoginWithSDK } from "@utils/api/auth";
+import { setTokens } from "@utils/auth/tokenManager";
 import { useNavigation } from "@react-navigation/native";
 import {
   registerForPushNotificationsAsync,
   sendTokenToServer,
-} from "../utils/notifications";
+} from "@utils/notifications";
 
 type RNKakao = {
   isKakaoTalkLoginAvailable?: () => Promise<boolean>;

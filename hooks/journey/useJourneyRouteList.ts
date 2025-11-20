@@ -1,8 +1,8 @@
 // hooks/routes/useRouteList.ts
 import { useEffect, useState } from 'react';
-import { listRoutes, type RouteSummary } from '../../utils/api/journeyRoutes';
-import { getMyProfile } from '../../utils/api/users';
-import { listUserProgress, getState as getJourneyState } from '../../utils/api/userJourneys';
+import { listRoutes, type RouteSummary } from '@utils/api/journeyRoutes';
+import { getMyProfile } from '@utils/api/users';
+import { listUserProgress, getState as getJourneyState } from '@utils/api/userJourneys';
 
 export default function useRouteList(category?: "DOMESTIC" | "INTERNATIONAL") {
   const [data, setData] = useState<RouteSummary[]>([]);

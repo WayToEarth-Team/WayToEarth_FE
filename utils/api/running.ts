@@ -1,6 +1,6 @@
 // utils/api/running.ts
-import { client } from "./client";
-import { RoutePoint } from "./types";
+import { client } from "@utils/api/client";
+import { RoutePoint } from "@utils/api/types";
 
 type RunningType = "SINGLE" | "JOURNEY";
 

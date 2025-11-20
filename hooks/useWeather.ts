@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useIsFocused } from "@react-navigation/native";
 import * as Location from "expo-location";
-import { getCurrentWeather } from "../utils/api/weather";
+import { getCurrentWeather } from "@utils/api/weather";
 
 export interface WeatherData {
   condition: string;

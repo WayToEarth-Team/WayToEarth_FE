@@ -1,5 +1,5 @@
 // running/utils/geo.ts
-import type { LatLng } from "../types/types.ts";
+import type { LatLng } from "@types/types.ts";
 export type AnyPoint = {
   latitude?: number;
   longitude?: number;

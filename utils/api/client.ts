@@ -1,8 +1,8 @@
 // utils/api/client.ts
 import axios, { AxiosResponse } from "axios";
-import { getAccessToken, refreshAccessToken, ensureAccessToken } from "../auth/tokenManager";
-import { getApiBaseUrl } from "../config/api";
-import { showToast } from "../toast";
+import { getAccessToken, refreshAccessToken, ensureAccessToken } from "@utils/auth/tokenManager";
+import { getApiBaseUrl } from "@utils/config/api";
+import { showToast } from "@utils/toast";
 
 // 목데이터 사용 중단: 항상 실서버 연동
 

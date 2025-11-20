@@ -13,7 +13,7 @@
 
 ## Files
 - App.tsx
-- components/Layout/TabBarAdapter.tsx
+- src/app/layout/TabBarAdapter.tsx
 - index.ts
 
 ## Checklist

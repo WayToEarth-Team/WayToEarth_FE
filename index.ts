@@ -28,11 +28,11 @@ try {
 } catch {}
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { navigationRef } from "./navigation/RootNavigation";
+import { navigationRef } from "@navigation/RootNavigation";
 // Ensure background location task is registered at startup
 import "./utils/backgroundLocation";
 import App from "./App";
-import { migrateLegacyTokens, logStorageBackendOnce } from "./utils/auth/tokenManager";
+import { migrateLegacyTokens, logStorageBackendOnce } from "@utils/auth/tokenManager";
 
 // FCM 백그라운드 메시지 핸들러 (앱 시작 전 등록 필수)
 messagingInstance.setBackgroundMessageHandler(async (remoteMessage) => {

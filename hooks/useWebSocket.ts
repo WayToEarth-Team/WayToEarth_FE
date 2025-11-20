@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { normalizeTimestampToDate } from '../utils/datetime';
+import { normalizeTimestampToDate } from '@utils/datetime';
 import 'react-native-url-polyfill/auto';
 
 export interface ChatMessage {
