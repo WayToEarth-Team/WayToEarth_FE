@@ -6,7 +6,7 @@ import { NativeModules, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 // safe-area not required here; keep padding minimal for tab bar only
-import { navigationRef } from "./navigation/RootNavigation";
+import { navigationRef } from "@navigation/RootNavigation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   createStackNavigator,
@@ -14,56 +14,56 @@ import {
   TransitionSpecs,
 } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import type { RootStackParamList } from "./types/types";
+import type { RootStackParamList } from "@types/types";
 import "./global.css";
 import {
   registerForPushNotificationsAsync,
   sendTokenToServer,
   setupNotificationListeners,
   setupTokenRefreshListener,
-} from "./utils/notifications";
-import { WeatherProvider } from "./contexts/WeatherContext";
-import { AuthProvider } from "./contexts/AuthContext";
+} from "@utils/notifications";
+import { WeatherProvider } from "@contexts/WeatherContext";
+import { AuthProvider } from "@contexts/AuthContext";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "./utils/queryClient";
-import { setupReactQueryFocus } from "./utils/reactQueryFocus";
+import { queryClient } from "@utils/queryClient";
+import { setupReactQueryFocus } from "@utils/reactQueryFocus";
 
-import Onboading from "./Pages/Onboading";
-import OnboardingScreen from "./Pages/OnboardingScreen";
-import Login from "./Pages/Login";
-import Main from "./Pages/Main";
-import RunSummaryScreen from "./Pages/RunSummaryscreen";
-import LiveRunningScreen from "./Pages/LiveRunningScreen";
-import RunningStartScreen from "./Pages/RunningStartScreen";
-import RunningComplete from "./Pages/RunningComplete";
-import JourneyRouteListScreen from "./Pages/JourneyRouteListScreen";
-import JourneyRouteDetailScreen from "./Pages/JourneyRouteDetailScreen";
-import JourneyLoadingScreen from "./Pages/JourneyLoadingScreen";
-import JourneyGuideScreen from "./Pages/JourneyGuideScreen";
-import JourneyRunningScreen from "./Pages/JourneyRunningScreen";
-import Feed from "./Pages/SendFeed";
-import Feed2 from "./Pages/FeedScreen2";
-import FeedDetail from "./Pages/FeedDetail";
-import Profile from "./Pages/ProfileScreen";
-import ProfileEdit from "./Pages/ProfileEditScreen";
+import Onboading from "@features/onboarding/screens/Onboading";
+import OnboardingScreen from "@features/onboarding/screens/OnboardingScreen";
+import Login from "@features/auth/screens/Login";
+import Main from "@app/screens/Main";
+import RunSummaryScreen from "@features/running/screens/RunSummaryscreen";
+import LiveRunningScreen from "@features/running/screens/LiveRunningScreen";
+import RunningStartScreen from "@features/running/screens/RunningStartScreen";
+import RunningComplete from "@features/running/screens/RunningComplete";
+import JourneyRouteListScreen from "@features/journey/screens/JourneyRouteListScreen";
+import JourneyRouteDetailScreen from "@features/journey/screens/JourneyRouteDetailScreen";
+import JourneyLoadingScreen from "@features/journey/screens/JourneyLoadingScreen";
+import JourneyGuideScreen from "@features/journey/screens/JourneyGuideScreen";
+import JourneyRunningScreen from "@features/journey/screens/JourneyRunningScreen";
+import Feed from "@features/feed/screens/SendFeed";
+import Feed2 from "@features/feed/screens/FeedScreen2";
+import FeedDetail from "@features/feed/screens/FeedDetail";
+import Profile from "@features/profile/screens/ProfileScreen";
+import ProfileEdit from "@features/profile/screens/ProfileEditScreen";
 
-import Emblem from "./Pages/EmblemCollectionScreen";
-import Record from "./Pages/RecordScreen";
-import RecordDetailScreen from "./Pages/RecordDetailScreen";
-import AIFeedbackScreen from "./Pages/AIFeedbackScreen";
-import LoginSuccessScreen from "./Pages/LoginSuccessScreen";
-import CrewScreen from "./Pages/CrewScreen";
-import CrewDetailScreen from "./Pages/CrewDetailScreen";
-import CrewEditScreen from "./Pages/CrewEditScreen";
-import CrewRankingScreen from "./Pages/CrewRankingScreen";
-import TabBarAdapter from "./components/Layout/TabBarAdapter";
-import LandmarkGuestbookScreen from "./Pages/LandmarkGuestbookScreen";
-import MyGuestbookScreen from "./Pages/MyGuestbookScreen";
-import GuestbookScreen from "./Pages/GuestbookScreen";
-import LandmarkStoryScreen from "./Pages/LandmarkStoryScreen";
-import ChatScreen from "./Pages/ChatScreen";
-import ScreenFade from "./components/Layout/ScreenFade";
-import { getApiBaseUrl } from "./utils/config/api";
+import Emblem from "@features/profile/screens/EmblemCollectionScreen";
+import Record from "@features/records/screens/RecordScreen";
+import RecordDetailScreen from "@features/records/screens/RecordDetailScreen";
+import AIFeedbackScreen from "@features/records/screens/AIFeedbackScreen";
+import LoginSuccessScreen from "@features/auth/screens/LoginSuccessScreen";
+import CrewScreen from "@features/crew/screens/CrewScreen";
+import CrewDetailScreen from "@features/crew/screens/CrewDetailScreen";
+import CrewEditScreen from "@features/crew/screens/CrewEditScreen";
+import CrewRankingScreen from "@features/crew/screens/CrewRankingScreen";
+import TabBarAdapter from "@app/layout/TabBarAdapter";
+import LandmarkGuestbookScreen from "@features/guestbook/screens/LandmarkGuestbookScreen";
+import MyGuestbookScreen from "@features/guestbook/screens/MyGuestbookScreen";
+import GuestbookScreen from "@features/guestbook/screens/GuestbookScreen";
+import LandmarkStoryScreen from "@features/landmark/screens/LandmarkStoryScreen";
+import ChatScreen from "@features/crew/screens/ChatScreen";
+import ScreenFade from "@app/layout/ScreenFade";
+import { getApiBaseUrl } from "@utils/config/api";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
