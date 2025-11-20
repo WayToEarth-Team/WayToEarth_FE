@@ -1,6 +1,6 @@
 // hooks/routes/useRouteDetail.ts
 import { useEffect, useState } from 'react';
-import { getRouteDetail, type RouteDetail, type RouteId } from '../../utils/api/journeyRoutes';
+import { getRouteDetail, type RouteDetail, type RouteId } from '@utils/api/journeyRoutes';
 
 export default function useRouteDetail(id: RouteId | undefined) {
   const [data, setData] = useState<RouteDetail | null>(null);

@@ -18,7 +18,7 @@ try {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, PermissionsAndroid, Platform } from 'react-native';
 import * as Location from 'expo-location';
-import { WAY_LOCATION_TASK } from '../../utils/backgroundLocation';
+import { WAY_LOCATION_TASK } from '@utils/backgroundLocation';
 
 const RUNNING_SESSION_KEY = '@running_session';
 const ONGOING_CHANNEL_ID = 'running_session_ongoing';

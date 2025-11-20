@@ -1,5 +1,5 @@
 // utils/api/aiFeedback.ts
-import { client } from "./client";
+import { client } from "@utils/api/client";
 
 /**
  * AI 피드백 응답 타입

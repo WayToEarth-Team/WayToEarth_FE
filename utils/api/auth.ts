@@ -1,6 +1,6 @@
 // utils/api/auth.ts
-import { client } from "./client";
-import { setTokens, clearTokens } from "../auth/tokenManager";
+import { client } from "@utils/api/client";
+import { setTokens, clearTokens } from "@utils/auth/tokenManager";
 
 type KakaoMe = {
   id: number;

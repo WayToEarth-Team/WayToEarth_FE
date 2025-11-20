@@ -1,9 +1,9 @@
 // utils/api/landmarks.ts
 // 랜드마크 스토리 API 유틸리티
 
-import { client } from './client';
-import type { LandmarkDetail, StoryCard, LandmarkSummary, StoryType } from '../../types/landmark';
-import { distanceKm } from '../geo';
+import { client } from '@utils/api/client';
+import type { LandmarkDetail, StoryCard, LandmarkSummary, StoryType } from '@types/landmark';
+import { distanceKm } from '@utils/geo';
 
 /**
  * 랜드마크 상세 조회 (스토리 포함)

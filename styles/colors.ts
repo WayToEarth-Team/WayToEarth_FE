@@ -1,2 +1,2 @@
-export { colors } from "../assets/styles/colors";
+export { colors } from "@assets/styles/colors";
 

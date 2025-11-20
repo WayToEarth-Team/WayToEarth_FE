@@ -29,9 +29,9 @@ try {
   AndroidImportance = mod?.AndroidImportance ?? null;
   EventType = mod?.EventType ?? null;
 } catch {}
-import { client } from "./api/client";
+import { client } from "@utils/api/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { navigate, navigateToJourneyRun, navigateToLiveRun } from "../navigation/RootNavigation";
+import { navigate, navigateToJourneyRun, navigateToLiveRun } from "@navigation/RootNavigation";
 
 /**
  * Firebase FCM 토큰 등록

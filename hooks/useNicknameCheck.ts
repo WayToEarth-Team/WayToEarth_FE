@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Alert } from "react-native";
-import { checkNickname } from "../utils/api/users";
+import { checkNickname } from "@utils/api/users";
 
 export default function useNicknameCheck() {
   const [checked, setChecked] = useState(false);

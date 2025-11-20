@@ -1,2 +1,2 @@
-export { Achievement, Summary, EmblemFilter } from "./types";
+export { Achievement, Summary, EmblemFilter } from "@types/types";
 

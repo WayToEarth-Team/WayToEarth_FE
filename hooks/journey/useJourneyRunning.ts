@@ -2,10 +2,10 @@
 // 여정 러닝 추적 훅 (싱글 러닝 + 여정 진행률 연동)
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useLiveRunTracker } from "../useLiveRunTracker";
-import type { LatLng } from "../../types/types";
-import type { JourneyId, Landmark } from "../../types/journey";
-import * as userJourneysApi from "../../utils/api/userJourneys";
+import { useLiveRunTracker } from "@features/running/hooks/useLiveRunTracker";
+import type { LatLng } from "@types/types";
+import type { JourneyId, Landmark } from "@types/journey";
+import * as userJourneysApi from "@utils/api/userJourneys";
 
 type JourneyLandmark = {
   id: string;

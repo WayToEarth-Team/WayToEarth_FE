@@ -1,2 +1,2 @@
-export { commonStyles } from "../assets/styles/commonStyles";
+export { commonStyles } from "@assets/styles/commonStyles";
 

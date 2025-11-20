@@ -1,5 +1,5 @@
-import { client } from "./client";
-import { getMyProfile } from "./users";
+import { client } from "@utils/api/client";
+import { getMyProfile } from "@utils/api/users";
 
 export type Crew = {
   id: string;

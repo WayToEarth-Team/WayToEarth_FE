@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
-import { getApiBaseUrl, joinApiUrl } from "../config/api";
+import { getApiBaseUrl, joinApiUrl } from "@utils/config/api";
 
 // Secure storage (Expo SecureStore) is preferred; fallback to AsyncStorage if unavailable
 let SecureStore: any = null;

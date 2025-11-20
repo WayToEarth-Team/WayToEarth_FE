@@ -1,11 +1,11 @@
 // utils/api/guestbook.ts
-import { client } from "./client";
+import { client } from "@utils/api/client";
 import type {
   GuestbookCreateRequest,
   GuestbookResponse,
   PageableResponse,
   LandmarkStatistics,
-} from "../../types/guestbook";
+} from "@types/guestbook";
 
 /**
  * 방명록 작성
