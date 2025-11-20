@@ -335,14 +335,15 @@ export default function JourneyRunningScreen(
 
     if (currentPaceSeconds <= 0) return;
 
+    // 중복 호출 방지: API 호출 전에 bucket 업데이트
+    setLastCheckedBucket(currentBucket);
+
     try {
       const response = await checkPaceCoach({
         session_id: t.sessionId || `journey-${Date.now()}`,
         current_km: Number(distanceKm.toFixed(3)),
         current_pace_seconds: currentPaceSeconds,
       });
-
-      setLastCheckedBucket(currentBucket);
 
       // 알림이 필요한 경우 팝업 표시
       if (response.should_alert && response.alert_message) {
