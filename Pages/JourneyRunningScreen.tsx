@@ -321,7 +321,7 @@ export default function JourneyRunningScreen(
   }, [isPaceCoachEnabled, refreshProfile]);
 
   // 페이스 코치 체크 함수
-  const PACE_CHECK_INTERVAL_KM = 0.005; // 5m 단위 테스트용
+  const PACE_CHECK_INTERVAL_KM = 0.5; // 500m 단위
 
   const checkPaceCoachIfNeeded = useCallback(async (currentBucket: number, distanceKm: number) => {
     if (!isPaceCoachEnabled || currentBucket <= lastCheckedBucket || distanceKm <= 0) {
