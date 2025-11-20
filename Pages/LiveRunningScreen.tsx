@@ -84,7 +84,7 @@ export default function LiveRunningScreen({
   const [paceCoachMessage, setPaceCoachMessage] = useState<string | null>(null);
 
   // 테스트/조정 가능: km 단위 간격 (0.005km = 5m)
-  const PACE_CHECK_INTERVAL_KM = 0.005;
+  const PACE_CHECK_INTERVAL_KM = 0.5; // 500m 단위
 
   // 워치 연결 상태
   const watchStatus = useWatchConnection();
