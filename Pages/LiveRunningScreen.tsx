@@ -203,6 +203,9 @@ export default function LiveRunningScreen({
 
     if (!currentPaceSeconds || currentPaceSeconds <= 0) return;
 
+    // 중복 호출 방지: API 호출 전에 bucket 업데이트
+    setLastCheckedBucket(currentBucket);
+
     try {
       const sessionId =
         (watchMode && watchData?.sessionId)
@@ -214,8 +217,6 @@ export default function LiveRunningScreen({
         current_km: Number(distanceKm.toFixed(3)),
         current_pace_seconds: currentPaceSeconds,
       });
-
-      setLastCheckedBucket(currentBucket);
 
       if (res?.should_alert && res.alert_message) {
         setPaceCoachMessage(res.alert_message);
