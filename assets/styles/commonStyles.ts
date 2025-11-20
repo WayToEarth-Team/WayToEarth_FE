@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native";
-import { colors } from "./colors";
+import { colors } from "@assets/styles/colors";
 
 export const commonStyles = StyleSheet.create({
   sectionTitle: {
