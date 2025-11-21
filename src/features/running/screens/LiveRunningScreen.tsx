@@ -981,7 +981,7 @@ export default function LiveRunningScreen({
               extraAwarded = Boolean(res.awarded);
             }
           } catch {}
-          if ((awards && Number(awards.awarded_count) > 0) || extraAwarded) {
+          if (((awards && Number(awards.awarded_count) > 0) || extraAwarded) && emblemEnabled) {
             const baseCount = Number(awards?.awarded_count || 0);
             setCelebrate({ visible: true, count: Math.max(1, baseCount + (extraAwarded ? 1 : 0)) });
             await new Promise((r) => setTimeout(r, 2500));
