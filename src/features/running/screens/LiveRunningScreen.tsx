@@ -41,6 +41,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { apiComplete } from "@utils/api/running"; // ✅ 추가
 import { awardEmblemByCode } from "@utils/api/emblems";
+import { EMBLEM_CELEBRATION_TEST_MODE } from "@utils/featureFlags";
 import {
   initWatchSync,
   subscribeRealtimeUpdates,
@@ -647,7 +648,12 @@ export default function LiveRunningScreen({
         setWatchCompleteData(null);
         setWatchRoutePoints([]);
 
-        // 테스트/개발 강제 표시 제거: 실제 수여 시에만 별도 처리
+        // Test mode: force celebration after run completion in watch mode as well
+        if (EMBLEM_CELEBRATION_TEST_MODE) {
+          setCelebrate({ visible: true, count: 1 });
+          await new Promise((r) => setTimeout(r, 2500));
+          setCelebrate({ visible: false });
+        }
 
         // 러닝 종료 → 탭바 재표시
         try {
@@ -711,20 +717,28 @@ export default function LiveRunningScreen({
         });
 
         const runId = completeRes.runId;
-        const awards = (completeRes as any)?.data?.emblemAwardResult;
-        // Extra client-side 10m emblem award (if backend didn't automatically)
-        let extraAwarded = false;
-        try {
-          if (t.distance >= 0.01) {
-            const res = await awardEmblemByCode("DIST_10M");
-            extraAwarded = Boolean(res.awarded);
-          }
-        } catch {}
-        if ((awards && Number(awards.awarded_count) > 0) || extraAwarded) {
-          const baseCount = Number(awards?.awarded_count || 0);
-          setCelebrate({ visible: true, count: Math.max(1, baseCount + (extraAwarded ? 1 : 0)) });
+        if (EMBLEM_CELEBRATION_TEST_MODE) {
+          // Test mode: always show celebration after run completion
+          setCelebrate({ visible: true, count: 1 });
           await new Promise((r) => setTimeout(r, 2500));
           setCelebrate({ visible: false });
+        } else {
+          // Normal behavior: show only when emblem conditions are met
+          const awards = (completeRes as any)?.data?.emblemAwardResult;
+          // Extra client-side 10m emblem award (if backend didn't automatically)
+          let extraAwarded = false;
+          try {
+            if (t.distance >= 0.01) {
+              const res = await awardEmblemByCode("DIST_10M");
+              extraAwarded = Boolean(res.awarded);
+            }
+          } catch {}
+          if ((awards && Number(awards.awarded_count) > 0) || extraAwarded) {
+            const baseCount = Number(awards?.awarded_count || 0);
+            setCelebrate({ visible: true, count: Math.max(1, baseCount + (extraAwarded ? 1 : 0)) });
+            await new Promise((r) => setTimeout(r, 2500));
+            setCelebrate({ visible: false });
+          }
         }
 
         await backgroundRunning.stopForegroundService();
