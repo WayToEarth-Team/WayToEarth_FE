@@ -1256,48 +1256,48 @@ export default function LiveRunningScreen({
         }}
       />
 
-      {/* 상단 위치 + 날씨 - 러닝 중이 아닐 때, 카운트다운 중이 아닐 때만 표시 */}
+      {/* 상단 위치 + 날씨 - 카운트다운 중이 아닐 때 표시 (러닝 중에도 보임) */}
+      {!countdownVisible && (locationName || weather?.temperature !== undefined) && (
+        <TouchableOpacity
+          onPress={toggleWeather}
+          style={styles.topWeatherContainer}
+          activeOpacity={0.7}
+        >
+          <View style={styles.topWeatherContent}>
+            {/* 기본 표시: 위치 + 온도 + 이모지 (확장 시 숨김) */}
+            {!weatherExpanded && (
+              <Animated.View
+                style={[
+                  styles.topWeatherCompact,
+                  { opacity: weatherExpanded ? 0 : 1 }
+                ]}
+              >
+                <Text style={styles.topWeatherText}>
+                  {locationName || ""}
+                  {locationName && weather?.temperature !== undefined ? " " : ""}
+                  {weather?.temperature !== undefined ? `${Math.round(weather.temperature)}°` : ""}
+                </Text>
+                {weather?.emoji && (
+                  <Text style={styles.topWeatherEmoji}>{weather.emoji}</Text>
+                )}
+              </Animated.View>
+            )}
+
+            {/* 확장 시 표시: 추천 메시지 (기본 상태에서 숨김) */}
+            {weatherExpanded && (
+              <View style={styles.topWeatherExpanded}>
+                <Text style={styles.weatherRecommendationText}>
+                  {weather?.recommendation || "날씨 정보를 불러오는 중..."}
+                </Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      )}
+
+      {/* 탭 - 러닝 중이 아닐 때만 표시 */}
       {!t.isRunning && !watchRunning && !countdownVisible && (
         <>
-          {/* 상단 중앙: 위치명 + 온도 + 날씨 아이콘 (확장/축소 애니메이션) */}
-          {(locationName || weather?.temperature !== undefined) && (
-            <TouchableOpacity
-              onPress={toggleWeather}
-              style={styles.topWeatherContainer}
-              activeOpacity={0.7}
-            >
-              <View style={styles.topWeatherContent}>
-                {/* 기본 표시: 위치 + 온도 + 이모지 (확장 시 숨김) */}
-                {!weatherExpanded && (
-                  <Animated.View
-                    style={[
-                      styles.topWeatherCompact,
-                      { opacity: weatherExpanded ? 0 : 1 }
-                    ]}
-                  >
-                    <Text style={styles.topWeatherText}>
-                      {locationName || ""}
-                      {locationName && weather?.temperature !== undefined ? " " : ""}
-                      {weather?.temperature !== undefined ? `${Math.round(weather.temperature)}°` : ""}
-                    </Text>
-                    {weather?.emoji && (
-                      <Text style={styles.topWeatherEmoji}>{weather.emoji}</Text>
-                    )}
-                  </Animated.View>
-                )}
-
-                {/* 확장 시 표시: 추천 메시지 (기본 상태에서 숨김) */}
-                {weatherExpanded && (
-                  <View style={styles.topWeatherExpanded}>
-                    <Text style={styles.weatherRecommendationText}>
-                      {weather?.recommendation || "날씨 정보를 불러오는 중..."}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
-          )}
-
           {/* 탭 */}
           <View
             style={{
