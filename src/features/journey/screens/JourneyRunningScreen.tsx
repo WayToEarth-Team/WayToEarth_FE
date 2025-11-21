@@ -21,6 +21,7 @@ import {
   ScrollView,
   AppState,
   Image as RNImage,
+  Animated,
 } from "react-native";
 import JourneyMapRoute from "@features/journey/components/JourneyMapRoute";
 import JourneyProgressCard from "@features/journey/components/JourneyProgressCard";
@@ -40,21 +41,10 @@ import { useWeather } from "@contexts/WeatherContext";
 import { useAuth } from "@contexts/AuthContext";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { LatLng } from "../types/types";
-import type { JourneyId } from "../types/journey";
-import { apiComplete, checkPaceCoach } from "../utils/api/running";
-import { updateUserSettings } from "../utils/api/users";
-import EmblemCelebration from "../components/Effects/EmblemCelebration";
-import { awardEmblemByCode } from "../utils/api/emblems";
-import type { LandmarkSummary } from "../types/guestbook";
-import type { LandmarkDetail } from "../types/landmark";
-import { getLandmarkDetail } from "../utils/api/landmarks";
-import { distanceKm } from "../utils/geo";
-import { Ionicons } from "@expo/vector-icons";
-import { ConfirmAlert, MessageAlert } from "../components/ui/AlertDialog";
 import type { LatLng } from "@types/types";
 import type { JourneyId } from "@types/journey";
-import { apiComplete } from "@utils/api/running";
+import { apiComplete, checkPaceCoach } from "@utils/api/running";
+import { updateUserSettings } from "@utils/api/users";
 import EmblemCelebration from "@shared/effects/EmblemCelebration";
 import { awardEmblemByCode } from "@utils/api/emblems";
 import type { LandmarkSummary } from "@types/guestbook";
@@ -62,7 +52,7 @@ import type { LandmarkDetail } from "@types/landmark";
 import { getLandmarkDetail } from "@utils/api/landmarks";
 import { distanceKm } from "@utils/geo";
 import { Ionicons } from "@expo/vector-icons";
-import { ConfirmAlert } from "@shared/ui/AlertDialog";
+import { ConfirmAlert, MessageAlert } from "@shared/ui/AlertDialog";
 import {
   getOrFetchProgressId,
   getProgressStamps,
@@ -71,17 +61,17 @@ import {
   type StampResponse,
 } from "@utils/api/stamps";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { emitRunningSession } from "../utils/navEvents";
+import { emitRunningSession } from "@utils/navEvents";
 import {
   initWatchSync,
   startRunOrchestrated,
   isWatchAvailable,
   subscribeRealtimeUpdates,
   type RealtimeRunningData,
-} from "../src/modules/watchSync";
-import { useWatchConnection } from "../src/hooks/useWatchConnection";
-import { useWatchRunning } from "../src/hooks/useWatchRunning";
-import { emitRunningSession } from "@utils/navEvents";
+} from "@features/running/lib/watchSync";
+import { useWatchConnection } from "@features/running/hooks/useWatchConnection";
+import { useWatchRunning } from "../../../hooks/useWatchRunning";
+import { STAMP_COLLECTION_TEST_MODE, PACE_COACH_TEST_MODE } from "@utils/featureFlags";
 
 type RouteParams = {
   route: {
@@ -214,30 +204,39 @@ export default function JourneyRunningScreen(
       if (userId == null) return;
       console.log("[JourneyRunning] 랜드마크 도달:", landmark.name);
 
-      // 스탬프 수집 (자동, 서버 규칙 준수: progressId/좌표 필요)
-      try {
-        const pid =
-          progressId || (await getOrFetchProgressId(userId, journeyId));
-        const lastPoint = (
-          t.route?.length ? t.route[t.route.length - 1] : null
-        ) as LatLng | null;
-        const lmid = parseInt(landmark.id);
-        if (pid && lastPoint && !collectedSet.has(lmid)) {
-          const can = await checkCollection(pid, lmid);
-          if (can) {
-            await collectStampForProgress(pid, lmid, {
-              latitude: lastPoint.latitude,
-              longitude: lastPoint.longitude,
-            });
-            setCollectedSet((prev) => new Set(prev).add(lmid));
-            console.log("[JourneyRunning] ✅ 스탬프 수집 완료:", landmark.name);
-          } else {
-            console.log("[JourneyRunning] ℹ️ 조건 미충족으로 자동 수집 생략");
+      const lmid = parseInt(landmark.id);
+
+      // 테스트 모드: 백엔드 호출 없이 UI만 표시
+      if (STAMP_COLLECTION_TEST_MODE) {
+        console.log("[JourneyRunning] 🧪 테스트 모드 - 스탬프 수집 시뮬레이션:", landmark.name);
+        setCollectedSet((prev) => new Set(prev).add(lmid));
+        setCelebrate({ visible: true, count: 1 });
+        setTimeout(() => setCelebrate({ visible: false }), 3200);
+      } else {
+        // 스탬프 수집 (자동, 서버 규칙 준수: progressId/좌표 필요)
+        try {
+          const pid =
+            progressId || (await getOrFetchProgressId(userId, journeyId));
+          const lastPoint = (
+            t.route?.length ? t.route[t.route.length - 1] : null
+          ) as LatLng | null;
+          if (pid && lastPoint && !collectedSet.has(lmid)) {
+            const can = await checkCollection(pid, lmid);
+            if (can) {
+              await collectStampForProgress(pid, lmid, {
+                latitude: lastPoint.latitude,
+                longitude: lastPoint.longitude,
+              });
+              setCollectedSet((prev) => new Set(prev).add(lmid));
+              console.log("[JourneyRunning] ✅ 스탬프 수집 완료:", landmark.name);
+            } else {
+              console.log("[JourneyRunning] ℹ️ 조건 미충족으로 자동 수집 생략");
+            }
           }
+        } catch (error) {
+          console.error("[JourneyRunning] ❌ 스탬프 수집 실패:", error);
+          // 수집 실패해도 계속 진행 (방명록은 작성 가능)
         }
-      } catch (error) {
-        console.error("[JourneyRunning] ❌ 스탬프 수집 실패:", error);
-        // 수집 실패해도 계속 진행 (방명록은 작성 가능)
       }
 
       // 랜드마크를 LandmarkSummary 형식으로 변환
@@ -250,26 +249,37 @@ export default function JourneyRunningScreen(
       };
 
       setSelectedLandmark(landmarkSummary);
-      setGuestbookModalVisible(true);
 
-      // 축하 알림 표시
-      Alert.alert(
-        `🎉 ${landmark.name} 도착!`,
-        "스탬프를 획득했습니다! 랜드마크에 방명록을 남겨보세요.",
-        [
-          {
-            text: "나중에",
-            style: "cancel",
-            onPress: () => {
-              setGuestbookModalVisible(false);
-              setSelectedLandmark(null);
-            },
-          },
-          { text: "방명록 작성", onPress: () => {} },
-        ]
-      );
+      // 예쁜 스탬프 획득 모달 표시
+      setStampSuccessLandmark(landmark.name);
+      setStampSuccessVisible(true);
+
+      // 모달 애니메이션
+      stampModalScale.setValue(0);
+      stampModalBounce.setValue(0);
+
+      Animated.sequence([
+        Animated.spring(stampModalScale, {
+          toValue: 1,
+          useNativeDriver: true,
+          stiffness: 200,
+          damping: 15,
+        }),
+        Animated.sequence([
+          Animated.timing(stampModalBounce, {
+            toValue: -20,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(stampModalBounce, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
     },
-    [userId, journeyId, progressId, collectedSet]
+    [userId, journeyId, progressId, collectedSet, stampModalScale, stampModalBounce]
   );
 
   const t = useJourneyRunning({
@@ -304,6 +314,12 @@ export default function JourneyRunningScreen(
   const celebratedKmRef = React.useRef<Set<number>>(new Set());
   const celebratingRef = React.useRef(false);
 
+  // 스탬프 획득 성공 모달
+  const [stampSuccessVisible, setStampSuccessVisible] = useState(false);
+  const [stampSuccessLandmark, setStampSuccessLandmark] = useState<string>("");
+  const stampModalScale = useRef(new Animated.Value(0)).current;
+  const stampModalBounce = useRef(new Animated.Value(0)).current;
+
   // 페이스 코치 관련 상태
   const [isPaceCoachEnabled, setIsPaceCoachEnabled] = useState(
     user?.is_pace_coach_enabled ?? false
@@ -311,6 +327,8 @@ export default function JourneyRunningScreen(
   const [lastCheckedBucket, setLastCheckedBucket] = useState(0);
   const [paceAlertVisible, setPaceAlertVisible] = useState(false);
   const [paceAlertMessage, setPaceAlertMessage] = useState("");
+  const paceAlertAnim = useRef(new Animated.Value(0)).current;
+  const paceAlertSlide = useRef(new Animated.Value(-100)).current;
 
   // 사용자 프로필 변경 시 isPaceCoachEnabled 동기화
   useEffect(() => {
@@ -383,6 +401,55 @@ export default function JourneyRunningScreen(
       checkPaceCoachIfNeeded(currentBucket, displayDistance);
     }
   }, [displayDistance, t.isRunning, t.isPaused, isPaceCoachEnabled, checkPaceCoachIfNeeded, lastCheckedBucket, PACE_CHECK_INTERVAL_KM]);
+
+  // 테스트 모드: 러닝 시작 7초 후 페이스 코치 알림 표시
+  useEffect(() => {
+    if (!PACE_COACH_TEST_MODE) return;
+    if (!t.isRunning) return;
+
+    const timer = setTimeout(() => {
+      console.log("[PaceCoach] 🧪 테스트 모드 - 페이스 알림 표시");
+      setPaceAlertMessage("페이스가 목표보다 느립니다.\n조금 더 속도를 올려보세요! 💪");
+      setPaceAlertVisible(true);
+
+      // 슬라이드 인 애니메이션
+      paceAlertSlide.setValue(-100);
+      paceAlertAnim.setValue(0);
+      Animated.parallel([
+        Animated.spring(paceAlertSlide, {
+          toValue: 0,
+          useNativeDriver: true,
+          stiffness: 300,
+          damping: 20,
+        }),
+        Animated.timing(paceAlertAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // 3초 후 슬라이드 아웃
+      setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(paceAlertSlide, {
+            toValue: -100,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(paceAlertAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setPaceAlertVisible(false);
+        });
+      }, 3000);
+    }, 7000); // 7초 후 트리거
+
+    return () => clearTimeout(timer);
+  }, [t.isRunning, paceAlertSlide, paceAlertAnim]);
 
   // 랜드마크 메뉴가 열릴 때 상세 정보 로드
   useEffect(() => {
@@ -657,6 +724,38 @@ export default function JourneyRunningScreen(
     collectingRef.current.add(idNum);
     (async () => {
       try {
+        // 테스트 모드: 백엔드 호출 없이 UI만 표시
+        if (STAMP_COLLECTION_TEST_MODE) {
+          console.log("[JourneyRunning] 🧪 50m 반경 테스트 - 스탬프 수집 시뮬레이션:", target.name);
+          setCollectedSet((prev) => new Set(prev).add(idNum));
+          setCelebrate({ visible: true, count: 1 });
+          setTimeout(() => setCelebrate({ visible: false }), 3200);
+
+          // 예쁜 모달 표시
+          setStampSuccessLandmark(target.name);
+          setStampSuccessVisible(true);
+          stampModalScale.setValue(0);
+          stampModalBounce.setValue(0);
+          Animated.sequence([
+            Animated.spring(stampModalScale, {
+              toValue: 1,
+              useNativeDriver: true,
+              stiffness: 200,
+              damping: 15,
+            }),
+          ]).start();
+
+          // selectedLandmark 설정
+          setSelectedLandmark({
+            id: idNum,
+            name: target.name,
+            cityName: "서울",
+            countryCode: "KR",
+            imageUrl: "",
+          });
+          return;
+        }
+
         const can = await checkCollection(progressId, idNum);
         if (!can) return;
         await collectStampForProgress(progressId, idNum, {
@@ -1394,13 +1493,30 @@ export default function JourneyRunningScreen(
       {/* 페이스 코치 알림 팝업 */}
       {paceAlertVisible && (
         <View style={styles.paceAlertOverlay} pointerEvents="none">
-          <View style={styles.paceAlertBox}>
-            <View style={styles.paceAlertIcon}>
-              <Ionicons name="speedometer" size={24} color="#F59E0B" />
-            </View>
-            <Text style={styles.paceAlertTitle}>페이스 알림</Text>
-            <Text style={styles.paceAlertMessage}>{paceAlertMessage}</Text>
-          </View>
+          <Animated.View
+            style={[
+              styles.paceAlertBox,
+              {
+                opacity: paceAlertAnim,
+                transform: [{ translateY: paceAlertSlide }],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={["#FF6B6B", "#FF8E53"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.paceAlertGradient}
+            >
+              <View style={styles.paceAlertIconNew}>
+                <Ionicons name="flash" size={28} color="#fff" />
+              </View>
+              <View style={styles.paceAlertContent}>
+                <Text style={styles.paceAlertTitleNew}>페이스 코치</Text>
+                <Text style={styles.paceAlertMessageNew}>{paceAlertMessage}</Text>
+              </View>
+            </LinearGradient>
+          </Animated.View>
         </View>
       )}
 
@@ -1567,6 +1683,69 @@ export default function JourneyRunningScreen(
           }}
         />
       )}
+
+      {/* 스탬프 획득 성공 모달 */}
+      <Modal
+        visible={stampSuccessVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setStampSuccessVisible(false)}
+      >
+        <View style={styles.stampModalOverlay}>
+          <Animated.View
+            style={[
+              styles.stampModalContent,
+              {
+                transform: [
+                  { scale: stampModalScale },
+                  { translateY: stampModalBounce },
+                ],
+              },
+            ]}
+          >
+            <View style={{ marginBottom: 20 }}>
+              <Ionicons name="trophy-outline" size={80} color="#111827" />
+            </View>
+            <Text style={styles.stampModalTitle}>스탬프 획득!</Text>
+            <View style={styles.stampModalPreview}>
+              <Ionicons name="business-outline" size={64} color="#6B7280" />
+            </View>
+            <Text style={styles.stampModalText}>
+              <Text style={styles.stampModalBold}>{stampSuccessLandmark}</Text>{" "}
+              스탬프를 성공적으로 수집했습니다!{"\n"}방명록을 남겨보세요.
+            </Text>
+            <View style={{ flexDirection: "row", gap: 12, width: "100%" }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setStampSuccessVisible(false);
+                  setSelectedLandmark(null);
+                }}
+                style={[styles.stampModalBtn, { flex: 1 }]}
+              >
+                <View style={[styles.stampModalBtnGradient, { backgroundColor: "#f3f4f6" }]}>
+                  <Text style={[styles.stampModalBtnText, { color: "#666" }]}>나중에</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setStampSuccessVisible(false);
+                  setGuestbookModalVisible(true);
+                }}
+                style={[styles.stampModalBtn, { flex: 1 }]}
+              >
+                <LinearGradient
+                  colors={["#667eea", "#764ba2"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.stampModalBtnGradient}
+                >
+                  <Text style={styles.stampModalBtnText}>방명록 작성</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </SafeLayout>
   );
 }
@@ -1837,23 +2016,49 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: "center",
-    paddingTop: 80,
+    paddingTop: 100,
     zIndex: 999,
   },
   paceAlertBox: {
-    backgroundColor: "rgba(255, 255, 255, 0.98)",
     borderRadius: 20,
-    padding: 20,
-    paddingVertical: 16,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
+    overflow: "hidden",
+    shadowColor: "#FF6B6B",
+    shadowOpacity: 0.4,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 8 },
     elevation: 12,
-    borderWidth: 2,
-    borderColor: "#F59E0B",
-    maxWidth: "85%",
+    width: "85%",
+    maxWidth: 340,
+  },
+  paceAlertGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    paddingVertical: 14,
+  },
+  paceAlertIconNew: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  paceAlertContent: {
+    flex: 1,
+  },
+  paceAlertTitleNew: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#fff",
+    marginBottom: 2,
+  },
+  paceAlertMessageNew: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "rgba(255, 255, 255, 0.9)",
+    lineHeight: 18,
   },
   paceAlertIcon: {
     width: 48,
@@ -1876,5 +2081,58 @@ const styles = StyleSheet.create({
     color: "#F59E0B",
     textAlign: "center",
     lineHeight: 20,
+  },
+  // 스탬프 획득 성공 모달
+  stampModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stampModalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 28,
+    padding: 40,
+    paddingHorizontal: 32,
+    width: 340,
+    alignItems: "center",
+  },
+  stampModalTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#1a1a1a",
+    marginBottom: 12,
+  },
+  stampModalPreview: {
+    marginVertical: 20,
+    padding: 20,
+    backgroundColor: "#F5F7FA",
+    borderRadius: 20,
+    width: "100%",
+    alignItems: "center",
+  },
+  stampModalText: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 28,
+    lineHeight: 22,
+    textAlign: "center",
+  },
+  stampModalBold: {
+    fontWeight: "700",
+    color: "#1a1a1a",
+  },
+  stampModalBtn: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  stampModalBtnGradient: {
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  stampModalBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
