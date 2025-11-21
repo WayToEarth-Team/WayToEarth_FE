@@ -789,6 +789,9 @@ export default function JourneyRunningScreen(
   const handleStartPress = useCallback(() => {
     console.log("[JourneyRunning] start pressed -> show countdown");
 
+    // 카운트다운 시작 시 즉시 탭바 숨기기
+    emitRunningSession(true);
+
     // 워치 연결 확인
     if (watchStatus.isConnected) {
       console.log("[JourneyRunning] Watch connected, using watch mode");
@@ -1165,23 +1168,25 @@ export default function JourneyRunningScreen(
         onBindCenter={(fn) => (centerMapRef.current = fn)}
       />
 
-      {/* 날씨 위젯 */}
-      <View
-        style={{
-          position: "absolute",
-          top: Math.max(insets.top, 12) + 12,
-          left: 16,
-          zIndex: 10,
-        }}
-      >
-        <WeatherWidget
-          emoji={weather?.emoji}
-          condition={weather?.condition}
-          temperature={weather?.temperature}
-          recommendation={weather?.recommendation}
-          loading={weatherLoading}
-        />
-      </View>
+      {/* 날씨 위젯 - 카운트다운 중 숨김 */}
+      {!countdownVisible && (
+        <View
+          style={{
+            position: "absolute",
+            top: Math.max(insets.top, 12) + 12,
+            left: 16,
+            zIndex: 10,
+          }}
+        >
+          <WeatherWidget
+            emoji={weather?.emoji}
+            condition={weather?.condition}
+            temperature={weather?.temperature}
+            recommendation={weather?.recommendation}
+            loading={weatherLoading}
+          />
+        </View>
+      )}
 
       {/* 러닝 중이 아닐 때: 여정 진행률 카드 */}
       {!t.isRunning && !t.isPaused && !watchRunning && t.progressReady && (
