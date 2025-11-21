@@ -310,9 +310,8 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
     const targetBottom = keyboardHeight > 0
       ? keyboardHeight + LIFT_WHEN_OPEN
       : bottomNavHeight + LIFT_WHEN_CLOSED;
-    const targetSpacer = keyboardHeight > 0
-      ? keyboardHeight + inputHeight + LIFT_WHEN_OPEN + 8
-      : bottomNavHeight + inputHeight + LIFT_WHEN_CLOSED + 8; // 미포커스: 입력칸+탭바 높이만 확보
+    // 🔧 수정: 스페이서는 입력창 bottom 위치 + 입력창 높이 + 여백
+    const targetSpacer = targetBottom + inputHeight + 16;
     const duration = 280; // 부드럽고 꾸덕한 타이밍
     const ease = Easing.out(Easing.cubic);
     const prev = prevTargetsRef.current;

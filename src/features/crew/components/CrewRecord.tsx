@@ -88,7 +88,7 @@ export default function CrewRecord({
           <Ionicons name="chevron-forward-outline" size={18} color="#9CA3AF" />
         </View>
 
-        <Text style={s.totalDistance}>{totalDistance.toFixed(2)} km</Text>
+        <Text style={s.totalDistance}>{(Math.floor(totalDistance * 100) / 100).toFixed(2)} km</Text>
         <Text
           style={[
             s.percentChange,
@@ -124,10 +124,10 @@ export default function CrewRecord({
                     >
                       <Text style={s.valueBubbleText}>
                         {leftActive
-                          ? `이번주 ${item.thisWeek.toFixed(2)} km`
+                          ? `이번주 ${(Math.floor(item.thisWeek * 100) / 100).toFixed(2)} km`
                           : rightActive
-                          ? `지난주 ${item.lastWeek.toFixed(2)} km`
-                          : `이번주 ${item.thisWeek.toFixed(2)} km / 지난주 ${item.lastWeek.toFixed(2)} km`}
+                          ? `지난주 ${(Math.floor(item.lastWeek * 100) / 100).toFixed(2)} km`
+                          : `이번주 ${(Math.floor(item.thisWeek * 100) / 100).toFixed(2)} km / 지난주 ${(Math.floor(item.lastWeek * 100) / 100).toFixed(2)} km`}
                       </Text>
                     </View>
                   )}
@@ -223,7 +223,7 @@ export default function CrewRecord({
               {item.name}
             </Text>
 
-            <Text style={s.rankingDistance}>{item.thisWeek.toFixed(2)} km</Text>
+            <Text style={s.rankingDistance}>{(Math.floor(item.thisWeek * 100) / 100).toFixed(2)} km</Text>
           </View>
         ))}
       </View>

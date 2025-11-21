@@ -234,9 +234,6 @@ export default function RouteDetailScreen({
               <Text style={styles.headerTitle}>
                 {data?.title ?? "여정 상세"}
               </Text>
-              <View style={styles.headerBadge}>
-                <Text style={styles.headerBadgeText}>데이터 불러오기 필요</Text>
-              </View>
             </View>
           </View>
         </View>

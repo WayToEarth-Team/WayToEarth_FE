@@ -20,6 +20,8 @@ import {
   TouchableOpacity,
   ScrollView,
   AppState,
+  Image as RNImage,
+  Animated,
 } from "react-native";
 import JourneyMapRoute from "@features/journey/components/JourneyMapRoute";
 import JourneyProgressCard from "@features/journey/components/JourneyProgressCard";
@@ -41,7 +43,8 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { LatLng } from "@types/types";
 import type { JourneyId } from "@types/journey";
-import { apiComplete } from "@utils/api/running";
+import { apiComplete, checkPaceCoach } from "@utils/api/running";
+import { updateUserSettings } from "@utils/api/users";
 import EmblemCelebration from "@shared/effects/EmblemCelebration";
 import { awardEmblemByCode } from "@utils/api/emblems";
 import type { LandmarkSummary } from "@types/guestbook";
@@ -49,7 +52,7 @@ import type { LandmarkDetail } from "@types/landmark";
 import { getLandmarkDetail } from "@utils/api/landmarks";
 import { distanceKm } from "@utils/geo";
 import { Ionicons } from "@expo/vector-icons";
-import { ConfirmAlert } from "@shared/ui/AlertDialog";
+import { ConfirmAlert, MessageAlert } from "@shared/ui/AlertDialog";
 import {
   getOrFetchProgressId,
   getProgressStamps,
@@ -59,6 +62,16 @@ import {
 } from "@utils/api/stamps";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { emitRunningSession } from "@utils/navEvents";
+import {
+  initWatchSync,
+  startRunOrchestrated,
+  isWatchAvailable,
+  subscribeRealtimeUpdates,
+  type RealtimeRunningData,
+} from "@features/running/lib/watchSync";
+import { useWatchConnection } from "@features/running/hooks/useWatchConnection";
+import { useWatchRunning } from "../../../hooks/useWatchRunning";
+import { STAMP_COLLECTION_TEST_MODE, PACE_COACH_TEST_MODE } from "@utils/featureFlags";
 
 type RouteParams = {
   route: {
@@ -93,6 +106,21 @@ export default function JourneyRunningScreen(
 
   // 로그인된 사용자 ID
   const { userId, user, refreshProfile } = useAuth();
+
+  // 워치 연결 상태
+  const watchStatus = useWatchConnection();
+
+  // 워치 모드 상태
+  const [watchMode, setWatchMode] = useState(false);
+  const [watchRunning, setWatchRunning] = useState(false);
+  const [watchData, setWatchData] = useState<RealtimeRunningData | null>(null);
+  const [watchCompleteData, setWatchCompleteData] = useState<any>(null);
+  const [alert, setAlert] = useState<{
+    open: boolean;
+    title?: string;
+    message?: string;
+  }>({ open: false });
+
   // 화면 포커스 시 프로필 재조회하여 만료된 아바타 URL 갱신
   useFocusEffect(
     React.useCallback(() => {
@@ -176,30 +204,39 @@ export default function JourneyRunningScreen(
       if (userId == null) return;
       console.log("[JourneyRunning] 랜드마크 도달:", landmark.name);
 
-      // 스탬프 수집 (자동, 서버 규칙 준수: progressId/좌표 필요)
-      try {
-        const pid =
-          progressId || (await getOrFetchProgressId(userId, journeyId));
-        const lastPoint = (
-          t.route?.length ? t.route[t.route.length - 1] : null
-        ) as LatLng | null;
-        const lmid = parseInt(landmark.id);
-        if (pid && lastPoint && !collectedSet.has(lmid)) {
-          const can = await checkCollection(pid, lmid);
-          if (can) {
-            await collectStampForProgress(pid, lmid, {
-              latitude: lastPoint.latitude,
-              longitude: lastPoint.longitude,
-            });
-            setCollectedSet((prev) => new Set(prev).add(lmid));
-            console.log("[JourneyRunning] ✅ 스탬프 수집 완료:", landmark.name);
-          } else {
-            console.log("[JourneyRunning] ℹ️ 조건 미충족으로 자동 수집 생략");
+      const lmid = parseInt(landmark.id);
+
+      // 테스트 모드: 백엔드 호출 없이 UI만 표시
+      if (STAMP_COLLECTION_TEST_MODE) {
+        console.log("[JourneyRunning] 🧪 테스트 모드 - 스탬프 수집 시뮬레이션:", landmark.name);
+        setCollectedSet((prev) => new Set(prev).add(lmid));
+        setCelebrate({ visible: true, count: 1 });
+        setTimeout(() => setCelebrate({ visible: false }), 3200);
+      } else {
+        // 스탬프 수집 (자동, 서버 규칙 준수: progressId/좌표 필요)
+        try {
+          const pid =
+            progressId || (await getOrFetchProgressId(userId, journeyId));
+          const lastPoint = (
+            t.route?.length ? t.route[t.route.length - 1] : null
+          ) as LatLng | null;
+          if (pid && lastPoint && !collectedSet.has(lmid)) {
+            const can = await checkCollection(pid, lmid);
+            if (can) {
+              await collectStampForProgress(pid, lmid, {
+                latitude: lastPoint.latitude,
+                longitude: lastPoint.longitude,
+              });
+              setCollectedSet((prev) => new Set(prev).add(lmid));
+              console.log("[JourneyRunning] ✅ 스탬프 수집 완료:", landmark.name);
+            } else {
+              console.log("[JourneyRunning] ℹ️ 조건 미충족으로 자동 수집 생략");
+            }
           }
+        } catch (error) {
+          console.error("[JourneyRunning] ❌ 스탬프 수집 실패:", error);
+          // 수집 실패해도 계속 진행 (방명록은 작성 가능)
         }
-      } catch (error) {
-        console.error("[JourneyRunning] ❌ 스탬프 수집 실패:", error);
-        // 수집 실패해도 계속 진행 (방명록은 작성 가능)
       }
 
       // 랜드마크를 LandmarkSummary 형식으로 변환
@@ -208,30 +245,41 @@ export default function JourneyRunningScreen(
         name: landmark.name,
         cityName: "서울", // TODO: 실제 도시명으로 교체
         countryCode: "KR",
-        imageUrl: "", // TODO: 실제 이미지 URL로 교체
+        imageUrl: "", // TODO: 실제 이미지 URL로 교체.
       };
 
       setSelectedLandmark(landmarkSummary);
-      setGuestbookModalVisible(true);
 
-      // 축하 알림 표시
-      Alert.alert(
-        `🎉 ${landmark.name} 도착!`,
-        "스탬프를 획득했습니다! 랜드마크에 방명록을 남겨보세요.",
-        [
-          {
-            text: "나중에",
-            style: "cancel",
-            onPress: () => {
-              setGuestbookModalVisible(false);
-              setSelectedLandmark(null);
-            },
-          },
-          { text: "방명록 작성", onPress: () => {} },
-        ]
-      );
+      // 예쁜 스탬프 획득 모달 표시
+      setStampSuccessLandmark(landmark.name);
+      setStampSuccessVisible(true);
+
+      // 모달 애니메이션
+      stampModalScale.setValue(0);
+      stampModalBounce.setValue(0);
+
+      Animated.sequence([
+        Animated.spring(stampModalScale, {
+          toValue: 1,
+          useNativeDriver: true,
+          stiffness: 200,
+          damping: 15,
+        }),
+        Animated.sequence([
+          Animated.timing(stampModalBounce, {
+            toValue: -20,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(stampModalBounce, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
     },
-    [userId, journeyId, progressId, collectedSet]
+    [userId, journeyId, progressId, collectedSet, stampModalScale, stampModalBounce]
   );
 
   const t = useJourneyRunning({
@@ -265,6 +313,143 @@ export default function JourneyRunningScreen(
   }>({ visible: false });
   const celebratedKmRef = React.useRef<Set<number>>(new Set());
   const celebratingRef = React.useRef(false);
+
+  // 스탬프 획득 성공 모달
+  const [stampSuccessVisible, setStampSuccessVisible] = useState(false);
+  const [stampSuccessLandmark, setStampSuccessLandmark] = useState<string>("");
+  const stampModalScale = useRef(new Animated.Value(0)).current;
+  const stampModalBounce = useRef(new Animated.Value(0)).current;
+
+  // 페이스 코치 관련 상태
+  const [isPaceCoachEnabled, setIsPaceCoachEnabled] = useState(
+    user?.is_pace_coach_enabled ?? false
+  );
+  const [lastCheckedBucket, setLastCheckedBucket] = useState(0);
+  const [paceAlertVisible, setPaceAlertVisible] = useState(false);
+  const [paceAlertMessage, setPaceAlertMessage] = useState("");
+  const paceAlertAnim = useRef(new Animated.Value(0)).current;
+  const paceAlertSlide = useRef(new Animated.Value(-100)).current;
+
+  // 사용자 프로필 변경 시 isPaceCoachEnabled 동기화
+  useEffect(() => {
+    if (user?.is_pace_coach_enabled !== undefined) {
+      setIsPaceCoachEnabled(user.is_pace_coach_enabled);
+    }
+  }, [user?.is_pace_coach_enabled]);
+
+  // 페이스 코치 토글 핸들러
+  const handlePaceCoachToggle = useCallback(async () => {
+    const newValue = !isPaceCoachEnabled;
+    setIsPaceCoachEnabled(newValue);
+    try {
+      await updateUserSettings({ is_pace_coach_enabled: newValue });
+      await refreshProfile();
+    } catch (error) {
+      console.error('[PaceCoach] 설정 업데이트 실패:', error);
+      setIsPaceCoachEnabled(!newValue);
+    }
+  }, [isPaceCoachEnabled, refreshProfile]);
+
+  // 페이스 코치 체크 함수
+  const PACE_CHECK_INTERVAL_KM = 0.5; // 500m 단위
+
+  const checkPaceCoachIfNeeded = useCallback(async (currentBucket: number, distanceKm: number) => {
+    if (!isPaceCoachEnabled || currentBucket <= lastCheckedBucket || distanceKm <= 0) {
+      return;
+    }
+
+    // 현재 페이스 계산 (초/km)
+    const currentPaceSeconds = displayElapsedSec > 0 && displayDistance > 0
+      ? Math.floor(displayElapsedSec / displayDistance)
+      : 0;
+
+    if (currentPaceSeconds <= 0) return;
+
+    // 중복 호출 방지: API 호출 전에 bucket 업데이트
+    setLastCheckedBucket(currentBucket);
+
+    try {
+      const response = await checkPaceCoach({
+        session_id: t.sessionId || `journey-${Date.now()}`,
+        current_km: Number(distanceKm.toFixed(3)),
+        current_pace_seconds: currentPaceSeconds,
+      });
+
+      // 알림이 필요한 경우 팝업 표시
+      if (response.should_alert && response.alert_message) {
+        setPaceAlertMessage(response.alert_message);
+        setPaceAlertVisible(true);
+
+        // 3초 후 자동으로 닫기
+        setTimeout(() => {
+          setPaceAlertVisible(false);
+        }, 3000);
+      }
+    } catch (error) {
+      console.error('[PaceCoach] 체크 실패:', error);
+      // 에러는 조용히 처리 (러닝 방해 안 되게)
+    }
+  }, [isPaceCoachEnabled, lastCheckedBucket, displayElapsedSec, displayDistance, t.sessionId]);
+
+  // km 통과 감지 (러닝 중일 때만)
+  useEffect(() => {
+    if (!t.isRunning || t.isPaused || !isPaceCoachEnabled) return;
+
+    const currentBucket = Math.floor(displayDistance / PACE_CHECK_INTERVAL_KM);
+
+    if (currentBucket > lastCheckedBucket && currentBucket > 0) {
+      checkPaceCoachIfNeeded(currentBucket, displayDistance);
+    }
+  }, [displayDistance, t.isRunning, t.isPaused, isPaceCoachEnabled, checkPaceCoachIfNeeded, lastCheckedBucket, PACE_CHECK_INTERVAL_KM]);
+
+  // 테스트 모드: 러닝 시작 7초 후 페이스 코치 알림 표시
+  useEffect(() => {
+    if (!PACE_COACH_TEST_MODE) return;
+    if (!t.isRunning) return;
+
+    const timer = setTimeout(() => {
+      console.log("[PaceCoach] 🧪 테스트 모드 - 페이스 알림 표시");
+      setPaceAlertMessage("페이스가 목표보다 느립니다.\n조금 더 속도를 올려보세요! 💪");
+      setPaceAlertVisible(true);
+
+      // 슬라이드 인 애니메이션
+      paceAlertSlide.setValue(-100);
+      paceAlertAnim.setValue(0);
+      Animated.parallel([
+        Animated.spring(paceAlertSlide, {
+          toValue: 0,
+          useNativeDriver: true,
+          stiffness: 300,
+          damping: 20,
+        }),
+        Animated.timing(paceAlertAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // 3초 후 슬라이드 아웃
+      setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(paceAlertSlide, {
+            toValue: -100,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(paceAlertAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setPaceAlertVisible(false);
+        });
+      }, 3000);
+    }, 7000); // 7초 후 트리거
+
+    return () => clearTimeout(timer);
+  }, [t.isRunning, paceAlertSlide, paceAlertAnim]);
 
   // 랜드마크 메뉴가 열릴 때 상세 정보 로드
   useEffect(() => {
@@ -313,6 +498,126 @@ export default function JourneyRunningScreen(
     };
   }, [userId, journeyId]);
 
+  // 워치 동기화 초기화
+  useEffect(() => {
+    if (isWatchAvailable()) {
+      console.log("[JourneyRunning] Initializing watch sync");
+      initWatchSync();
+    }
+  }, []);
+
+  // 워치 모드일 때 실시간 데이터 구독
+  useEffect(() => {
+    if (!watchMode) return;
+
+    console.log("[JourneyRunning] Subscribing to watch updates");
+
+    // 실시간 데이터 구독
+    const unsubscribeUpdates = subscribeRealtimeUpdates((data) => {
+      console.log("[JourneyRunning] Watch data received:", data);
+      setWatchData(data);
+
+      // 첫 데이터 수신 시 러닝 시작으로 간주
+      if (!watchRunning) {
+        setWatchRunning(true);
+
+        // AsyncStorage에 러닝 세션 저장 (탭 바 숨김용)
+        try {
+          AsyncStorage.setItem(
+            "@running_session",
+            JSON.stringify({
+              isRunning: true,
+              sessionId: data.sessionId,
+              startTime: Date.now(),
+            })
+          ).catch(() => {});
+        } catch {}
+
+        // 즉시 탭바 숨김 반영
+        try {
+          emitRunningSession(true);
+        } catch {}
+      }
+    });
+
+    // wearStarted 이벤트 리스너 추가
+    const { NativeModules, NativeEventEmitter } = require("react-native");
+    const { WayToEarthWear } = NativeModules;
+    const emitter = new NativeEventEmitter(WayToEarthWear);
+
+    const startedSub = emitter.addListener("wearStarted", (payload: string) => {
+      console.log("[JourneyRunning] Watch session started:", payload);
+      setWatchRunning(true);
+    });
+
+    // wearRunningComplete 이벤트 리스너 추가 (워치에서 종료 버튼 누름)
+    const completeSub = emitter.addListener(
+      "wearRunningComplete",
+      async (payload: string) => {
+        console.log("[JourneyRunning] Watch session completed:", payload);
+
+        try {
+          // payload 파싱
+          const completeData = JSON.parse(payload);
+          console.log("[JourneyRunning] Parsed complete data:", completeData);
+
+          // 완료 데이터 저장
+          setWatchCompleteData(completeData);
+
+          // 워치 러닝 종료
+          setWatchRunning(false);
+
+          // 🔧 폰 러닝 트래커도 중지 (혹시 실행 중이었다면)
+          try {
+            if (t.isRunning) {
+              await t.stop();
+            }
+          } catch (e) {
+            console.error("[JourneyRunning] Failed to stop phone tracker:", e);
+          }
+
+          // AsyncStorage 세션 정보 제거
+          try { await AsyncStorage.removeItem("@running_session"); } catch {}
+
+          // 저장 확인 다이얼로그 표시
+          setConfirmSave(true);
+        } catch (e) {
+          console.error("[JourneyRunning] Failed to parse complete data:", e);
+        }
+      }
+    );
+
+    // wearRunIdReceived 이벤트 리스너 추가 (서버에서 runId 수신)
+    const runIdSub = emitter.addListener(
+      "wearRunIdReceived",
+      (payload: string) => {
+        console.log("[JourneyRunning] Watch runId received:", payload);
+
+        try {
+          const data = JSON.parse(payload);
+          console.log("[JourneyRunning] Parsed runId data:", data);
+
+          // watchCompleteData 업데이트
+          setWatchCompleteData((prev) => {
+            if (prev && prev.sessionId === data.sessionId) {
+              return { ...prev, runId: data.runId };
+            }
+            return prev;
+          });
+        } catch (e) {
+          console.error("[JourneyRunning] Failed to parse runId data:", e);
+        }
+      }
+    );
+
+    return () => {
+      unsubscribeUpdates();
+      startedSub.remove();
+      completeSub.remove();
+      runIdSub.remove();
+    };
+  }, [watchMode, watchRunning]);
+
   // 날씨 정보 (이 화면에서만 위치/날씨 활성화)
   const {
     weather,
@@ -345,17 +650,18 @@ export default function JourneyRunningScreen(
 
   // 러닝 세션 상태 업데이트
   useEffect(() => {
-    if (!t.isRunning) return;
+    const isRunningNow = t.isRunning || watchRunning;
+    if (!isRunningNow) return;
 
     const session = {
       type: "journey" as const,
       journeyId,
       journeyTitle,
       sessionId: t.sessionId,
-      startTime: Date.now() - t.elapsedSec * 1000,
-      distanceKm: t.distance,
-      durationSeconds: t.elapsedSec,
-      isRunning: t.isRunning,
+      startTime: Date.now() - displayElapsedSec * 1000,
+      distanceKm: displayDistance,
+      durationSeconds: displayElapsedSec,
+      isRunning: isRunningNow,
       isPaused: t.isPaused,
       reachedLandmarks: reachedIds,
     };
@@ -365,26 +671,27 @@ export default function JourneyRunningScreen(
 
     // 세션 상태 저장 (백그라운드 복원용)
     backgroundRunning.saveSession(session);
-  }, [t.isRunning, t.distance, t.elapsedSec, t.isPaused, nextLandmark]);
+  }, [t.isRunning, watchRunning, displayDistance, displayElapsedSec, t.isPaused, nextLandmark]);
 
   // 러닝 시작 시 Foreground Service 시작
   useEffect(() => {
-    if (t.isRunning) {
+    const isRunningNow = t.isRunning || watchRunning;
+    if (isRunningNow) {
       const session = {
         type: "journey" as const,
         journeyId,
         journeyTitle,
         sessionId: t.sessionId,
-        startTime: Date.now() - t.elapsedSec * 1000,
-        distanceKm: t.distance,
-        durationSeconds: t.elapsedSec,
+        startTime: Date.now() - displayElapsedSec * 1000,
+        distanceKm: displayDistance,
+        durationSeconds: displayElapsedSec,
         isRunning: true,
         isPaused: t.isPaused,
         reachedLandmarks: reachedIds,
       };
       backgroundRunning.startForegroundService(session);
     }
-  }, [t.isRunning]);
+  }, [t.isRunning, watchRunning]);
 
   // 컴포넌트 언마운트 시 세션 정리 (완료/취소 시)
   useEffect(() => {
@@ -417,6 +724,38 @@ export default function JourneyRunningScreen(
     collectingRef.current.add(idNum);
     (async () => {
       try {
+        // 테스트 모드: 백엔드 호출 없이 UI만 표시
+        if (STAMP_COLLECTION_TEST_MODE) {
+          console.log("[JourneyRunning] 🧪 50m 반경 테스트 - 스탬프 수집 시뮬레이션:", target.name);
+          setCollectedSet((prev) => new Set(prev).add(idNum));
+          setCelebrate({ visible: true, count: 1 });
+          setTimeout(() => setCelebrate({ visible: false }), 3200);
+
+          // 예쁜 모달 표시
+          setStampSuccessLandmark(target.name);
+          setStampSuccessVisible(true);
+          stampModalScale.setValue(0);
+          stampModalBounce.setValue(0);
+          Animated.sequence([
+            Animated.spring(stampModalScale, {
+              toValue: 1,
+              useNativeDriver: true,
+              stiffness: 200,
+              damping: 15,
+            }),
+          ]).start();
+
+          // selectedLandmark 설정
+          setSelectedLandmark({
+            id: idNum,
+            name: target.name,
+            cityName: "서울",
+            countryCode: "KR",
+            imageUrl: "",
+          });
+          return;
+        }
+
         const can = await checkCollection(progressId, idNum);
         if (!can) return;
         await collectStampForProgress(progressId, idNum, {
@@ -449,45 +788,118 @@ export default function JourneyRunningScreen(
 
   const handleStartPress = useCallback(() => {
     console.log("[JourneyRunning] start pressed -> show countdown");
-    // 카운트다운 동안 초기 위치를 예열해 정확도 확보
-    try {
-      (t as any).prime?.();
-    } catch {}
+
+    // 카운트다운 시작 시 즉시 탭바 숨기기
+    emitRunningSession(true);
+
+    // 워치 연결 확인
+    if (watchStatus.isConnected) {
+      console.log("[JourneyRunning] Watch connected, using watch mode");
+      setWatchMode(true);
+    } else {
+      console.log("[JourneyRunning] Watch not connected, using phone-only mode");
+      setWatchMode(false);
+      // 폰 모드에서만 GPS 가열
+      try {
+        (t as any).prime?.();
+      } catch {}
+    }
+
     setCountdownVisible(true);
-  }, []);
+  }, [watchStatus.isConnected]);
 
   const handleCountdownDone = useCallback(async () => {
-    console.log("[JourneyRunning] countdown done");
+    console.log("[JourneyRunning] countdown done, watchMode:", watchMode);
     setCountdownVisible(false);
-    // 즉시 시작 시도 (권한은 내부에서 처리)
-    requestAnimationFrame(() => {
-      console.log("[JourneyRunning] calling t.startJourneyRun()");
-      t.startJourneyRun();
-    });
-    // 탭바 숨김 즉시 반영 및 세션 플래그 저장
-    try {
-      await AsyncStorage.setItem(
-        "@running_session",
-        JSON.stringify({
-          isRunning: true,
-          sessionId: t.sessionId || `journey-${Date.now()}`,
-          startTime: Date.now(),
-        })
-      );
-    } catch {}
-    try {
-      emitRunningSession(true);
-    } catch {}
+
+    // 페이스 코치 체크 초기화
+    setLastCheckedBucket(0);
+
+    if (watchMode) {
+      // 워치 모드: 워치 세션만 시작 (폰 GPS는 시작하지 않음)
+      try {
+        console.log("[JourneyRunning] Starting watch session (JOURNEY)");
+        const sessionId = await startRunOrchestrated("JOURNEY", { journeyId: Number(journeyId) });
+        console.log("[JourneyRunning] Watch session started:", sessionId);
+
+        // ✅ 워치 러닝 상태 시작 (UI 표시용)
+        setWatchRunning(true);
+
+        // 🔧 워치 모드에서도 폰 GPS 시작 (지도 마커 표시용)
+        // 거리/시간은 워치 데이터 우선 사용 (displayDistance, displayElapsedSec)
+        requestAnimationFrame(() => {
+          console.log("[JourneyRunning] calling t.startJourneyRun() (watch mode - GPS for map marker)");
+          t.startJourneyRun();
+        });
+
+        // 탭바 숨김 즉시 반영 및 세션 플래그 저장
+        try {
+          await AsyncStorage.setItem(
+            "@running_session",
+            JSON.stringify({
+              isRunning: true,
+              sessionId,
+              startTime: Date.now(),
+            })
+          );
+        } catch {}
+        try {
+          emitRunningSession(true);
+        } catch {}
+
+        // 워치 연동 팝업 표시
+        setAlert({
+          open: true,
+          title: "워치 연동",
+          message: "워치와 연동되어 여정 러닝을 시작합니다",
+        });
+      } catch (error) {
+        console.error("[JourneyRunning] Watch start failed, fallback to phone mode:", error);
+        // 워치 시작 실패 시 폰 모드로 전환
+        setWatchMode(false);
+        setWatchRunning(false);
+        requestAnimationFrame(() => {
+          t.startJourneyRun();
+        });
+        setAlert({
+          open: true,
+          title: "워치 연동 실패",
+          message: "폰 모드로 여정 러닝을 시작합니다",
+        });
+      }
+    } else {
+      // 폰 전용 모드: 기존 로직
+      requestAnimationFrame(() => {
+        console.log("[JourneyRunning] calling t.startJourneyRun() (phone mode)");
+        t.startJourneyRun();
+      });
+      // 탭바 숨김 즉시 반영 및 세션 플래그 저장
+      try {
+        await AsyncStorage.setItem(
+          "@running_session",
+          JSON.stringify({
+            isRunning: true,
+            sessionId: t.sessionId || `journey-${Date.now()}`,
+            startTime: Date.now(),
+          })
+        );
+      } catch {}
+      try {
+        emitRunningSession(true);
+      } catch {}
+    }
+
     // 알림 권한 요청은 비동기로 병렬 처리
     backgroundRunning.requestNotificationPermission().catch(() => {});
-  }, [t, backgroundRunning]);
+  }, [watchMode, t, backgroundRunning, journeyId]);
 
   // 러닝 상태 변화에 따라 탭바 상태 즉시 동기화(보조 안전장치)
   useEffect(() => {
+    const running = t.isRunning || watchRunning;
     try {
-      emitRunningSession(!!t.isRunning);
+      emitRunningSession(!!running);
     } catch {}
-  }, [t.isRunning]);
+  }, [t.isRunning, watchRunning]);
 
   // 랜드마크 마커 클릭 핸들러 - 스토리 페이지로 이동
   const handleLandmarkMarkerPress = useCallback(
@@ -517,11 +929,42 @@ export default function JourneyRunningScreen(
     setConfirmExit(true);
   }, [navigation, t, journeyTitle, backgroundRunning, journeyId]);
 
+  // 🔧 워치 모드일 때는 워치 데이터 우선 사용
+  const displayDistance = useMemo(() => {
+    if (watchMode && watchData?.distanceMeters != null) {
+      return watchData.distanceMeters / 1000; // 미터를 km로 변환
+    }
+    return t.distance;
+  }, [watchMode, watchData?.distanceMeters, t.distance]);
+
+  const displayElapsedSec = useMemo(() => {
+    if (watchMode && watchData?.durationSeconds != null) {
+      return watchData.durationSeconds;
+    }
+    return t.elapsedSec;
+  }, [watchMode, watchData?.durationSeconds, t.elapsedSec]);
+
+  const displayPace = useMemo(() => {
+    if (watchMode && watchData?.averagePaceSeconds != null) {
+      const paceMin = Math.floor(watchData.averagePaceSeconds / 60);
+      const paceSec = Math.floor(watchData.averagePaceSeconds % 60);
+      return `${paceMin}'${String(paceSec).padStart(2, "0")}"`;
+    }
+    return t.paceLabel;
+  }, [watchMode, watchData?.averagePaceSeconds, t.paceLabel]);
+
+  const displayKcal = useMemo(() => {
+    if (watchMode && watchData?.calories != null) {
+      return watchData.calories;
+    }
+    return t.kcal;
+  }, [watchMode, watchData?.calories, t.kcal]);
+
   const elapsedLabel = useMemo(() => {
-    const m = Math.floor(t.elapsedSec / 60);
-    const s = String(t.elapsedSec % 60).padStart(2, "0");
+    const m = Math.floor(displayElapsedSec / 60);
+    const s = String(displayElapsedSec % 60).padStart(2, "0");
     return `${m}:${s}`;
-  }, [t.elapsedSec]);
+  }, [displayElapsedSec]);
 
   // 진행률에 따른 여정 경로 상의 가상 위치 계산 (거리 기반으로 수정)
   const virtualLocation = useMemo(() => {
@@ -725,26 +1168,28 @@ export default function JourneyRunningScreen(
         onBindCenter={(fn) => (centerMapRef.current = fn)}
       />
 
-      {/* 날씨 위젯 */}
-      <View
-        style={{
-          position: "absolute",
-          top: Math.max(insets.top, 12) + 12,
-          left: 16,
-          zIndex: 10,
-        }}
-      >
-        <WeatherWidget
-          emoji={weather?.emoji}
-          condition={weather?.condition}
-          temperature={weather?.temperature}
-          recommendation={weather?.recommendation}
-          loading={weatherLoading}
-        />
-      </View>
+      {/* 날씨 위젯 - 카운트다운 중 숨김 */}
+      {!countdownVisible && (
+        <View
+          style={{
+            position: "absolute",
+            top: Math.max(insets.top, 12) + 12,
+            left: 16,
+            zIndex: 10,
+          }}
+        >
+          <WeatherWidget
+            emoji={weather?.emoji}
+            condition={weather?.condition}
+            temperature={weather?.temperature}
+            recommendation={weather?.recommendation}
+            loading={weatherLoading}
+          />
+        </View>
+      )}
 
       {/* 러닝 중이 아닐 때: 여정 진행률 카드 */}
-      {!t.isRunning && !t.isPaused && t.progressReady && (
+      {!t.isRunning && !t.isPaused && !watchRunning && t.progressReady && (
           <JourneyProgressCard
             progressPercent={t.progressPercent}
             currentDistanceKm={t.progressM / 1000}
@@ -773,27 +1218,24 @@ export default function JourneyRunningScreen(
         />
       )}
 
-      {/* 러닝 중일 때: 사이드 패널(통계) + 간소화된 진행률 */}
-      {(t.isRunning || t.isPaused) && (
-        <>
-          {/* 종료 확인 커스텀 팝업들 */}
-          <ConfirmAlert
-            visible={confirmExit}
-            title="여정 러닝 종료"
-            message="러닝을 종료하시겠습니까?"
-            onClose={() => setConfirmExit(false)}
-            onCancel={() => {
-              setConfirmExit(false);
-              if (t.isPaused) t.resume();
-            }}
-            onConfirm={() => {
-              setConfirmExit(false);
-              setConfirmSave(true);
-            }}
-            confirmText="종료"
-          />
-          <ConfirmAlert
-            visible={confirmSave}
+      {/* 종료 확인 & 저장 팝업 (조건부 렌더링 밖에 배치) */}
+      <ConfirmAlert
+        visible={confirmExit}
+        title="여정 러닝 종료"
+        message="러닝을 종료하시겠습니까?"
+        onClose={() => setConfirmExit(false)}
+        onCancel={() => {
+          setConfirmExit(false);
+          if (t.isPaused) t.resume();
+        }}
+        onConfirm={() => {
+          setConfirmExit(false);
+          setConfirmSave(true);
+        }}
+        confirmText="종료"
+      />
+      <ConfirmAlert
+        visible={confirmSave}
             title="기록 저장"
             message="러닝 기록을 저장하시겠습니까?"
             onClose={() => setConfirmSave(false)}
@@ -802,9 +1244,18 @@ export default function JourneyRunningScreen(
               try {
                 await backgroundRunning.stopForegroundService();
                 await backgroundRunning.clearSession();
-                await t.stop();
+                if (!watchMode) {
+                  await t.stop();
+                }
                 try { await AsyncStorage.removeItem('@running_session'); } catch {}
                 try { emitRunningSession(false); } catch {}
+
+                // 워치 모드 리셋
+                setWatchMode(false);
+                setWatchRunning(false);
+                setWatchData(null);
+                setWatchCompleteData(null);
+
                 navigation.navigate('JourneyRouteDetail', { id: journeyId });
               } catch (e) {
                 console.error('[JourneyRunning] 종료 실패:', e);
@@ -813,29 +1264,68 @@ export default function JourneyRunningScreen(
             onConfirm={async () => {
               setConfirmSave(false);
               try {
-                const avgPaceSec = t.distance > 0 && Number.isFinite(t.elapsedSec / t.distance)
-                  ? Math.floor(t.elapsedSec / Math.max(t.distance, 0.000001))
-                  : null;
-                const now = Math.floor(Date.now() / 1000);
-                const routePoints = (t.route ?? []).map((p, i) => ({ latitude: p.latitude, longitude: p.longitude, sequence: i + 1, t: now }));
-                await apiComplete({
-                  sessionId: t.sessionId as string,
-                  distanceMeters: Math.round(t.distance * 1000),
-                  durationSeconds: t.elapsedSec,
-                  averagePaceSeconds: avgPaceSec,
-                  calories: Math.round(t.kcal),
-                  routePoints,
-                  endedAt: Date.now(),
-                  title: journeyTitle,
-                });
-                try { if (t.distance >= 0.01) await awardEmblemByCode('DIST_10M'); } catch {}
-                await backgroundRunning.stopForegroundService();
-                await backgroundRunning.clearSession();
-                await t.completeJourneyRun();
-                navigation.navigate('JourneyRouteDetail', { id: journeyId });
-                await t.stop();
-                try { await AsyncStorage.removeItem('@running_session'); } catch {}
-                try { emitRunningSession(false); } catch {}
+                // 워치 모드인지 폰 모드인지 확인
+                if (watchMode && watchCompleteData) {
+                  // 워치 모드: watchCompleteData 사용 (watchSync.ts에서 이미 서버에 complete 전송됨)
+                  const distanceMeters =
+                    watchCompleteData.totalDistanceMeters ||
+                    watchCompleteData.distanceMeters ||
+                    0;
+                  const distanceKm = distanceMeters / 1000;
+
+                  // 워치 모드: 여정 진행률 업데이트
+                  const deltaM = distanceMeters;
+                  console.log("[JourneyRunning] 💾 워치 완료: 진행률 저장", {
+                    deltaM,
+                    distanceKm: (deltaM / 1000).toFixed(2),
+                  });
+
+                  try {
+                    await t.completeJourneyRun(); // 여정 진행률 저장
+                  } catch (e) {
+                    console.error('[JourneyRunning] 여정 진행률 저장 실패:', e);
+                  }
+
+                  await backgroundRunning.stopForegroundService();
+                  await backgroundRunning.clearSession();
+
+                  // 워치 모드 리셋
+                  setWatchMode(false);
+                  setWatchRunning(false);
+                  setWatchData(null);
+                  setWatchCompleteData(null);
+
+                  try { await AsyncStorage.removeItem('@running_session'); } catch {}
+                  try { emitRunningSession(false); } catch {}
+
+                  navigation.navigate('JourneyRouteDetail', { id: journeyId });
+                } else {
+                  // 폰 모드: 기존 로직
+                  const avgPaceSec = t.distance > 0 && Number.isFinite(t.elapsedSec / t.distance)
+                    ? Math.floor(t.elapsedSec / Math.max(t.distance, 0.000001))
+                    : null;
+                  const now = Math.floor(Date.now() / 1000);
+                  const routePoints = (t.route ?? []).map((p, i) => ({ latitude: p.latitude, longitude: p.longitude, sequence: i + 1, t: now }));
+                  await apiComplete({
+                    sessionId: t.sessionId as string,
+                    distanceMeters: Math.round(t.distance * 1000),
+                    durationSeconds: t.elapsedSec,
+                    averagePaceSeconds: avgPaceSec,
+                    calories: Math.round(t.kcal),
+                    routePoints,
+                    endedAt: Date.now(),
+                    title: journeyTitle,
+                  });
+                  try { if (t.distance >= 0.01) await awardEmblemByCode('DIST_10M'); } catch {}
+                  await backgroundRunning.stopForegroundService();
+                  await backgroundRunning.clearSession();
+                  await t.completeJourneyRun();
+                  await t.stop();
+                  try { await AsyncStorage.removeItem('@running_session'); } catch {}
+                  try { emitRunningSession(false); } catch {}
+
+                  navigation.navigate('JourneyRouteDetail', { id: journeyId });
+                }
               } catch (e) {
                 console.error('[JourneyRunning] 저장 종료 실패:', e);
                 Alert.alert('저장 실패', '네트워크 또는 서버 오류가 발생했어요.');
@@ -844,12 +1334,16 @@ export default function JourneyRunningScreen(
             confirmText="저장"
             cancelText="저장 안 함"
           />
+
+      {/* 러닝 중일 때: 사이드 패널(통계) + 간소화된 진행률 */}
+      {(t.isRunning || t.isPaused || watchRunning) && (
+        <>
           {/* 오른쪽 사이드 패널 (여정 러닝 전용) */}
           <RunStatsSidePanel
-            distanceKm={t.distance}
-            paceLabel={t.paceLabel}
-            kcal={t.kcal}
-            elapsedSec={t.elapsedSec}
+            distanceKm={displayDistance}
+            paceLabel={displayPace}
+            kcal={displayKcal}
+            elapsedSec={displayElapsedSec}
           />
 
           {/* 간소화된 진행률 표시 */}
@@ -916,7 +1410,7 @@ export default function JourneyRunningScreen(
       )}
 
       {/* 시작 버튼 (러닝 전) */}
-      {!t.isRunning && !t.isPaused && (
+      {!t.isRunning && !t.isPaused && !watchRunning && (
         <View
           style={[
             styles.startButtonContainer,
@@ -946,8 +1440,8 @@ export default function JourneyRunningScreen(
         </View>
       )}
 
-      {/* 러닝 제어 버튼 (러닝 중) - 위치 조정 */}
-      {t.isRunning && (
+      {/* 러닝 제어 버튼 (러닝 중) - 워치 모드가 아닐 때만 표시 */}
+      {t.isRunning && !watchMode && (
         <View style={styles.playControlsContainer}>
           <RunPlayControls
             isRunning={t.isRunning}
@@ -961,6 +1455,28 @@ export default function JourneyRunningScreen(
         </View>
       )}
 
+      {/* 워치 제어 중 메시지 + 디버그 정보 */}
+      {watchRunning && watchMode && (
+        <View style={styles.watchControlContainer}>
+          <Text style={styles.watchControlText}>
+            ⌚ 워치에서 제어 중
+          </Text>
+          {__DEV__ && t.watchData && (
+            <View style={{ backgroundColor: 'rgba(0,0,0,0.7)', padding: 8, borderRadius: 8, marginTop: 8 }}>
+              <Text style={{ color: '#fff', fontSize: 11 }}>
+                🐛 워치 데이터: {(t.watchData.distanceMeters / 1000).toFixed(3)}km
+              </Text>
+              <Text style={{ color: '#fff', fontSize: 11 }}>
+                시간: {Math.floor(t.watchData.durationSeconds / 60)}:{String(t.watchData.durationSeconds % 60).padStart(2, '0')}
+              </Text>
+              <Text style={{ color: '#fff', fontSize: 11 }}>
+                칼로리: {t.watchData.calories || 0}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
       {/* 카운트다운 오버레이 */}
       <CountdownOverlay
         visible={countdownVisible}
@@ -970,6 +1486,44 @@ export default function JourneyRunningScreen(
 
       {/* Emblem Celebration */}
       {celebrate.visible && <EmblemCelebration count={celebrate.count} />}
+
+      {/* 워치 연동 팝업 */}
+      <MessageAlert
+        visible={alert.open}
+        title={alert.title}
+        message={alert.message}
+        onClose={() => setAlert({ open: false })}
+      />
+
+      {/* 페이스 코치 알림 팝업 */}
+      {paceAlertVisible && (
+        <View style={styles.paceAlertOverlay} pointerEvents="none">
+          <Animated.View
+            style={[
+              styles.paceAlertBox,
+              {
+                opacity: paceAlertAnim,
+                transform: [{ translateY: paceAlertSlide }],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={["#FF6B6B", "#FF8E53"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.paceAlertGradient}
+            >
+              <View style={styles.paceAlertIconNew}>
+                <Ionicons name="flash" size={28} color="#fff" />
+              </View>
+              <View style={styles.paceAlertContent}>
+                <Text style={styles.paceAlertTitleNew}>페이스 코치</Text>
+                <Text style={styles.paceAlertMessageNew}>{paceAlertMessage}</Text>
+              </View>
+            </LinearGradient>
+          </Animated.View>
+        </View>
+      )}
 
       {/* 방명록 작성 모달 */}
       {selectedLandmark && (
@@ -1134,6 +1688,69 @@ export default function JourneyRunningScreen(
           }}
         />
       )}
+
+      {/* 스탬프 획득 성공 모달 */}
+      <Modal
+        visible={stampSuccessVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setStampSuccessVisible(false)}
+      >
+        <View style={styles.stampModalOverlay}>
+          <Animated.View
+            style={[
+              styles.stampModalContent,
+              {
+                transform: [
+                  { scale: stampModalScale },
+                  { translateY: stampModalBounce },
+                ],
+              },
+            ]}
+          >
+            <View style={{ marginBottom: 20 }}>
+              <Ionicons name="trophy-outline" size={80} color="#111827" />
+            </View>
+            <Text style={styles.stampModalTitle}>스탬프 획득!</Text>
+            <View style={styles.stampModalPreview}>
+              <Ionicons name="business-outline" size={64} color="#6B7280" />
+            </View>
+            <Text style={styles.stampModalText}>
+              <Text style={styles.stampModalBold}>{stampSuccessLandmark}</Text>{" "}
+              스탬프를 성공적으로 수집했습니다!{"\n"}방명록을 남겨보세요.
+            </Text>
+            <View style={{ flexDirection: "row", gap: 12, width: "100%" }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setStampSuccessVisible(false);
+                  setSelectedLandmark(null);
+                }}
+                style={[styles.stampModalBtn, { flex: 1 }]}
+              >
+                <View style={[styles.stampModalBtnGradient, { backgroundColor: "#f3f4f6" }]}>
+                  <Text style={[styles.stampModalBtnText, { color: "#666" }]}>나중에</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setStampSuccessVisible(false);
+                  setGuestbookModalVisible(true);
+                }}
+                style={[styles.stampModalBtn, { flex: 1 }]}
+              >
+                <LinearGradient
+                  colors={["#667eea", "#764ba2"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.stampModalBtnGradient}
+                >
+                  <Text style={styles.stampModalBtnText}>방명록 작성</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </SafeLayout>
   );
 }
@@ -1343,5 +1960,184 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
     marginTop: 8,
+  },
+  watchControlContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 110, // 스탬프 바텀시트 위
+    alignItems: "center",
+  },
+  watchControlText: {
+    fontSize: 14,
+    color: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(255,255,255,0.9)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  // 페이스 코치 관련 스타일
+  startButtonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  paceCoachToggle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: "rgba(107, 114, 128, 0.2)",
+  },
+  paceCoachToggleActive: {
+    backgroundColor: "#10B981",
+    borderColor: "#059669",
+  },
+  paceCoachTogglePressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.95 }],
+  },
+  disabledSlash: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 32,
+    height: 2,
+    backgroundColor: '#EF4444',
+    transform: [{ translateX: -16 }, { translateY: -1 }, { rotate: '-45deg' }],
+    borderRadius: 1,
+  },
+  paceAlertOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    paddingTop: 100,
+    zIndex: 999,
+  },
+  paceAlertBox: {
+    borderRadius: 20,
+    overflow: "hidden",
+    shadowColor: "#FF6B6B",
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+    width: "85%",
+    maxWidth: 340,
+  },
+  paceAlertGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    paddingVertical: 14,
+  },
+  paceAlertIconNew: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  paceAlertContent: {
+    flex: 1,
+  },
+  paceAlertTitleNew: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#fff",
+    marginBottom: 2,
+  },
+  paceAlertMessageNew: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "rgba(255, 255, 255, 0.9)",
+    lineHeight: 18,
+  },
+  paceAlertIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#FEF3C7",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  paceAlertTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#111827",
+    marginBottom: 6,
+  },
+  paceAlertMessage: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#F59E0B",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  // 스탬프 획득 성공 모달
+  stampModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stampModalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 28,
+    padding: 40,
+    paddingHorizontal: 32,
+    width: 340,
+    alignItems: "center",
+  },
+  stampModalTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#1a1a1a",
+    marginBottom: 12,
+  },
+  stampModalPreview: {
+    marginVertical: 20,
+    padding: 20,
+    backgroundColor: "#F5F7FA",
+    borderRadius: 20,
+    width: "100%",
+    alignItems: "center",
+  },
+  stampModalText: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 28,
+    lineHeight: 22,
+    textAlign: "center",
+  },
+  stampModalBold: {
+    fontWeight: "700",
+    color: "#1a1a1a",
+  },
+  stampModalBtn: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  stampModalBtnGradient: {
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  stampModalBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

@@ -352,7 +352,7 @@ export default function RecordScreen({ navigation }: any) {
                     marginTop: 2,
                   }}
                 >
-                  {distance > 0 ? distance.toFixed(1) : "0"}
+                  {distance > 0 ? (Math.floor(distance * 10) / 10).toFixed(1) : "0"}
                 </Text>
               </View>
             );
@@ -494,7 +494,7 @@ export default function RecordScreen({ navigation }: any) {
                     </View>
                     <View style={s.progressInfo}>
                       <Text style={s.progressText}>
-                        {(weekly?.totalDistance ?? 0).toFixed(1)} km
+                        {(Math.floor((weekly?.totalDistance ?? 0) * 10) / 10).toFixed(1)} km
                       </Text>
                       <Text style={s.progressPercent}>
                         {Math.round(
@@ -544,7 +544,7 @@ export default function RecordScreen({ navigation }: any) {
                   color="#667eea"
                 />
                 <Text style={s.statItemValue}>
-                  {(weekly.totalDistance ?? 0).toFixed(1)}
+                  {(Math.floor((weekly.totalDistance ?? 0) * 10) / 10).toFixed(1)}
                 </Text>
                 <Text style={s.statItemLabel}>거리 (km)</Text>
               </View>
@@ -711,7 +711,7 @@ export default function RecordScreen({ navigation }: any) {
                         style={{ marginRight: 4 }}
                       />
                       <Text style={s.recordStatText}>
-                        {(r.distanceKm ?? 0).toFixed(2)} km
+                        {(Math.floor((r.distanceKm ?? 0) * 100) / 100).toFixed(2)} km
                       </Text>
                     </View>
                     <View style={s.recordStat}>

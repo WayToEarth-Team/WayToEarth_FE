@@ -40,6 +40,7 @@ import {
   addStampCollectedListener,
   type StampCollectedPayload,
 } from "@utils/navEvents";
+import { STAMP_COLLECTION_TEST_MODE } from "@utils/featureFlags";
 
 type LandmarkLite = { id: number; name: string; distanceM?: number };
 
@@ -320,7 +321,30 @@ export default function StampBottomSheet({
   );
 
   const handleCollect = useCallback(async () => {
-    if (!progressId || !nextCollectable) return;
+    if (!nextCollectable) return;
+
+    // 테스트 모드: 백엔드 호출 없이 팝업만 표시
+    if (STAMP_COLLECTION_TEST_MODE) {
+      setLoading(true);
+      await new Promise((r) => setTimeout(r, 500)); // 로딩 시뮬레이션
+
+      const mockStamp: StampResponse = {
+        id: Date.now(),
+        landmark: {
+          id: nextCollectable.id,
+          name: nextCollectable.name,
+        },
+        collectedAt: new Date().toISOString(),
+      };
+
+      setStamps((prev) => [mockStamp, ...prev]);
+      onCollected?.(mockStamp);
+      showSuccessModal(mockStamp);
+      setLoading(false);
+      return;
+    }
+
+    if (!progressId) return;
     if (!currentLocation) {
       setError("현재 위치를 확인할 수 없습니다");
       return;

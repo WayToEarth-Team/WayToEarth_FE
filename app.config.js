@@ -22,7 +22,7 @@ export default {
     ios: {
       bundleIdentifier: "com.waytoearth", // ???�수 추�?
       supportsTablet: true,
-      googleServicesFile: "./GoogleService-Info.plist",
+      // googleServicesFile: "./GoogleService-Info.plist", // iOS 빌드 시에만 필요
       config: { googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY },
       infoPlist: {
         NSPhotoLibraryUsageDescription: "WayToEarth가 사진을 업로드하기 위해 갤러리 접근 권한이 필요합니다.",

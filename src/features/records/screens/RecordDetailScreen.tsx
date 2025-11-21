@@ -334,7 +334,7 @@ const RecordDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 <View style={s.statIconBg}>
                   <Ionicons name="navigate" size={24} color={runningColor} />
                 </View>
-                <Text style={s.statValue}>{distanceKm.toFixed(2)}</Text>
+                <Text style={s.statValue}>{(Math.floor(distanceKm * 100) / 100).toFixed(2)}</Text>
                 <Text style={s.statLabel}>거리 (km)</Text>
               </View>
 

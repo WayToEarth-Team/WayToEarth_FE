@@ -41,6 +41,20 @@ export default function TabBarAdapter({
         const s = JSON.parse(raw);
         // 탭바 숨김은 러닝 화면에서만 적용
         const isRunning = !!s?.isRunning;
+
+        // 오래된 세션 자동 정리 (6시간 이상 경과)
+        if (isRunning && s?.startTime) {
+          const elapsed = Date.now() - s.startTime;
+          const SIX_HOURS = 6 * 60 * 60 * 1000;
+          if (elapsed > SIX_HOURS) {
+            console.log("[TabBarAdapter] Clearing stale running session");
+            await AsyncStorage.removeItem("@running_session");
+            setHidden(false);
+            setLocked(false);
+            return;
+          }
+        }
+
         // 러닝 중엔 어떤 화면에서도 탭바 숨김
         setHidden(isRunning);
         setLocked(isRunning);
