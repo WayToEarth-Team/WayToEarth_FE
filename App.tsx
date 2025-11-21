@@ -48,6 +48,7 @@ import Profile from "@features/profile/screens/ProfileScreen";
 import ProfileEdit from "@features/profile/screens/ProfileEditScreen";
 
 import Emblem from "@features/profile/screens/EmblemCollectionScreen";
+import NotificationSettings from "@features/profile/screens/NotificationSettingsScreen";
 import Record from "@features/records/screens/RecordScreen";
 import RecordDetailScreen from "@features/records/screens/RecordDetailScreen";
 import AIFeedbackScreen from "@features/records/screens/AIFeedbackScreen";
@@ -261,6 +262,10 @@ export default function App() {
               />
               <Stack.Screen name="Emblem" component={Emblem} />
               <Stack.Screen name="ProfileEdit" component={ProfileEdit} />
+              <Stack.Screen
+                name="NotificationSettings"
+                component={NotificationSettings}
+              />
               <Stack.Screen name="CrewDetail" component={CrewDetailScreen} />
               <Stack.Screen name="CrewEdit" component={CrewEditScreen} />
               <Stack.Screen name="CrewRanking" component={CrewRankingScreen as any} />
