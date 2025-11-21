@@ -6,11 +6,8 @@ import { useLiveRunTracker } from "@features/running/hooks/useLiveRunTracker";
 import type { LatLng } from "@types/types";
 import type { JourneyId, Landmark } from "@types/journey";
 import * as userJourneysApi from "@utils/api/userJourneys";
-import { useLiveRunTracker } from "../useLiveRunTracker";
 import { useWatchRunning } from "../../src/hooks/useWatchRunning";
-import type { LatLng } from "../../types/types";
-import type { JourneyId, Landmark } from "../../types/journey";
-import * as userJourneysApi from "../../utils/api/userJourneys";
+import { STAMP_COLLECTION_TEST_MODE } from "@utils/featureFlags";
 
 type JourneyLandmark = {
   id: string;
@@ -160,6 +157,23 @@ export function useJourneyRunning({
     reachedLandmarks,
     onLandmarkReached,
   ]);
+
+  // 테스트 모드: 러닝 시작 5초 후 첫 번째 랜드마크 자동 도달
+  useEffect(() => {
+    if (!STAMP_COLLECTION_TEST_MODE) return;
+    if (!runTracker.isRunning) return;
+
+    const timer = setTimeout(() => {
+      const firstUnreached = landmarks.find((lm) => !reachedLandmarks.has(lm.id));
+      if (firstUnreached) {
+        console.log("[useJourneyRunning] 🧪 테스트 모드 - 강제 랜드마크 도달:", firstUnreached.name);
+        setReachedLandmarks((prev) => new Set(prev).add(firstUnreached.id));
+        onLandmarkReached?.(firstUnreached);
+      }
+    }, 5000); // 5초 후 트리거
+
+    return () => clearTimeout(timer);
+  }, [runTracker.isRunning, landmarks, reachedLandmarks, onLandmarkReached]);
 
   // 러닝 시작
   const startJourneyRun = useCallback(async () => {
