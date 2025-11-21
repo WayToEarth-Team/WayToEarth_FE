@@ -141,6 +141,8 @@ export default function LiveRunningScreen({
   const weatherAnimOpacity = useRef(new Animated.Value(0)).current;
 
   const toggleWeather = () => {
+    const nextExpanded = !weatherExpanded;
+
     LayoutAnimation.configureNext(
       LayoutAnimation.create(
         300,
@@ -148,10 +150,10 @@ export default function LiveRunningScreen({
         LayoutAnimation.Properties.opacity
       )
     );
-    setWeatherExpanded(!weatherExpanded);
+    setWeatherExpanded(nextExpanded);
 
     Animated.timing(weatherAnimOpacity, {
-      toValue: weatherExpanded ? 0 : 1,
+      toValue: nextExpanded ? 1 : 0,
       duration: 300,
       useNativeDriver: true,
     }).start();
@@ -1285,17 +1287,12 @@ export default function LiveRunningScreen({
                 )}
 
                 {/* 확장 시 표시: 추천 메시지 (기본 상태에서 숨김) */}
-                {weatherExpanded && weather?.recommendation && (
-                  <Animated.View
-                    style={[
-                      styles.topWeatherExpanded,
-                      { opacity: weatherAnimOpacity }
-                    ]}
-                  >
+                {weatherExpanded && (
+                  <View style={styles.topWeatherExpanded}>
                     <Text style={styles.weatherRecommendationText}>
-                      {weather.recommendation}
+                      {weather?.recommendation || "날씨 정보를 불러오는 중..."}
                     </Text>
-                  </Animated.View>
+                  </View>
                 )}
               </View>
             </TouchableOpacity>
