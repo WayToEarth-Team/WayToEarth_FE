@@ -50,6 +50,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { apiComplete, checkPaceCoach } from "@utils/api/running"; // ✅ 추가
 import { updateUserSettings } from "@utils/api/users";
 import { awardEmblemByCode } from "@utils/api/emblems";
+import { getNotificationSettings } from "@utils/api/notifications";
 import { useAuth } from "@contexts/AuthContext";
 import {
   initWatchSync,
@@ -876,9 +877,20 @@ export default function LiveRunningScreen({
 
         // Test mode: force celebration after run completion in watch mode as well
         if (EMBLEM_CELEBRATION_TEST_MODE) {
-          setCelebrate({ visible: true, count: 1 });
-          await new Promise((r) => setTimeout(r, 2500));
-          setCelebrate({ visible: false });
+          // 사용자 설정 확인
+          try {
+            const notifSettings = await getNotificationSettings();
+            if (notifSettings.emblemNotification && notifSettings.allNotificationsEnabled) {
+              setCelebrate({ visible: true, count: 1 });
+              await new Promise((r) => setTimeout(r, 2500));
+              setCelebrate({ visible: false });
+            }
+          } catch {
+            // 설정 조회 실패 시 기본으로 표시
+            setCelebrate({ visible: true, count: 1 });
+            await new Promise((r) => setTimeout(r, 2500));
+            setCelebrate({ visible: false });
+          }
         }
 
         // 러닝 종료 → 탭바 재표시
@@ -943,12 +955,22 @@ export default function LiveRunningScreen({
         });
 
         const runId = completeRes.runId;
-        if (EMBLEM_CELEBRATION_TEST_MODE) {
+
+        // 사용자 알림 설정 확인
+        let emblemEnabled = true;
+        try {
+          const notifSettings = await getNotificationSettings();
+          emblemEnabled = notifSettings.emblemNotification && notifSettings.allNotificationsEnabled;
+        } catch {
+          // 설정 조회 실패 시 기본으로 활성화
+        }
+
+        if (EMBLEM_CELEBRATION_TEST_MODE && emblemEnabled) {
           // Test mode: always show celebration after run completion
           setCelebrate({ visible: true, count: 1 });
           await new Promise((r) => setTimeout(r, 2500));
           setCelebrate({ visible: false });
-        } else {
+        } else if (!EMBLEM_CELEBRATION_TEST_MODE) {
           // Normal behavior: show only when emblem conditions are met
           const awards = (completeRes as any)?.data?.emblemAwardResult;
           // Extra client-side 10m emblem award (if backend didn't automatically)
