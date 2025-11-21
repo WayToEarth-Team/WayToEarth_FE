@@ -1,7 +1,7 @@
 // utils/api/emblems.ts
-import { client } from "./client";
+import { client } from "@utils/api/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { Achievement, Summary } from "../../types/types";
+import type { Achievement, Summary } from "@types/types";
 
 export async function getEmblemSummary(): Promise<Summary> {
   const { data } = await client.get("/v1/emblems/me/summary");

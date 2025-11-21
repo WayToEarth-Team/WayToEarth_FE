@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { Crew } from "../utils/api/crews";
-import { getMyCrew, listCrews, createCrew, joinCrew, type JoinResult, getCrewById } from "../utils/api/crews";
-import { getTopCrewsByDistance } from "../utils/api/crewStats";
-import type { TopCrewItemData } from "../types/Crew";
+import type { Crew } from "@utils/api/crews";
+import { getMyCrew, listCrews, createCrew, joinCrew, type JoinResult, getCrewById } from "@utils/api/crews";
+import { getTopCrewsByDistance } from "@utils/api/crewStats";
+import type { TopCrewItemData } from "@types/Crew";
 // Top crew mock data removed. If server provides a ranking API,
 // fetch and map it here; otherwise leave empty for now.
 

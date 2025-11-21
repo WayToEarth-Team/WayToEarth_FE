@@ -1,9 +1,9 @@
 // utils/api/stamps.ts
 // 스탬프 API: 수집/조회/확인/통계 (서버 규격에 맞춤)
-import { client } from "./client";
-import { emitStampCollected } from "../navEvents";
+import { client } from "@utils/api/client";
+import { emitStampCollected } from "@utils/navEvents";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { JourneyId } from "../../types/journey";
+import type { JourneyId } from "@types/journey";
 
 export type Coordinates = { latitude: number; longitude: number };
 

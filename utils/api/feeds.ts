@@ -1,4 +1,4 @@
-import { client } from "./client";
+import { client } from "@utils/api/client";
 import * as FileSystem from "expo-file-system";
 
 export type FeedItem = {

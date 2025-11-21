@@ -1,6 +1,6 @@
 ﻿// utils/api/users.ts
-import { client } from "./client";
-import type { UserInfo } from "../../types/types";
+import { client } from "@utils/api/client";
+import type { UserInfo } from "@types/types";
 
 // unwrap helper: many APIs return { success, data, ... }
 function unwrap<T = any>(resData: any): T {

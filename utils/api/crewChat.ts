@@ -1,4 +1,4 @@
-import { client } from "./client";
+import { client } from "@utils/api/client";
 
 export type CrewChatMessage = {
   messageId: number;

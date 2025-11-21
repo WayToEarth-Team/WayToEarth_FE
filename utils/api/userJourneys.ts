@@ -1,7 +1,7 @@
 // utils/api/userJourneys.ts
 // 서버 연동: Swagger 참고 (/v1/journeys/{journeyId}/start, /v1/journey-progress/user/{userId})
-import type { JourneyId, UserJourneyState } from "../../types/journey";
-import { client } from "./client";
+import type { JourneyId, UserJourneyState } from "@types/journey";
+import { client } from "@utils/api/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type ProgressResponse = {

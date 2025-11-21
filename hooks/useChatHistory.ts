@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import { client } from '../utils/api/client';
-import { normalizeTimestampToDate } from '../utils/datetime';
+import { client } from '@utils/api/client';
+import { normalizeTimestampToDate } from '@utils/datetime';
 
 export type ChatMessage = {
   id?: string;

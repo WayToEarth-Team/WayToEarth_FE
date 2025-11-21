@@ -1,7 +1,7 @@
 // utils/api/client.ts
 import axios, { AxiosResponse } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getApiBaseUrl } from "./config/api";
+import { getApiBaseUrl } from "@utils/config/api";
 
 const BASE_URL = getApiBaseUrl();
 

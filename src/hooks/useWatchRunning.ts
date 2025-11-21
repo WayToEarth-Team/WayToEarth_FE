@@ -2,7 +2,7 @@
 // React hook for watch running realtime updates
 
 import { useState, useEffect } from 'react';
-import { subscribeRealtimeUpdates, getRealtimeData, RealtimeRunningData } from '../modules/watchSync';
+import { subscribeRealtimeUpdates, getRealtimeData, RealtimeRunningData } from '@features/running/lib/watchSync';
 
 /**
  * 워치 러닝 실시간 데이터를 구독하는 React Hook

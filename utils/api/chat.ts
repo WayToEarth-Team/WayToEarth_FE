@@ -1,4 +1,4 @@
-import { client } from './client';
+import { client } from '@utils/api/client';
 
 // 백엔드 API 응답 타입 (실제 API 스펙에 맞춤)
 export interface ChatMessage {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { getCrewWeeklyCompare, getCrewWeeklyDaily } from "../utils/api/crewStats";
-import { getAllCrewMembers } from "../utils/api/crews";
+import { getCrewWeeklyCompare, getCrewWeeklyDaily } from "@utils/api/crewStats";
+import { getAllCrewMembers } from "@utils/api/crews";
 
 export type WeeklyItem = { label: string; thisWeek: number; lastWeek: number; name?: string };
 export type RankingItem = { rank: number; name: string; thisWeek: number; lastWeek: number; isUser?: boolean; imageUrl?: string | null; userId?: number };

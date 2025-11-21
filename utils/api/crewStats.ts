@@ -1,5 +1,5 @@
-import { client } from "./client";
-import type { TopCrewItemData } from "../../types/Crew";
+import { client } from "@utils/api/client";
+import type { TopCrewItemData } from "@types/Crew";
 
 export type CrewWeeklyCompareMember = {
   userId: number;

@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { ensureAccessToken, onAuthTokenChange, clearTokens } from '../utils/auth/tokenManager';
-import { getMyProfile, type UserProfile } from '../utils/api/users';
+import { ensureAccessToken, onAuthTokenChange, clearTokens } from '@utils/auth/tokenManager';
+import { getMyProfile, type UserProfile } from '@utils/api/users';
 
 type AuthContextValue = {
   user: UserProfile | null;

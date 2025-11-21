@@ -1,9 +1,9 @@
 // utils/api/journeyRoutes.ts
-import { client } from "./client";
-import { getMyProfile } from "./users";
-import * as userJourneys from "./userJourneys";
-import type { LandmarkSummary } from "../../types/landmark";
-import { getJourneyLandmarks } from "./landmarks";
+import { client } from "@utils/api/client";
+import { getMyProfile } from "@utils/api/users";
+import * as userJourneys from "@utils/api/userJourneys";
+import type { LandmarkSummary } from "@types/landmark";
+import { getJourneyLandmarks } from "@utils/api/landmarks";
 
 export type RouteId = string | number;
 

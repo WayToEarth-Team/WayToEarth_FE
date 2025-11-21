@@ -2,8 +2,8 @@
 import React, { createContext, useContext, ReactNode, useCallback, useEffect, useState } from "react";
 import * as Location from "expo-location";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getCurrentWeather } from "../utils/api/weather";
-import { ensureAccessToken, onAuthTokenChange } from "../utils/auth/tokenManager";
+import { getCurrentWeather } from "@utils/api/weather";
+import { ensureAccessToken, onAuthTokenChange } from "@utils/auth/tokenManager";
 
 export interface WeatherData {
   condition: string;

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { registerUser } from "../utils/api/users";
-import type { UserInfo } from "../types/types";
+import { registerUser } from "@utils/api/users";
+import type { UserInfo } from "@types/types";
 
 export default function useRegister() {
   const navigation = useNavigation();
