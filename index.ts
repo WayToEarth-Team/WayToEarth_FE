@@ -76,6 +76,24 @@ messagingInstance.setBackgroundMessageHandler(async (remoteMessage) => {
 try { migrateLegacyTokens(); } catch {}
 try { logStorageBackendOnce(); } catch {}
 
+// 앱 시작 시 오래된 러닝 세션 자동 정리 (비정상 종료 대응)
+(async () => {
+  try {
+    const raw = await AsyncStorage.getItem("@running_session");
+    if (raw) {
+      const session = JSON.parse(raw);
+      if (session?.isRunning && session?.startTime) {
+        const elapsed = Date.now() - session.startTime;
+        const SIX_HOURS = 6 * 60 * 60 * 1000;
+        if (elapsed > SIX_HOURS) {
+          console.log("[index] Clearing stale running session on app start");
+          await AsyncStorage.removeItem("@running_session");
+        }
+      }
+    }
+  } catch {}
+})();
+
 registerRootComponent(App);
 // Android foreground service registration for Notifee (required for asForegroundService)
 if (Platform.OS === "android" && notifee) {
