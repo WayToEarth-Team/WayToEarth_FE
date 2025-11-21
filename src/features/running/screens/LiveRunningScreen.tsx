@@ -47,19 +47,20 @@ import { emitRunningSession } from "@utils/navEvents";
 import { useWeather } from "@contexts/WeatherContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { apiComplete, checkPaceCoach } from "../utils/api/running"; // ✅ 추가
-import { updateUserSettings } from "../utils/api/users";
-import { awardEmblemByCode } from "../utils/api/emblems";
-import { useAuth } from "../contexts/AuthContext";
+import { apiComplete, checkPaceCoach } from "@utils/api/running"; // ✅ 추가
+import { updateUserSettings } from "@utils/api/users";
+import { awardEmblemByCode } from "@utils/api/emblems";
+import { useAuth } from "@contexts/AuthContext";
 import {
   initWatchSync,
   subscribeRealtimeUpdates,
   startRunOrchestrated,
   isWatchAvailable,
   type RealtimeRunningData,
-} from "../src/modules/watchSync";
-import { useWatchConnection } from "../src/hooks/useWatchConnection";
-import { showToast } from "../utils/toast";
+} from "@features/running/lib/watchSync";
+import { useWatchConnection } from "@features/running/hooks/useWatchConnection";
+import { showToast } from "@utils/toast";
+import { EMBLEM_CELEBRATION_TEST_MODE, PACE_COACH_TEST_MODE } from "@utils/featureFlags";
 
 export default function LiveRunningScreen({
   navigation,
@@ -82,6 +83,8 @@ export default function LiveRunningScreen({
   );
   const [lastCheckedBucket, setLastCheckedBucket] = useState(0); // 페이스 체크 간격 버킷
   const [paceCoachMessage, setPaceCoachMessage] = useState<string | null>(null);
+  const paceAlertAnim = useRef(new Animated.Value(0)).current;
+  const paceAlertSlide = useRef(new Animated.Value(-100)).current;
 
   // 테스트/조정 가능: km 단위 간격 (0.005km = 5m)
   const PACE_CHECK_INTERVAL_KM = 0.5; // 500m 단위
@@ -238,6 +241,55 @@ export default function LiveRunningScreen({
       checkPaceCoachIfNeeded(currentBucket, displayDistanceKm);
     }
   }, [watchMode, watchRunning, t.isRunning, t.isPaused, isPaceCoachEnabled, displayDistanceKm, lastCheckedBucket, checkPaceCoachIfNeeded, PACE_CHECK_INTERVAL_KM]);
+
+  // 테스트 모드: 러닝 시작 7초 후 페이스 코치 알림 표시
+  useEffect(() => {
+    if (!PACE_COACH_TEST_MODE) return;
+    const running = watchMode ? watchRunning : t.isRunning;
+    if (!running) return;
+
+    const timer = setTimeout(() => {
+      console.log("[PaceCoach] 🧪 테스트 모드 - 페이스 알림 표시");
+      setPaceCoachMessage("페이스가 목표보다 느립니다.\n조금 더 속도를 올려보세요! 💪");
+
+      // 슬라이드 인 애니메이션
+      paceAlertSlide.setValue(-100);
+      paceAlertAnim.setValue(0);
+      Animated.parallel([
+        Animated.spring(paceAlertSlide, {
+          toValue: 0,
+          useNativeDriver: true,
+          stiffness: 300,
+          damping: 20,
+        }),
+        Animated.timing(paceAlertAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // 3초 후 슬라이드 아웃
+      setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(paceAlertSlide, {
+            toValue: -100,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(paceAlertAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setPaceCoachMessage(null);
+        });
+      }, 3000);
+    }, 7000);
+
+    return () => clearTimeout(timer);
+  }, [watchMode, watchRunning, t.isRunning, paceAlertSlide, paceAlertAnim]);
 
   // 날씨 정보 (이 화면에서만 위치/날씨 활성화)
   const {
@@ -1052,9 +1104,31 @@ export default function LiveRunningScreen({
       />
 
       {paceCoachMessage && (
-        <View style={styles.paceCoachBanner}>
-          <Text style={styles.paceCoachBannerTitle}>페이스 알림</Text>
-          <Text style={styles.paceCoachBannerText}>{paceCoachMessage}</Text>
+        <View style={styles.paceAlertOverlay} pointerEvents="none">
+          <Animated.View
+            style={[
+              styles.paceAlertBox,
+              {
+                opacity: paceAlertAnim,
+                transform: [{ translateY: paceAlertSlide }],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={["#FF6B6B", "#FF8E53"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.paceAlertGradient}
+            >
+              <View style={styles.paceAlertIconNew}>
+                <Ionicons name="flash" size={28} color="#fff" />
+              </View>
+              <View style={styles.paceAlertContent}>
+                <Text style={styles.paceAlertTitleNew}>페이스 코치</Text>
+                <Text style={styles.paceAlertMessageNew}>{paceCoachMessage}</Text>
+              </View>
+            </LinearGradient>
+          </Animated.View>
         </View>
       )}
       <MapRoute
@@ -1607,5 +1681,56 @@ const styles = StyleSheet.create({
   paceCoachBannerText: {
     fontSize: 12,
     color: "#7C2D12",
+  },
+  // 새로운 페이스 알림 스타일
+  paceAlertOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    paddingTop: 100,
+    zIndex: 999,
+  },
+  paceAlertBox: {
+    borderRadius: 20,
+    overflow: "hidden",
+    shadowColor: "#FF6B6B",
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+    width: "85%",
+    maxWidth: 340,
+  },
+  paceAlertGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    paddingVertical: 14,
+  },
+  paceAlertIconNew: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  paceAlertContent: {
+    flex: 1,
+  },
+  paceAlertTitleNew: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#fff",
+    marginBottom: 2,
+  },
+  paceAlertMessageNew: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "rgba(255, 255, 255, 0.9)",
+    lineHeight: 18,
   },
 });
