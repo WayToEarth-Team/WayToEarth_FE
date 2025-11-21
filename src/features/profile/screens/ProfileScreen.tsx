@@ -437,6 +437,15 @@ export default function ProfileScreen({
               <Text style={styles.menuTitle}>기본 정보 관리</Text>
               <Text style={styles.chevron}>›</Text>
             </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity
+              style={styles.menuItem}
+              activeOpacity={0.6}
+              onPress={() => navigation.navigate("NotificationSettings")}
+            >
+              <Text style={styles.menuTitle}>알림 설정</Text>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.menuSpacer} />
