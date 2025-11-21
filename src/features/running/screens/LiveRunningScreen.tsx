@@ -618,6 +618,9 @@ export default function LiveRunningScreen({
   const handleRunningStart = useCallback(() => {
     console.log("[LiveRunning] start pressed -> checking watch connection");
 
+    // 카운트다운 시작 시 즉시 탭바 숨기기
+    emitRunningSession(true);
+
     // 새 러닝마다 페이스 코치 상태 초기화
     setLastCheckedBucket(0);
     setPaceCoachMessage(null);
@@ -1251,8 +1254,8 @@ export default function LiveRunningScreen({
         }}
       />
 
-      {/* 상단 위치 + 날씨 - 러닝 중이 아닐 때만 표시 */}
-      {!t.isRunning && !watchRunning && (
+      {/* 상단 위치 + 날씨 - 러닝 중이 아닐 때, 카운트다운 중이 아닐 때만 표시 */}
+      {!t.isRunning && !watchRunning && !countdownVisible && (
         <>
           {/* 상단 중앙: 위치명 + 온도 + 날씨 아이콘 (확장/축소 애니메이션) */}
           {(locationName || weather?.temperature !== undefined) && (
