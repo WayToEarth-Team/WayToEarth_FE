@@ -13,9 +13,8 @@ import {
   Alert,
   Platform,
   Keyboard,
-  Animated,
-  Easing,
   Image,
+  KeyboardAvoidingView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ensureAccessToken, getAccessToken } from "@utils/auth/tokenManager";
@@ -52,15 +51,6 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
   const { activeTab, onTabPress } = useBottomNav("crew");
   const [token, setToken] = useState<string | null>(null);
   const [kbVisible, setKbVisible] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [inputHeight, setInputHeight] = useState(72);
-  const inputBottomAnim = useRef(new Animated.Value(0)).current;
-  const spacerHeightAnim = useRef(new Animated.Value(0)).current;
-  const ESTIMATED_ANDROID_KB = 280; // dp, 즉시 반응용 임시 높이
-  const prevTargetsRef = useRef({ bottom: 0, spacer: 0 });
-  const justFocusedRef = useRef(false);
-  const predictedRef = useRef<{ active: boolean; at: number }>({ active: false, at: 0 });
-  const USE_SYSTEM_PAN = false; // 양 플랫폼 모두 커스텀 애니메이션 사용
   const [avatarByNickname, setAvatarByNickname] = useState<Record<string, string | null>>({});
   const avatarFetchSetRef = useRef<Set<string>>(new Set());
 
@@ -115,22 +105,15 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
     };
   }, []);
 
-  // 키보드 표시/숨김 상태 추적 → 입력창 하단 여백 동적 조정
+  // 키보드 표시/숨김 상태 추적
   useEffect(() => {
     const show = Keyboard.addListener(
       Platform.select({ ios: "keyboardWillShow", android: "keyboardDidShow" }) || "keyboardDidShow",
-      (e: any) => {
-        setKbVisible(true);
-        const h = Number(e?.endCoordinates?.height || e?.end?.height || 0);
-        if (Number.isFinite(h)) setKeyboardHeight(h);
-      }
+      () => setKbVisible(true)
     );
     const hide = Keyboard.addListener(
       Platform.select({ ios: "keyboardWillHide", android: "keyboardDidHide" }) || "keyboardDidHide",
-      () => {
-        setKbVisible(false);
-        setKeyboardHeight(0);
-      }
+      () => setKbVisible(false)
     );
     return () => {
       try { show.remove(); hide.remove(); } catch {}
@@ -142,12 +125,10 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
     if (kbVisible && atBottomRef.current) {
       const t = setTimeout(() => {
         try { scrollViewRef.current?.scrollToEnd({ animated: true }); } catch {}
-      }, 50);
+      }, 100);
       return () => clearTimeout(t);
     }
-  }, [kbVisible, keyboardHeight]);
-
-  // 키보드 이벤트에는 스크롤 자동 이동을 걸지 않고, 포커스/신규 메시지에서만 처리
+  }, [kbVisible]);
 
   useEffect(() => {
     let alive = true;
@@ -299,56 +280,6 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
     } catch { return false; }
   };
 
-  // 탭바/안전영역 기반 하단 오프셋 계산
-  // 입력창 절대 배치 및 스크롤 패딩 계산
-  const bottomNavHeight = BOTTOM_NAV_MIN_HEIGHT + (insets.bottom || 0);
-  const LIFT_WHEN_CLOSED = 12; // 기본 상태에서 더 위로 띄우기
-  const LIFT_WHEN_OPEN = 8; // 키보드와 살짝 간격을 둬 충돌 느낌 방지
-
-  // 입력칸/여백을 부드럽게 애니메이션 (양 플랫폼 동일 커브/타이밍 적용)
-  useEffect(() => {
-    const targetBottom = keyboardHeight > 0
-      ? keyboardHeight + LIFT_WHEN_OPEN
-      : bottomNavHeight + LIFT_WHEN_CLOSED;
-    // 🔧 수정: 스페이서는 입력창 bottom 위치 + 입력창 높이 + 여백
-    const targetSpacer = targetBottom + inputHeight + 16;
-    const duration = 280; // 부드럽고 꾸덕한 타이밍
-    const ease = Easing.out(Easing.cubic);
-    const prev = prevTargetsRef.current;
-    const deltaB = Math.abs(targetBottom - prev.bottom);
-    const deltaS = Math.abs(targetSpacer - prev.spacer);
-    const now = Date.now();
-    const predictedRecently = predictedRef.current.active && now - predictedRef.current.at < 800;
-    // 항상 기존 애니메이션 중단
-    try { inputBottomAnim.stopAnimation(); spacerHeightAnim.stopAnimation(); } catch {}
-    if (predictedRecently) {
-      // 예측 → 실측 보정: 차이가 크면 짧게 부드럽게 수렴, 작으면 즉시 고정
-      const settleDur = 120;
-      if (deltaB > 8) {
-        Animated.timing(inputBottomAnim, { toValue: targetBottom, duration: settleDur, easing: ease, useNativeDriver: false }).start();
-      } else {
-        inputBottomAnim.setValue(targetBottom);
-      }
-      if (deltaS > 8) {
-        Animated.timing(spacerHeightAnim, { toValue: targetSpacer, duration: settleDur, easing: ease, useNativeDriver: false }).start();
-      } else {
-        spacerHeightAnim.setValue(targetSpacer);
-      }
-      predictedRef.current.active = false;
-    } else {
-      if (deltaB < 10) {
-        inputBottomAnim.setValue(targetBottom);
-      } else {
-        Animated.timing(inputBottomAnim, { toValue: targetBottom, duration, easing: ease, useNativeDriver: false }).start();
-      }
-      if (deltaS < 10) {
-        spacerHeightAnim.setValue(targetSpacer);
-      } else {
-        Animated.timing(spacerHeightAnim, { toValue: targetSpacer, duration, easing: ease, useNativeDriver: false }).start();
-      }
-    }
-    prevTargetsRef.current = { bottom: targetBottom, spacer: targetSpacer };
-  }, [keyboardHeight, inputHeight, bottomNavHeight]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -438,7 +369,11 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
         </View>
       )}
 
-      <View style={styles.chatContainer}>
+      <KeyboardAvoidingView
+        style={styles.chatContainer}
+        behavior="padding"
+        keyboardVerticalOffset={-insets.bottom - 20}
+      >
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}
@@ -617,65 +552,40 @@ export default function ChatScreen({ route }: any = { route: { params: {} } }) {
               );
             })
           )}
-          {/* 하단 공간 확보: Android는 시스템 pan에 위임하여 스페이서 제거 */}
-          <Animated.View style={{ height: spacerHeightAnim }} />
         </ScrollView>
 
-        <Animated.View
-          style={[
-            styles.inputContainer,
-            {
-              // 절대 배치 + 애니메이션 bottom (양 플랫폼 동일)
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              bottom: (inputBottomAnim as any),
-              zIndex: 200,
-              elevation: 8,
-              paddingBottom: Platform.OS === "ios" ? 8 : 12,
-            },
-          ]}
-          onLayout={(e) => {
-            const h = e.nativeEvent.layout.height;
-            if (h && Math.abs(h - inputHeight) > 1) setInputHeight(h);
-          }}
-        >
+        <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
           <View style={styles.inputWrapper}>
             <TextInput
               style={styles.textInput}
-              placeholder="메시지를 입력하세요"
-              placeholderTextColor="#94a3b8"
+              placeholder="메시지 입력..."
+              placeholderTextColor="#9ca3af"
               value={message}
               onChangeText={setMessage}
-              multiline={false}
+              multiline
+              maxLength={500}
               editable={isConnected}
               onSubmitEditing={handleSend}
               returnKeyType="send"
               onFocus={() => {
-                // 포커스 직후에는 시스템/실측 이벤트에 의한 단일 애니만 사용해 반동 최소화
-                justFocusedRef.current = true;
-                setTimeout(() => { justFocusedRef.current = false; }, 260);
+                setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
               }}
             />
-            {message.trim().length > 0 && (
-              <TouchableOpacity
-                style={styles.sendButton}
-                onPress={handleSend}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="send" size={20} color="#ffffff" />
-              </TouchableOpacity>
-            )}
-            {message.trim().length === 0 && (
-              <View style={styles.emptyButtonSpace} />
-            )}
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                { opacity: message.trim().length > 0 ? 1 : 0.4 }
+              ]}
+              onPress={handleSend}
+              activeOpacity={0.7}
+              disabled={message.trim().length === 0}
+            >
+              <Ionicons name="paper-plane" size={18} color="#ffffff" />
+            </TouchableOpacity>
           </View>
-        </Animated.View>
-      </View>
+        </View>
+      </KeyboardAvoidingView>
 
-      {!(Platform.OS === 'android' && kbVisible) && (
-        <BottomNavigation activeTab={activeTab} onTabPress={onTabPress} />
-      )}
     </SafeAreaView>
   );
 }
@@ -831,42 +741,42 @@ const styles = StyleSheet.create({
     backgroundColor: "#e5e7eb",
   },
   inputContainer: {
-    paddingHorizontal: 12,
-    paddingTop: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
     backgroundColor: "#ffffff",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#e2e8f0",
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
   },
   inputWrapper: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f1f5f9",
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e7eb",
-    minHeight: 40,
+    alignItems: "flex-end",
+    backgroundColor: "#f8fafc",
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    minHeight: 44,
+    maxHeight: 120,
   },
   textInput: {
     flex: 1,
-    color: "#1e293b",
-    fontSize: 14,
+    color: "#1f2937",
+    fontSize: 15,
     fontWeight: "400",
-    paddingVertical: 6,
-    maxHeight: 100,
+    paddingVertical: 4,
+    lineHeight: 20,
+    maxHeight: 80,
   },
   sendButton: {
-    backgroundColor: "#667eea",
-    borderRadius: 16,
-    width: 32,
-    height: 32,
+    backgroundColor: "#3b82f6",
+    borderRadius: 18,
+    width: 36,
+    height: 36,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: 8,
-  },
-  emptyButtonSpace: {
-    width: 8,
+    marginLeft: 10,
   },
   connectionStatus: {
     backgroundColor: "#fef3c7",

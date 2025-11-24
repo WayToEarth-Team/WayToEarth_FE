@@ -235,6 +235,9 @@ export default function LiveRunningScreen({
   }, [isPaceCoachEnabled, lastCheckedBucket, watchMode, watchData, t.sessionId, displayElapsedSec, displayDistanceKm]);
 
   useEffect(() => {
+    // 테스트 모드면 실제 API 호출 스킵
+    if (PACE_COACH_TEST_MODE) return;
+
     const running = watchMode ? watchRunning : t.isRunning;
     const paused = watchMode ? false : t.isPaused;
     if (!running || paused || !isPaceCoachEnabled) return;
@@ -245,15 +248,53 @@ export default function LiveRunningScreen({
     }
   }, [watchMode, watchRunning, t.isRunning, t.isPaused, isPaceCoachEnabled, displayDistanceKm, lastCheckedBucket, checkPaceCoachIfNeeded, PACE_CHECK_INTERVAL_KM]);
 
-  // 테스트 모드: 러닝 시작 7초 후 페이스 코치 알림 표시
+  // 테스트 모드: 500m 간격으로 페이스 코치 알림 표시
+  const [testLastBucket, setTestLastBucket] = useState(0);
+  const testPreviousPace = useRef(330); // 가상의 이전 기록 페이스 (5분 30초/km)
+
   useEffect(() => {
     if (!PACE_COACH_TEST_MODE) return;
     const running = watchMode ? watchRunning : t.isRunning;
-    if (!running) return;
+    const paused = watchMode ? false : t.isPaused;
+    if (!running || paused) return;
 
-    const timer = setTimeout(() => {
-      console.log("[PaceCoach] 🧪 테스트 모드 - 페이스 알림 표시");
-      setPaceCoachMessage("페이스가 목표보다 느립니다.\n조금 더 속도를 올려보세요! 💪");
+    const currentBucket = Math.floor(displayDistanceKm / PACE_CHECK_INTERVAL_KM);
+    if (currentBucket > testLastBucket && currentBucket > 0) {
+      setTestLastBucket(currentBucket);
+
+      // 현재 페이스 계산
+      let currentPaceSeconds = 0;
+      if (displayElapsedSec > 0 && displayDistanceKm > 0) {
+        currentPaceSeconds = Math.floor(displayElapsedSec / displayDistanceKm);
+      }
+
+      // 가상의 이전 기록과 비교
+      const prevPace = testPreviousPace.current;
+      const diff = currentPaceSeconds - prevPace;
+      const absDiff = Math.abs(diff);
+
+      let message = "";
+      const formatPace = (sec: number) => `${Math.floor(sec / 60)}분 ${sec % 60}초`;
+
+      if (diff > 15) {
+        // 15초 이상 느림
+        message = `현재 페이스 ${formatPace(currentPaceSeconds)}\n이전 기록보다 ${absDiff}초 느립니다.\n조금 더 속도를 올려보세요! 💪`;
+      } else if (diff > 5) {
+        // 5~15초 느림
+        message = `현재 페이스 ${formatPace(currentPaceSeconds)}\n이전 기록보다 ${absDiff}초 느립니다.\n페이스를 유지해보세요 🏃`;
+      } else if (diff >= -5) {
+        // ±5초 이내 (유지)
+        message = `현재 페이스 ${formatPace(currentPaceSeconds)}\n좋아요! 이전 기록과 비슷한 페이스입니다 👍`;
+      } else if (diff >= -15) {
+        // 5~15초 빠름
+        message = `현재 페이스 ${formatPace(currentPaceSeconds)}\n이전 기록보다 ${absDiff}초 빠릅니다!\n잘하고 있어요 🔥`;
+      } else {
+        // 15초 이상 빠름
+        message = `현재 페이스 ${formatPace(currentPaceSeconds)}\n이전 기록보다 ${absDiff}초 빠릅니다!\n훌륭해요! 🚀`;
+      }
+
+      console.log(`[PaceCoach] 🧪 테스트 모드 - ${currentBucket * 0.5}km 지점, 현재: ${currentPaceSeconds}초, 이전: ${prevPace}초`);
+      setPaceCoachMessage(message);
 
       // 슬라이드 인 애니메이션
       paceAlertSlide.setValue(-100);
@@ -272,7 +313,7 @@ export default function LiveRunningScreen({
         }),
       ]).start();
 
-      // 3초 후 슬라이드 아웃
+      // 4초 후 슬라이드 아웃
       setTimeout(() => {
         Animated.parallel([
           Animated.timing(paceAlertSlide, {
@@ -288,11 +329,17 @@ export default function LiveRunningScreen({
         ]).start(() => {
           setPaceCoachMessage(null);
         });
-      }, 3000);
-    }, 7000);
+      }, 4000);
+    }
+  }, [watchMode, watchRunning, t.isRunning, t.isPaused, displayDistanceKm, displayElapsedSec, testLastBucket, paceAlertSlide, paceAlertAnim]);
 
-    return () => clearTimeout(timer);
-  }, [watchMode, watchRunning, t.isRunning, paceAlertSlide, paceAlertAnim]);
+  // 러닝 종료 시 테스트 버킷 리셋
+  useEffect(() => {
+    const running = watchMode ? watchRunning : t.isRunning;
+    if (!running) {
+      setTestLastBucket(0);
+    }
+  }, [watchMode, watchRunning, t.isRunning]);
 
   // 날씨 정보 (이 화면에서만 위치/날씨 활성화)
   const {
